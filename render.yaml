@@ -21,6 +21,8 @@ services:
           property: connectionString
       - key: AI_PROVIDER
         value: stub
+      - key: CORS_ORIGINS
+        value: https://crypto-investor-web.onrender.com
       - key: PYTHONUNBUFFERED
         value: "1"
 

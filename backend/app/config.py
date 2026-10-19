@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     alert_email_from: str = "alerts@localhost"
     alert_email_to: str = ""
 
+    # CORS: comma-separated list of allowed frontend origins.
+    # Default covers local dev and the Render production frontend.
+    cors_origins: str = "http://localhost:3000,https://crypto-investor-web.onrender.com"
+
     # AI assistant model (Phase 7+). Default is the local stub (no network,
     # answers labeled DEMO). Set ai_provider=openai-compatible plus the
     # three vars below to use a real OpenAI-compatible endpoint. The key
