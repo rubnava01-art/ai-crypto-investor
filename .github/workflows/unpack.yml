@@ -1,0 +1,16 @@
+name: Unpack source
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git ls-files | grep -v '^ai-crypto-investor.zip$' | grep -v '^\.github/workflows/' | xargs -r git rm -q
+          unzip -o -q ai-crypto-investor.zip
+          rm ai-crypto-investor.zip
+          git add -A ':!.github/workflows'
+          git -c user.name="github-actions" -c user.email="github-actions@github.com" commit -m "Unpack AI Crypto Investor source"
+          git push
