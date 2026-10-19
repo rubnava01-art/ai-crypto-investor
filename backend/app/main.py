@@ -28,26 +28,28 @@ def seed_demo_data() -> None:
                     is_admin=True,
                 )
             )
-        if db.query(StrategyVersion).count() == 0:
-            db.add(
-                StrategyVersion(
-                    name="trend-momentum",
-                    version="0.1.0",
-                    config_json={
-                        "timeframe": "1h",
-                        "symbols": ["BTC/USD", "ETH/USD"],
-                        "max_trades_per_day": 3,
-                    },
-                    status="draft",
-                    notes="DEMO skeleton — real strategy logic arrives in Phase 3.",
-                )
+        sv = db.query(StrategyVersion).order_by(StrategyVersion.id).first()
+        if sv is None:
+            sv = StrategyVersion(
+                name="trend-momentum",
+                version="0.1.0",
+                config_json={
+                    "timeframe": "1h",
+                    "symbols": ["BTC/USD", "ETH/USD"],
+                    "max_trades_per_day": 3,
+                },
+                status="draft",
+                notes="DEMO skeleton — real strategy logic arrives in Phase 3.",
             )
+            db.add(sv)
+            db.flush()  # populate sv.id (never assume it is 1: the sequence may
+            # have advanced after a rolled-back insert, e.g. on Postgres)
         if db.query(Signal).count() == 0:
             now = dt.datetime.now(dt.timezone.utc)
             db.add_all(
                 [
                     Signal(
-                        strategy_version_id=1,
+                        strategy_version_id=sv.id,
                         symbol="BTC/USD",
                         side="hold",
                         reason="DEMO: waiting for real market data (Phase 2).",
@@ -55,7 +57,7 @@ def seed_demo_data() -> None:
                         created_at=now,
                     ),
                     Signal(
-                        strategy_version_id=1,
+                        strategy_version_id=sv.id,
                         symbol="ETH/USD",
                         side="hold",
                         reason="DEMO: waiting for real market data (Phase 2).",
