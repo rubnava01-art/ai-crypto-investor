@@ -30,6 +30,8 @@ services:
     runtime: docker
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
+    dockerfileArgs:
+      NEXT_PUBLIC_API_URL: https://crypto-investor-api.onrender.com
     plan: free
     healthCheckPath: /
     envVars:
