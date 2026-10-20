@@ -289,6 +289,7 @@ export default function DashboardPage() {
         {isAdmin && (
           <InvestorPanel
             mode={sim?.current ?? "simulation"}
+            realEnabled={sim?.real_enabled ?? false}
             equityUsd={balances ? Number(balances.equity_usd) : null}
             onExecuted={load}
           />
@@ -337,8 +338,9 @@ export default function DashboardPage() {
                 ))}
               </select>
               <p className="mt-2 text-xs text-zinc-500">
-                Real mode {sim.real_enabled ? "enabled" : "disabled"} — switching to real requires
-                backend approval.
+                Modo real {sim.real_enabled ? "ACTIVO en el servidor" : "apagado en el servidor"} —
+                lo enciende solo el dueño con las llaves de Kraken (sin permiso de retiros) y el
+                interruptor del servidor.
                 {!isAdmin && " Cambiar el modo es solo del administrador."}
               </p>
             </div>

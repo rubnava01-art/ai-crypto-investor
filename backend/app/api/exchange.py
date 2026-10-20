@@ -115,3 +115,50 @@ def register_connection(
     db.add(conn)
     db.commit()
     return {"id": conn.id, "exchange": conn.exchange, "label": conn.label}
+
+
+class LiveBalanceResponse(BaseModel):
+    connected: bool
+    exchange: str = "kraken"
+    real_trading_enabled: bool = False
+    balances: dict = {}
+    detail: str = ""
+
+
+@router.get("/live", response_model=LiveBalanceResponse)
+def live_balance(user: User = Depends(require_admin)):
+    """Validate the owner's Kraken keys (env only) with a read-only balance
+    call. Never returns or logs key material. Admin only."""
+    from app.config import settings
+
+    if not ((settings.kraken_api_key or "").strip()
+            and (settings.kraken_api_secret or "").strip()):
+        return LiveBalanceResponse(
+            connected=False,
+            real_trading_enabled=settings.real_trading_enabled,
+            detail="Kraken keys not configured on the server yet.",
+        )
+    try:
+        from app.execution.engine import _real_exchange
+
+        ex = _real_exchange()
+        raw = ex.fetch_balance()
+        totals = raw.get("total") or {}
+        balances = {
+            cur: str(amt)
+            for cur, amt in totals.items()
+            if amt and float(amt) > 0
+        }
+        return LiveBalanceResponse(
+            connected=True,
+            real_trading_enabled=settings.real_trading_enabled,
+            balances=balances,
+            detail="Keys accepted by Kraken. Balances are read live; "
+                   "the key must have NO withdrawal permission.",
+        )
+    except Exception as e:  # noqa: BLE001 - report a clean reason, never secrets
+        return LiveBalanceResponse(
+            connected=False,
+            real_trading_enabled=settings.real_trading_enabled,
+            detail=f"Kraken rejected the keys or is unreachable: {type(e).__name__}",
+        )

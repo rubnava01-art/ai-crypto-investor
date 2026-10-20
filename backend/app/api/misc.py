@@ -85,9 +85,19 @@ def set_mode(
     db: Session = Depends(get_db),
 ):
     if payload.mode == "real":
-        # HARD-DISABLED in Phase 1. Phase 8 requires 30d paper + written approval.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+        # Phase 8: the owner gave explicit written confirmation on 2026-10-20
+        # (ahead of the original 30-day paper schedule). Real mode additionally
+        # requires the server flag + Kraken keys, both set by the owner in the
+        # hosting dashboard — never from this API.
+        if not settings.real_trading_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Real mode is locked on the server (REAL_TRADING_ENABLED off).",
+            )
+        if not ((settings.kraken_api_key or "").strip()
+                and (settings.kraken_api_secret or "").strip()):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
             detail="Real trading is disabled. It requires Phase 8 criteria and explicit written authorization.",
         )
     old = state.simulation_mode
@@ -138,7 +148,9 @@ def create_order(
 ):
     """Create + execute an order. Requires Idempotency-Key header.
 
-    Real mode is rejected (403). Simulation/paper fill instantly at market.
+    Simulation/paper fill instantly at market. Real mode executes on Kraken
+    only with the server flag on + keys configured (Phase 8, owner-confirmed
+    2026-10-20) and is bounded by the $20 cumulative hard cap.
     The server-side risk guard runs before anything is created.
     """
     from decimal import Decimal as _D
@@ -162,12 +174,19 @@ def create_order(
         return OrderOut(**response)
 
     if payload.mode == "real":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Real trading is disabled (Phase 8 gate).",
-        )
-    if payload.mode not in ("simulation", "paper", "sandbox"):
-        raise HTTPException(status_code=400, detail="mode must be simulation|paper|sandbox")
+        if not settings.real_trading_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Real trading is off on the server (REAL_TRADING_ENABLED).",
+            )
+        if not ((settings.kraken_api_key or "").strip()
+                and (settings.kraken_api_secret or "").strip()):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Kraken API keys are not configured on the server.",
+            )
+    if payload.mode not in ("simulation", "paper", "sandbox", "real"):
+        raise HTTPException(status_code=400, detail="mode must be simulation|paper|sandbox|real")
     if payload.side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be buy|sell")
     try:
@@ -188,6 +207,22 @@ def create_order(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Market price unavailable.",
         )
+    if payload.mode == "real":
+        # Hard armor (checked again inside execute_real): $20 cumulative cap
+        # on real buys, and no naked real sells.
+        if payload.side == "buy":
+            projected = _exec.real_buy_cost_total(db) + price * qty
+            if projected > _D(str(settings.initial_capital_usd)):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Real hard cap: cumulative real buys cannot exceed $20.",
+                )
+        elif _exec.real_position(db, payload.symbol) < qty:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No real position to sell for this symbol.",
+            )
+
     candidate = _Candidate(
         symbol=payload.symbol,
         side=payload.side,

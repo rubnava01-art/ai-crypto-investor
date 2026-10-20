@@ -11,10 +11,12 @@ type Step = "form" | "validate" | "done";
 
 export function InvestorPanel({
   mode,
+  realEnabled,
   equityUsd,
   onExecuted,
 }: {
   mode: string;
+  realEnabled: boolean;
   equityUsd: number | null;
   onExecuted: () => void;
 }) {
@@ -51,7 +53,8 @@ export function InvestorPanel({
   const qty = validAmount && price ? amountNum / price : 0;
   const pctCapital =
     validAmount && equityUsd && equityUsd > 0 ? (amountNum / equityUsd) * 100 : null;
-  const orderMode = mode === "paper" ? "paper" : "simulation";
+  const isReal = mode === "real" && realEnabled;
+  const orderMode = isReal ? "real" : mode === "paper" ? "paper" : "simulation";
 
   const confirm = async () => {
     setBusy(true);
@@ -85,9 +88,15 @@ export function InvestorPanel({
     <Panel
       title="Invertir"
       badge={
-        <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">
-          {orderMode === "paper" ? "PAPER" : "SIMULACIÓN"} · sin dinero real
-        </span>
+        isReal ? (
+          <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-bold text-red-400">
+            ⚠ DINERO REAL · tope $20
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">
+            {orderMode === "paper" ? "PAPER" : "SIMULACIÓN"} · sin dinero real
+          </span>
+        )
       }
     >
       {step === "done" ? (
@@ -102,6 +111,12 @@ export function InvestorPanel({
         </div>
       ) : step === "validate" ? (
         <div className="py-1">
+          {isReal && (
+            <div className="mb-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-200">
+              ⚠️ <strong>Esto ejecuta con dinero REAL en Kraken.</strong> Tope acumulado de
+              compras reales: $20. La llave no tiene permiso de retiros. Revisa todo dos veces.
+            </div>
+          )}
           <p className="text-sm font-semibold text-zinc-100">Valida tu orden antes de ejecutarla:</p>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
@@ -128,7 +143,9 @@ export function InvestorPanel({
             </div>
             <div className="flex justify-between">
               <dt className="text-zinc-400">Modo</dt>
-              <dd className="font-mono">{orderMode} (el guardia de riesgo la revisa al ejecutar)</dd>
+              <dd className="font-mono">
+                {isReal ? "REAL · Kraken" : orderMode} (el guardia de riesgo la revisa al ejecutar)
+              </dd>
             </div>
           </dl>
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
@@ -140,7 +157,7 @@ export function InvestorPanel({
                 side === "buy" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
               }`}
             >
-              {busy ? "Ejecutando…" : side === "buy" ? "Confirmar entrada" : "Confirmar salida"}
+              {busy ? "Ejecutando…" : isReal ? (side === "buy" ? "Confirmar entrada REAL" : "Confirmar salida REAL") : side === "buy" ? "Confirmar entrada" : "Confirmar salida"}
             </button>
             <button
               onClick={() => setStep("form")}

@@ -5,7 +5,9 @@ Lifecycle: pending -> approved -> sent -> executed | partial | cancelled | faile
 - Before any retry, the real order state is checked first (no duplicates).
 - Partial fills are recorded per-fill; the order aggregates to 'partial'.
 - Modes: simulation/paper fill instantly at market (no keys needed).
-  sandbox uses ccxt sandbox mode (needs keys). real is HARD-DISABLED.
+  sandbox uses ccxt sandbox mode (needs keys). real executes on Kraken
+  only when the server flag REAL_TRADING_ENABLED is on (Phase 8, owner-
+  confirmed 2026-10-20) with a $20 cumulative hard cap.
 """
 import time
 import uuid
@@ -119,10 +121,126 @@ def execute_sandbox(db: Session, order: Order) -> Order:
     raise RuntimeError(f"sandbox execution failed after retries: {last_err}")
 
 
+def _real_exchange():
+    """Authenticated Kraken client for REAL orders (keys from env only)."""
+    import ccxt as _ccxt  # local import: only needed here
+
+    from app.data import _compat
+
+    _compat.apply_shims()
+    key = (settings.kraken_api_key or "").strip()
+    secret = (settings.kraken_api_secret or "").strip()
+    if not key or not secret:
+        raise RuntimeError("real trading keys not configured (KRAKEN_API_KEY/SECRET)")
+    return _ccxt.kraken({
+        "apiKey": key, "secret": secret, "enableRateLimit": True,
+        "proxies": _compat.proxy_dict() or None,
+    })
+
+
+def real_buy_cost_total(db: Session) -> Decimal:
+    """Cumulative cost of all real BUY fills — the hard-cap meter."""
+    rows = (
+        db.query(Fill)
+        .join(Order, Fill.order_id == Order.id)
+        .filter(Order.mode == "real", Order.side == "buy")
+        .all()
+    )
+    return sum((f.price * f.quantity + f.fee for f in rows), Decimal("0"))
+
+
+def real_position(db: Session, symbol: str) -> Decimal:
+    """Net real filled quantity for a symbol (buys - sells)."""
+    net = Decimal("0")
+    rows = (
+        db.query(Fill, Order.side)
+        .join(Order, Fill.order_id == Order.id)
+        .filter(Order.mode == "real", Order.symbol == symbol)
+        .all()
+    )
+    for fill, side in rows:
+        net += fill.quantity if side == "buy" else -fill.quantity
+    return net
+
+
+def execute_real(db: Session, order: Order) -> Order:
+    """REAL execution on Kraken (Phase 8).
+
+    Activated by the owner's explicit written confirmation (2026-10-20),
+    ahead of the original 30-day paper schedule, with maximum armor:
+    - server flag REAL_TRADING_ENABLED must be on (env, owner-controlled)
+    - keys come from env only, and must be created WITHOUT withdrawal rights
+    - cumulative real-buy hard cap = initial capital ($20)
+    - no naked real sells (must hold a real filled position)
+    - single send attempt; on ambiguous network errors, reconcile by
+      client_order_id before declaring failure (never blind-retry real money)
+    """
+    if not settings.real_trading_enabled:
+        raise RuntimeError("real trading is disabled (REAL_TRADING_ENABLED off)")
+    price = _market_price(order.symbol)
+    if order.side == "buy":
+        projected = real_buy_cost_total(db) + price * order.quantity
+        if projected > Decimal(str(settings.initial_capital_usd)):
+            order.status = "failed"
+            db.commit()
+            raise RuntimeError("real hard cap exceeded ($20 total real buys)")
+    else:
+        if real_position(db, order.symbol) < order.quantity:
+            order.status = "failed"
+            db.commit()
+            raise RuntimeError("no real position to sell")
+
+    ex = _real_exchange()
+    order.status = "approved"
+    db.flush()
+    try:
+        res = ex.create_order(
+            order.symbol, "market", order.side, float(order.quantity),
+            params={"clientOrderId": order.client_order_id},
+        )
+    except Exception as send_err:
+        res = None
+        try:
+            found = ex.fetch_order(
+                None, order.symbol,
+                params={"clientOrderId": order.client_order_id},
+            )
+            if found:
+                res = found
+        except Exception:
+            pass
+        if res is None:
+            order.status = "failed"
+            db.add(SystemEvent(
+                level="error", category="execution",
+                message=f"REAL order {order.client_order_id} send failed: {send_err}",
+            ))
+            db.commit()
+            raise RuntimeError(f"real execution failed: {send_err}")
+
+    filled = Decimal(str(res.get("filled", 0) or 0))
+    avg = Decimal(str(res.get("average") or res.get("price") or 0))
+    if filled > 0 and avg > 0:
+        _record_fill(db, order, avg, filled)
+        order.status = "sent"
+        _refresh_status(db, order)
+    else:
+        # Accepted by the exchange but not filled yet: leave it open ('sent')
+        # rather than mislabeling it failed.
+        order.status = "sent"
+    db.add(SystemEvent(
+        level="warning", category="execution",
+        message=(f"REAL order {order.client_order_id} {order.side} {order.symbol} "
+                 f"qty={order.quantity} exchange_id={res.get('id')} status={order.status}"),
+    ))
+    db.commit()
+    return order
+
+
 def execute(db: Session, order: Order, price: Decimal | None = None) -> Order:
     """Route execution by order mode."""
     if order.mode == "real":
-        raise RuntimeError("real trading is disabled (Phase 8 gate)")
+        return execute_real(db, order)
     if order.mode == "sandbox":
         return execute_sandbox(db, order)
     return execute_simulated(db, order, price)
