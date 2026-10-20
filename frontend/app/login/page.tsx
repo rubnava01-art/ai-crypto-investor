@@ -73,7 +73,8 @@ export default function LoginPage() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
         <p className="mt-4 text-center text-xs text-zinc-500">
-          Dev login: <code className="text-zinc-400">admin</code> / <code className="text-zinc-400">admin</code>
+          Dev login: <code className="text-zinc-400">admin</code> / <code className="text-zinc-400">admin</code> (control total) ·{" "}
+          <code className="text-zinc-400">prueba</code> / <code className="text-zinc-400">prueba</code> (solo ver y probar)
         </p>
       </form>
     </main>

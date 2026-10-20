@@ -28,6 +28,15 @@ def seed_demo_data() -> None:
                     is_admin=True,
                 )
             )
+        # Demo read-only "prueba" account (view + tests only, no controls).
+        if db.query(User).filter(User.username == "prueba").first() is None:
+            db.add(
+                User(
+                    username="prueba",
+                    password_hash=hash_password("prueba"),
+                    is_admin=False,
+                )
+            )
         sv = db.query(StrategyVersion).order_by(StrategyVersion.id).first()
         if sv is None:
             sv = StrategyVersion(
@@ -144,7 +153,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import auth, backtest, exchange, market, misc, portfolio, signals, strategy, system
+    from app.api import auth, backtest, exchange, market, misc, portfolio, signals, strategy, system, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -177,6 +186,7 @@ def create_app() -> FastAPI:
     app.include_router(strategy.router)
     app.include_router(backtest.router)
     app.include_router(exchange.router)
+    app.include_router(users.router)
     app.include_router(ai_api.router)
     return app
 

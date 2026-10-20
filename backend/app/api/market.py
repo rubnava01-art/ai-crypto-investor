@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.data import exchanges, ingest
 from app.database import get_db
 from app.indicators import technical as ind
@@ -169,7 +169,7 @@ def trigger_ingest(
     symbol: str = Query("BTC/USD"),
     timeframe: str = Query("1h"),
     exchange: str = Query(DEFAULT_EXCHANGE),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Manually trigger one ingestion cycle (also runs on the scanner loop)."""

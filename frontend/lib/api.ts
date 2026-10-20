@@ -158,6 +158,15 @@ export interface MarketPricesResponse {
 export interface MeResponse {
   username: string;
   is_admin: boolean;
+  role: "admin" | "prueba";
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  role: "admin" | "prueba";
+  is_admin: boolean;
+  created_at: string | null;
 }
 
 // ---------- fetch core ----------
@@ -194,6 +203,7 @@ async function request<T>(
     }
     throw new ApiError(res.status, detail);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -232,4 +242,15 @@ export const api = {
   aiLessons: () => request<AILessonsResponse>("/api/ai/lessons", { auth: true }),
   me: () => request<MeResponse>("/api/auth/me", { auth: true }),
   marketPrices: () => request<MarketPricesResponse>("/api/market/prices", { auth: true }),
+  listUsers: () => request<AdminUser[]>("/api/users", { auth: true }),
+  createUser: (username: string, password: string, role: "admin" | "prueba") =>
+    request<AdminUser>("/api/users", {
+      method: "POST",
+      auth: true,
+      body: { username, password, role },
+    }),
+  updateUser: (id: number, patch: { role?: "admin" | "prueba"; password?: string }) =>
+    request<AdminUser>(`/api/users/${id}`, { method: "PATCH", auth: true, body: patch }),
+  deleteUser: (id: number) =>
+    request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),
 };

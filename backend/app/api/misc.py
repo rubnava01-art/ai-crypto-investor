@@ -10,7 +10,7 @@ from app.core.idempotency import (
     store_idempotency,
 )
 from app.core.hardening import audit
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.core.state import state
 from app.database import get_db
 from app.models.tables import Order, StrategyVersion, SystemEvent, User
@@ -52,7 +52,7 @@ def list_strategies(
 # ---------- scanner ----------
 @scanner_router.post("/start", response_model=ScannerState)
 def scanner_start(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
     # Phase 1: flips a flag. Phase 2 wires the real market-data loop.
     state.scanner_running = True
@@ -62,7 +62,7 @@ def scanner_start(
 
 @scanner_router.post("/stop", response_model=ScannerState)
 def scanner_stop(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    user: User = Depends(require_admin), db: Session = Depends(get_db)
 ):
     state.scanner_running = False
     audit(db, user, "scanner.stop", "scanner", details={"running": False})
@@ -81,7 +81,7 @@ def get_modes(user: User = Depends(get_current_user)):
 @simulation_router.post("/mode", response_model=SimulationModes)
 def set_mode(
     payload: SetModeRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     if payload.mode == "real":
@@ -133,7 +133,7 @@ class CreateOrderRequest(BaseModel):
 def create_order(
     payload: CreateOrderRequest,
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Create + execute an order. Requires Idempotency-Key header.
@@ -250,7 +250,7 @@ def risk_limits(user: User = Depends(get_current_user)):
 @risk_router.post("/kill-switch", response_model=KillSwitchResponse)
 def kill_switch(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Emergency stop. Idempotent via Idempotency-Key header (replays return the

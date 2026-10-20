@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.exchange import adapter
 from app.models.tables import ExchangeConnection, User
@@ -98,7 +98,7 @@ def exchange_balances(
 @router.post("/connections", status_code=status.HTTP_201_CREATED)
 def register_connection(
     payload: RegisterConnectionRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """Register connection METADATA only. Secrets are never accepted here."""

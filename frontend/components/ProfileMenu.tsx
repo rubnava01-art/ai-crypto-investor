@@ -37,7 +37,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <div role="menu" className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
           <div className="border-b border-zinc-800 px-4 py-3">
             <p className="truncate text-sm font-semibold text-zinc-100">{me?.username ?? "…"}</p>
-            <p className="text-xs text-zinc-500">{me?.is_admin ? "Administrador" : "Usuario"} · modo demo</p>
+            <p className="text-xs text-zinc-500">{me?.is_admin ? "Administrador · control total" : "Prueba · solo ver y probar"} · modo demo</p>
           </div>
           <button
             role="menuitem"

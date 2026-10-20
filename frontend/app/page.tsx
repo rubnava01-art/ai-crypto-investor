@@ -12,6 +12,8 @@ import { Panel } from "../components/Panel";
 import { AiAssistant } from "../components/AiAssistant";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
+import { UsersPanel } from "../components/UsersPanel";
+import type { MeResponse } from "../lib/api";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { Footer } from "../components/Footer";
 
@@ -55,6 +57,8 @@ export default function DashboardPage() {
   const [operations, setOperations] = useState<OperationsResponse | null>(null);
   const [risk, setRisk] = useState<RiskLimits | null>(null);
   const [logs, setLogs] = useState<LogEntry[] | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const isAdmin = !!me?.is_admin;
 
   const load = useCallback(async () => {
     setActionError(null);
@@ -66,6 +70,7 @@ export default function DashboardPage() {
       setSystem(s); setBalances(b); setPerformance(p); setSignals(sig);
       setStrategies(strat); setSim(modes); setOperations(ops); setRisk(r); setLogs(l);
       setOffline(false);
+      api.me().then(setMe).catch(() => setMe(null));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setToken(null);
@@ -149,6 +154,20 @@ export default function DashboardPage() {
       <div className="mb-4">
         <MarketPanel />
       </div>
+
+      {me && !isAdmin && (
+        <div className="mb-4 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
+          <strong className="font-semibold">Modo prueba:</strong> puedes ver todo y correr
+          pruebas (backtests y evaluación), pero los controles — escáner, modos, kill switch y
+          usuarios — son solo del administrador.
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="mb-4">
+          <UsersPanel />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
@@ -272,6 +291,7 @@ export default function DashboardPage() {
             <StatusDot on={scanning} />
             <span className="text-sm text-zinc-300">{scanning ? "Running" : "Stopped"}</span>
           </div>
+          {isAdmin ? (
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => scanner("start")}
@@ -288,6 +308,9 @@ export default function DashboardPage() {
               Stop
             </button>
           </div>
+          ) : (
+            <p className="mt-3 text-xs text-zinc-500">Controles solo del administrador.</p>
+          )}
         </Panel>
 
         {/* Simulation mode */}
@@ -296,6 +319,7 @@ export default function DashboardPage() {
             <div>
               <select
                 value={sim.current}
+                disabled={!isAdmin}
                 onChange={(e) => changeMode(e.target.value)}
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
               >
@@ -306,6 +330,7 @@ export default function DashboardPage() {
               <p className="mt-2 text-xs text-zinc-500">
                 Real mode {sim.real_enabled ? "enabled" : "disabled"} — switching to real requires
                 backend approval.
+                {!isAdmin && " Cambiar el modo es solo del administrador."}
               </p>
             </div>
           ) : (
@@ -331,6 +356,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </dl>
+              {isAdmin && (
               <button
                 onClick={() => setConfirmKill(true)}
                 disabled={risk.kill_switch}
@@ -338,6 +364,7 @@ export default function DashboardPage() {
               >
                 {risk.kill_switch ? "Kill switch engaged" : "Kill switch"}
               </button>
+              )}
               {confirmKill && (
                 <div className="mt-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm">
                   <p className="text-red-200">

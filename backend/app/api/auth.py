@@ -29,4 +29,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 @router.get("/me")
 def me(user: User = Depends(get_current_user)):
-    return {"username": user.username, "is_admin": user.is_admin}
+    return {
+        "username": user.username,
+        "is_admin": user.is_admin,
+        "role": "admin" if user.is_admin else "prueba",
+    }
