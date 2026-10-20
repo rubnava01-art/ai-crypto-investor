@@ -139,6 +139,27 @@ export interface AIStatusResponse {
   demo: boolean;
 }
 
+export interface CoinPrice {
+  symbol: string;
+  name: string;
+  pair: string;
+  price_usd: number | null;
+  change_24h_pct: number | null;
+  sparkline_24h: number[];
+}
+
+export interface MarketPricesResponse {
+  source: string;
+  updated_utc: string;
+  stale: boolean;
+  prices: CoinPrice[];
+}
+
+export interface MeResponse {
+  username: string;
+  is_admin: boolean;
+}
+
 // ---------- fetch core ----------
 
 async function request<T>(
@@ -209,4 +230,6 @@ export const api = {
       body: { question, signal_id: signal_id ?? null },
     }),
   aiLessons: () => request<AILessonsResponse>("/api/ai/lessons", { auth: true }),
+  me: () => request<MeResponse>("/api/auth/me", { auth: true }),
+  marketPrices: () => request<MarketPricesResponse>("/api/market/prices", { auth: true }),
 };

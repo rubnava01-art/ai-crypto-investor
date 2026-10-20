@@ -10,6 +10,8 @@ import {
 } from "../lib/api";
 import { Panel } from "../components/Panel";
 import { AiAssistant } from "../components/AiAssistant";
+import { MarketPanel } from "../components/MarketPanel";
+import { ProfileMenu } from "../components/ProfileMenu";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { Footer } from "../components/Footer";
 
@@ -133,12 +135,7 @@ export default function DashboardPage() {
           >
             Refresh
           </button>
-          <button
-            onClick={logout}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
-          >
-            Log out
-          </button>
+          <ProfileMenu onLogout={logout} />
         </div>
       </header>
 
@@ -148,6 +145,10 @@ export default function DashboardPage() {
           {actionError}
         </p>
       )}
+
+      <div className="mb-4">
+        <MarketPanel />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}

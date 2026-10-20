@@ -4,6 +4,7 @@ Every response carries the data source and update timestamp. With no
 connection, endpoints return 503 with a clear message (never fake data).
 """
 import datetime as dt
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -18,6 +19,16 @@ from app.models.tables import User
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 DEFAULT_EXCHANGE = "kraken"  # spec: Coinbase or Kraken; Kraken default, both supported
+
+# Top coins shown on the dashboard market panel (real public prices, no keys).
+MARKET_COINS = (
+    ("BTC", "Bitcoin", "BTC/USD"),
+    ("ETH", "Ethereum", "ETH/USD"),
+    ("USDT", "Tether", "USDT/USD"),
+    ("BNB", "BNB", "BNB/USD"),
+)
+_PRICES_CACHE: dict = {"at": 0.0, "payload": None}
+_PRICES_TTL_S = 60.0
 
 
 class CandleOut(BaseModel):
@@ -50,6 +61,22 @@ class IndicatorsResponse(BaseModel):
     source: str
     updated_utc: str
     indicators: dict
+
+
+class CoinPriceOut(BaseModel):
+    symbol: str  # BTC
+    name: str  # Bitcoin
+    pair: str  # BTC/USD
+    price_usd: float | None
+    change_24h_pct: float | None
+    sparkline_24h: list[float]  # 1h closes, oldest -> newest
+
+
+class MarketPricesResponse(BaseModel):
+    source: str
+    updated_utc: str
+    stale: bool = False
+    prices: list[CoinPriceOut]
 
 
 def _utcnow() -> str:
@@ -154,3 +181,64 @@ def trigger_ingest(
             detail=f"Ingestion failed ({exchange}): {type(e).__name__}: {str(e)[:120]}",
         )
     return {"ingested": n, "symbol": symbol, "timeframe": timeframe, "source": exchange}
+
+
+def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
+    """Real public prices for the top coins (no API keys needed)."""
+    out: list[CoinPriceOut] = []
+    for symbol, name, pair in MARKET_COINS:
+        t = exchanges.fetch_ticker(exchange, pair)
+        last = t.get("last")
+        pct = t.get("percentage")
+        spark: list[float] = []
+        try:
+            ohlcv = exchanges.fetch_ohlcv(exchange, pair, "1h", limit=24)
+            spark = [float(row[4]) for row in ohlcv if row[4] is not None]
+        except Exception:  # noqa: BLE001 - sparkline is best-effort
+            spark = []
+        out.append(
+            CoinPriceOut(
+                symbol=symbol,
+                name=name,
+                pair=pair,
+                price_usd=float(last) if last is not None else None,
+                change_24h_pct=float(pct) if pct is not None else None,
+                sparkline_24h=spark,
+            )
+        )
+    return out
+
+
+@router.get("/prices", response_model=MarketPricesResponse)
+def get_market_prices(
+    exchange: str = Query(DEFAULT_EXCHANGE),
+    user: User = Depends(get_current_user),
+):
+    """Live prices for the top coins from the exchange's public API.
+
+    Cached 60s. Serves stale cache (flagged) when the exchange is
+    unreachable; 503 only when there is nothing to show (never fake data).
+    """
+    now = time.monotonic()
+    if _PRICES_CACHE["payload"] is not None and now - _PRICES_CACHE["at"] < _PRICES_TTL_S:
+        payload = _PRICES_CACHE["payload"]
+        return MarketPricesResponse(**{**payload, "stale": False})
+    try:
+        prices = _fetch_market_prices(exchange)
+    except Exception as e:  # noqa: BLE001 - surface as 503, never fake
+        if _PRICES_CACHE["payload"] is not None:
+            payload = _PRICES_CACHE["payload"]
+            return MarketPricesResponse(**{**payload, "stale": True})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Exchange unreachable ({exchange}): {type(e).__name__}",
+        )
+    payload = {
+        "source": exchange,
+        "updated_utc": _utcnow(),
+        "stale": False,
+        "prices": [p.model_dump() for p in prices],
+    }
+    _PRICES_CACHE["at"] = now
+    _PRICES_CACHE["payload"] = payload
+    return MarketPricesResponse(**payload)
