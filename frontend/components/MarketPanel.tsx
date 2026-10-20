@@ -11,6 +11,14 @@ const COIN_STYLE: Record<string, { bg: string; glyph: string }> = {
   BNB: { bg: "#F0B90B", glyph: "⬢" },
 };
 
+// Kraken WS v1 usa XBT para BTC en los nombres de par.
+const PAIR_TO_SYMBOL: Record<string, string> = {
+  "XBT/USD": "BTC",
+  "ETH/USD": "ETH",
+  "USDT/USD": "USDT",
+  "BNB/USD": "BNB",
+};
+
 function Sparkline({ data, up }: { data: number[]; up: boolean }) {
   if (data.length < 2) return <span className="text-xs text-zinc-600">—</span>;
   const w = 96;
@@ -33,6 +41,8 @@ export function MarketPanel() {
   const [prices, setPrices] = useState<CoinPrice[] | null>(null);
   const [meta, setMeta] = useState<{ source: string; updated: string; stale: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState<Record<string, number>>({});
+  const [wsLive, setWsLive] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -50,11 +60,63 @@ export function MarketPanel() {
   useEffect(() => {
     load();
     const t = setInterval(load, 60_000);
-    return () => clearInterval(t);
+
+    // Ticks en tiempo real directo del WebSocket público de Kraken (sin clave).
+    const ws = new WebSocket("wss://ws.kraken.com");
+    ws.onopen = () => {
+      setWsLive(true);
+      ws.send(
+        JSON.stringify({
+          event: "subscribe",
+          pair: Object.keys(PAIR_TO_SYMBOL),
+          subscription: { name: "ticker" },
+        })
+      );
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data as string);
+        if (Array.isArray(msg) && msg.length >= 4 && msg[2] === "ticker") {
+          const sym = PAIR_TO_SYMBOL[msg[3] as string];
+          const price = parseFloat(msg[1]?.c?.[0]);
+          if (sym && Number.isFinite(price)) {
+            setLive((prev) => ({ ...prev, [sym]: price }));
+          }
+        }
+      } catch {
+        /* ignorar frames malformados */
+      }
+    };
+    const down = () => setWsLive(false);
+    ws.onerror = down;
+    ws.onclose = down;
+
+    return () => {
+      clearInterval(t);
+      try {
+        ws.close();
+      } catch {
+        /* ya cerrado */
+      }
+    };
   }, [load]);
 
+  const liveBadge = wsLive ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+      </span>
+      EN VIVO
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-700/40 px-2.5 py-1 text-xs font-semibold text-zinc-400">
+      actualizando…
+    </span>
+  );
+
   return (
-    <Panel title="Mercado en vivo" badge={meta ? <span className="text-xs font-normal normal-case tracking-normal text-zinc-500">Kraken · {meta.stale ? "datos de caché" : "actualizado"}</span> : undefined}>
+    <Panel title="Mercado en vivo" badge={liveBadge}>
       {error && <p className="py-4 text-center text-sm text-amber-400">{error}</p>}
       {!error && !prices && <p className="py-4 text-center text-sm text-zinc-500">Cargando precios…</p>}
       {prices && (
@@ -62,6 +124,7 @@ export function MarketPanel() {
           {prices.map((c) => {
             const style = COIN_STYLE[c.symbol] ?? { bg: "#52525b", glyph: c.symbol.slice(0, 1) };
             const up = (c.change_24h_pct ?? 0) >= 0;
+            const price = live[c.symbol] ?? c.price_usd;
             return (
               <li key={c.symbol} className="flex items-center gap-3 py-3">
                 <span
@@ -80,9 +143,9 @@ export function MarketPanel() {
                 </div>
                 <div className="w-32 text-right sm:w-36">
                   <p className="text-[15px] font-semibold tabular-nums text-zinc-100">
-                    {c.price_usd == null
+                    {price == null
                       ? "—"
-                      : `$${c.price_usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: c.price_usd < 10 ? 4 : 2 })}`}
+                      : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: price < 10 ? 4 : 2 })}`}
                   </p>
                   <p className={`text-sm font-medium tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
                     {c.change_24h_pct == null ? "—" : `${up ? "↗" : "↘"} ${Math.abs(c.change_24h_pct).toFixed(2)}%`}
@@ -95,7 +158,9 @@ export function MarketPanel() {
       )}
       {meta && (
         <p className="mt-1 text-[11px] text-zinc-600">
-          Precios públicos de Kraken (solo lectura) · {new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false })} UTC
+          {wsLive
+            ? "Precios en tiempo real (WebSocket público de Kraken) · cambio 24h cada minuto"
+            : `Precios públicos de Kraken (solo lectura) · ${new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false })} UTC`}
         </p>
       )}
     </Panel>
