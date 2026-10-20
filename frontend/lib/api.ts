@@ -169,6 +169,29 @@ export interface AdminUser {
   created_at: string | null;
 }
 
+export interface OrderOut {
+  id: number;
+  client_order_id: string;
+  symbol: string;
+  side: string;
+  quantity: string;
+  status: string;
+  mode: string;
+  created_utc: string;
+}
+
+export interface DashboardResponse {
+  system: SystemStatus;
+  balances: BalancesResponse;
+  performance: PerformanceResponse;
+  signals: SignalsResponse;
+  strategies: StrategyOut[];
+  modes: SimulationModes;
+  operations: OperationsResponse;
+  risk: RiskLimits;
+  logs: LogEntry[];
+}
+
 // ---------- fetch core ----------
 
 async function request<T>(
@@ -253,4 +276,15 @@ export const api = {
     request<AdminUser>(`/api/users/${id}`, { method: "PATCH", auth: true, body: patch }),
   deleteUser: (id: number) =>
     request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),
+  dashboard: () => request<DashboardResponse>("/api/dashboard", { auth: true }),
+  createOrder: (
+    body: { symbol: string; side: "buy" | "sell"; quantity: string; mode: string },
+    idempotencyKey: string
+  ) =>
+    request<OrderOut>("/api/orders", {
+      method: "POST",
+      auth: true,
+      body,
+      idempotencyKey,
+    }),
 };

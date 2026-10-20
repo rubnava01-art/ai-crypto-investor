@@ -13,6 +13,7 @@ import { AiAssistant } from "../components/AiAssistant";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
 import { UsersPanel } from "../components/UsersPanel";
+import { InvestorPanel } from "../components/InvestorPanel";
 import type { MeResponse } from "../lib/api";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { Footer } from "../components/Footer";
@@ -63,12 +64,11 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setActionError(null);
     try {
-      const [s, b, p, sig, strat, modes, ops, r, l] = await Promise.all([
-        api.systemStatus(), api.balances(), api.performance(), api.signals(),
-        api.strategies(), api.simulationModes(), api.operations(), api.riskLimits(), api.logs(),
-      ]);
-      setSystem(s); setBalances(b); setPerformance(p); setSignals(sig);
-      setStrategies(strat); setSim(modes); setOperations(ops); setRisk(r); setLogs(l);
+      // Una sola petición agregada (antes eran 9): carga mucho más rápida.
+      const d = await api.dashboard();
+      setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
+      setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
+      setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
       setOffline(false);
       api.me().then(setMe).catch(() => setMe(null));
     } catch (err) {
@@ -284,6 +284,15 @@ export default function DashboardPage() {
             <EmptyState text={offline ? "No data — API offline" : "Loading…"} />
           )}
         </Panel>
+
+        {/* Invertir: entrar / salir / validar (solo admin) */}
+        {isAdmin && (
+          <InvestorPanel
+            mode={sim?.current ?? "simulation"}
+            equityUsd={balances ? Number(balances.equity_usd) : null}
+            onExecuted={load}
+          />
+        )}
 
         {/* Scanner controls */}
         <Panel title="Scanner controls">
