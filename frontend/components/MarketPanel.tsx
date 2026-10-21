@@ -61,40 +61,64 @@ export function MarketPanel() {
     load();
     const t = setInterval(load, 60_000);
 
-    // Ticks en tiempo real directo del WebSocket público de Kraken (sin clave).
-    const ws = new WebSocket("wss://ws.kraken.com");
-    ws.onopen = () => {
-      setWsLive(true);
-      ws.send(
-        JSON.stringify({
-          event: "subscribe",
-          pair: Object.keys(PAIR_TO_SYMBOL),
-          subscription: { name: "ticker" },
-        })
-      );
-    };
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data as string);
-        if (Array.isArray(msg) && msg.length >= 4 && msg[2] === "ticker") {
-          const sym = PAIR_TO_SYMBOL[msg[3] as string];
-          const price = parseFloat(msg[1]?.c?.[0]);
-          if (sym && Number.isFinite(price)) {
-            setLive((prev) => ({ ...prev, [sym]: price }));
+    // Ticks en tiempo real directo del WebSocket público de Kraken (sin clave),
+    // con reconexión automática con backoff exponencial si la conexión cae.
+    let ws: WebSocket | null = null;
+    let retryDelay = 2_000;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let unmounted = false;
+
+    const connect = () => {
+      if (unmounted) return;
+      const sock = new WebSocket("wss://ws.kraken.com");
+      ws = sock;
+      sock.onopen = () => {
+        retryDelay = 2_000; // la conexión funcionó: reiniciar el backoff
+        setWsLive(true);
+        sock.send(
+          JSON.stringify({
+            event: "subscribe",
+            pair: Object.keys(PAIR_TO_SYMBOL),
+            subscription: { name: "ticker" },
+          })
+        );
+      };
+      sock.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data as string);
+          if (Array.isArray(msg) && msg.length >= 4 && msg[2] === "ticker") {
+            const sym = PAIR_TO_SYMBOL[msg[3] as string];
+            const price = parseFloat(msg[1]?.c?.[0]);
+            if (sym && Number.isFinite(price)) {
+              setLive((prev) => ({ ...prev, [sym]: price }));
+            }
           }
+        } catch {
+          /* ignorar frames malformados */
         }
-      } catch {
-        /* ignorar frames malformados */
-      }
+      };
+      const down = () => {
+        setWsLive(false);
+        // onerror llega antes que onclose: programar un solo reintento
+        if (!unmounted && retryTimer === null) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null;
+            connect();
+          }, retryDelay);
+          retryDelay = Math.min(retryDelay * 2, 30_000);
+        }
+      };
+      sock.onerror = down;
+      sock.onclose = down;
     };
-    const down = () => setWsLive(false);
-    ws.onerror = down;
-    ws.onclose = down;
+    connect();
 
     return () => {
+      unmounted = true;
       clearInterval(t);
+      if (retryTimer) clearTimeout(retryTimer);
       try {
-        ws.close();
+        ws?.close();
       } catch {
         /* ya cerrado */
       }
