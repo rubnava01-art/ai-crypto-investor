@@ -194,9 +194,20 @@ export interface DashboardResponse {
 
 // ---------- fetch core ----------
 
+// Default per-request timeout: a hung backend must never block the UI forever.
+// /api/ai/ask may legitimately take longer, so it opts into a longer timeout.
+const DEFAULT_TIMEOUT_MS = 30_000;
+const AI_TIMEOUT_MS = 120_000;
+
 async function request<T>(
   path: string,
-  opts: { method?: string; body?: unknown; auth?: boolean; idempotencyKey?: string } = {},
+  opts: {
+    method?: string;
+    body?: unknown;
+    auth?: boolean;
+    idempotencyKey?: string;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (opts.auth) {
@@ -205,6 +216,10 @@ async function request<T>(
   }
   if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -212,9 +227,16 @@ async function request<T>(
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       cache: "no-store",
+      signal: ctrl.signal,
     });
-  } catch {
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, `API timeout (${timeoutMs / 1000}s) en ${path}`);
+    }
     throw new ApiError(0, `API unreachable (${API_URL})`);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     let detail = res.statusText;
@@ -261,6 +283,7 @@ export const api = {
       method: "POST",
       auth: true,
       body: { question, signal_id: signal_id ?? null },
+      timeoutMs: AI_TIMEOUT_MS,
     }),
   aiLessons: () => request<AILessonsResponse>("/api/ai/lessons", { auth: true }),
   me: () => request<MeResponse>("/api/auth/me", { auth: true }),
