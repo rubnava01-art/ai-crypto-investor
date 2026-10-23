@@ -9,6 +9,7 @@ import {
   type OperationsResponse, type RiskLimits, type LogEntry, type SignalSide,
 } from "../lib/api";
 import { Panel } from "../components/Panel";
+import { ModuleNav } from "../components/ModuleNav";
 import { AiAssistant } from "../components/AiAssistant";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
@@ -127,9 +128,9 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">AI CRYPTO INVESTOR</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">PLATAFORMA</h1>
           <p className="text-sm text-zinc-400">
-            {system ? <>Mode: <span className="font-mono">{system.mode}</span></> : "Loading…"} · Phase 1 dashboard
+            Invertir · AI Crypto Investor — {system ? <>Mode: <span className="font-mono">{system.mode}</span></> : "Loading…"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -144,8 +145,11 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}
-      {actionError && (
+      <div className="mb-6">
+        <ModuleNav />
+      </div>
+
+      {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}      {actionError && (
         <p role="alert" className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
           {actionError}
         </p>

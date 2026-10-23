@@ -289,3 +289,34 @@ class AILesson(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class Contact(Base):
+    """CRM contact (Plataforma Unificada — Fase 1).
+
+    The connective tissue between modules: leads and customers from the
+    Academy (Estudiar), Cohley brand work, RIV Goods and manual entry.
+    `source`: manual|academia|cohley|rivgoods|otro.
+    `status`: nuevo|contactado|interesado|cliente|inactivo.
+    """
+
+    __tablename__ = "crm_contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    phone: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(32), default="manual", nullable=False
+    )  # manual|academia|cohley|rivgoods|otro
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="nuevo", nullable=False
+    )  # nuevo|contactado|interesado|cliente|inactivo
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

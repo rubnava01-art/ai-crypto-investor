@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI CRYPTO INVESTOR",
-  description: "Phase 1 trading-bot dashboard (demo)",
+  title: "Plataforma — Invertir · Estudiar · Crear · CRM",
+  description: "Plataforma unificada: trading (AI Crypto Investor), Academia, Forge y CRM",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

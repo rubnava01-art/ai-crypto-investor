@@ -153,7 +153,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import auth, backtest, dashboard, exchange, market, misc, portfolio, signals, strategy, system, users
+    from app.api import auth, backtest, crm, dashboard, exchange, market, misc, portfolio, signals, strategy, system, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -187,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(backtest.router)
     app.include_router(exchange.router)
     app.include_router(users.router)
+    app.include_router(crm.router)
     app.include_router(dashboard.router)
     app.include_router(ai_api.router)
     return app

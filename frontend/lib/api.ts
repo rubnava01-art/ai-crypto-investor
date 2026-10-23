@@ -192,6 +192,34 @@ export interface DashboardResponse {
   logs: LogEntry[];
 }
 
+// ---------- CRM (Plataforma Unificada — Fase 1) ----------
+
+export type CrmSource = "manual" | "academia" | "cohley" | "rivgoods" | "otro";
+export type CrmStatus = "nuevo" | "contactado" | "interesado" | "cliente" | "inactivo";
+
+export interface CrmContact {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  source: CrmSource;
+  tags: string[];
+  status: CrmStatus;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CrmContactInput {
+  name: string;
+  email?: string;
+  phone?: string;
+  source?: CrmSource;
+  tags?: string[];
+  status?: CrmStatus;
+  notes?: string;
+}
+
 // ---------- fetch core ----------
 
 // Default per-request timeout: a hung backend must never block the UI forever.
@@ -310,4 +338,17 @@ export const api = {
       body,
       idempotencyKey,
     }),
+  listContacts: (q?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    const qs = params.toString();
+    return request<CrmContact[]>(`/api/crm/contacts${qs ? `?${qs}` : ""}`, { auth: true });
+  },
+  createContact: (body: CrmContactInput) =>
+    request<CrmContact>("/api/crm/contacts", { method: "POST", auth: true, body }),
+  updateContact: (id: number, body: CrmContactInput) =>
+    request<CrmContact>(`/api/crm/contacts/${id}`, { method: "PUT", auth: true, body }),
+  deleteContact: (id: number) =>
+    request<void>(`/api/crm/contacts/${id}`, { method: "DELETE", auth: true }),
 };
