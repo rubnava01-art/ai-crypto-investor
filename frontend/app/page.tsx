@@ -64,21 +64,31 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     setActionError(null);
-    try {
-      // Una sola petición agregada (antes eran 9): carga mucho más rápida.
-      const d = await api.dashboard();
-      setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
-      setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
-      setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
-      setOffline(false);
-      api.me().then(setMe).catch(() => setMe(null));
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setToken(null);
-        router.replace("/login");
+    // Intento con un reintento: un fallo transitorio de red no debe tirar
+    // todo el dashboard al modo offline sin intentarlo de nuevo.
+    const attempts = [0, 1];
+    for (const i of attempts) {
+      try {
+        // Una sola petición agregada (antes eran 9): carga mucho más rápida.
+        const d = await api.dashboard();
+        setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
+        setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
+        setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
+        setOffline(false);
+        api.me().then(setMe).catch(() => setMe(null));
         return;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          setToken(null);
+          router.replace("/login");
+          return;
+        }
+        if (i === attempts.length - 1) {
+          setOffline(true);
+        } else {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
       }
-      setOffline(true);
     }
   }, [router]);
 
