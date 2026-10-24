@@ -83,6 +83,16 @@ def seed_demo_data() -> None:
                     message="Phase 1 skeleton initialized. All data shown is DEMO.",
                 )
             )
+        # Plataforma Unificada — Fase 2: seed the REAL Academia catalog
+        # (Hotmart ebooks + Pack + Academy) into the Estudiar module.
+        from app.api.academy import seed_academy_catalog
+
+        seed_academy_catalog(db)
+        # Plataforma Unificada — Fase 3: seed the trends panel with the
+        # topics Rubén actually published on Threads (vía @tecnologia).
+        from app.api.crear import seed_trend_notes
+
+        seed_trend_notes(db)
         db.commit()
     finally:
         db.close()
@@ -153,7 +163,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import auth, backtest, crm, dashboard, exchange, market, misc, portfolio, signals, strategy, system, users
+    from app.api import academy, auth, backtest, crear, crm, dashboard, exchange, market, misc, portfolio, signals, strategy, system, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -188,6 +198,8 @@ def create_app() -> FastAPI:
     app.include_router(exchange.router)
     app.include_router(users.router)
     app.include_router(crm.router)
+    app.include_router(academy.router)
+    app.include_router(crear.router)
     app.include_router(dashboard.router)
     app.include_router(ai_api.router)
     return app

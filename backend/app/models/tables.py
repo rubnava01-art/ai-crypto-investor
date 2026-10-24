@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -313,6 +314,118 @@ class Contact(Base):
     status: Mapped[str] = mapped_column(
         String(16), default="nuevo", nullable=False
     )  # nuevo|contactado|interesado|cliente|inactivo
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class CopyDraft(Base):
+    """A generated social-media copy kept in the Crear module (Fase 3).
+
+    `demo` records whether the text came from the local stub model (True)
+    or a real configured AI provider (False) — the UI labels demo copies
+    honestly instead of pretending they are real AI output.
+    """
+
+    __tablename__ = "copy_drafts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    topic: Mapped[str] = mapped_column(String(200), nullable=False)
+    platform: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # instagram|threads|facebook
+    tone: Mapped[str] = mapped_column(String(32), default="directo", nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class TrendNote(Base):
+    """A trend/research note feeding the Crear module (Fase 3).
+
+    Seeded ONLY with topics Rubén actually published on Threads
+    (@rubenpromkt, vía @tecnologia) per threads-tecnologia/used-posts.txt;
+    new notes are added manually/by research — never invented.
+    """
+
+    __tablename__ = "trend_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    source: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    published_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Course(Base):
+    """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
+
+    Seeded with Rubén's REAL catalog: the 6 Hotmart ebooks ($19.99), the
+    Pack Creador Completo ($59.99) and the $400 Academy. Prices/URLs come
+    from the documented records — never invented.
+    `kind`: ebook|pack|academia.
+    """
+
+    __tablename__ = "academy_courses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    price_usd: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(
+        String(16), default="ebook", nullable=False
+    )  # ebook|pack|academia
+    buy_url: Mapped[str] = mapped_column(String(512), default="", nullable=False)
+    delivery_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class CourseEnrollment(Base):
+    """Delivery record: a CRM contact bought/received a course (Fase 2).
+
+    One row per (contact, course). `purchased` = the sale happened;
+    `delivered` = the content was actually handed over, with timestamps
+    for both so the Academy fulfillment is auditable from the CRM.
+    """
+
+    __tablename__ = "academy_enrollments"
+    __table_args__ = (
+        UniqueConstraint("contact_id", "course_id", name="uq_enrollment_contact_course"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        ForeignKey("crm_contacts.id"), nullable=False
+    )
+    course_id: Mapped[int] = mapped_column(
+        ForeignKey("academy_courses.id"), nullable=False
+    )
+    purchased: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    delivered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    purchased_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    delivered_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

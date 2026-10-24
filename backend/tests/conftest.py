@@ -53,3 +53,28 @@ def auth_headers(app):
         assert r.status_code == 200, r.text
         token = r.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="session")
+def admin_headers(auth_headers):
+    """Shared admin headers — modules must reuse these instead of logging
+    in again: the login endpoint is rate-limited (10/min per IP) across
+    the whole suite, and every extra per-module login eats that budget."""
+    return auth_headers
+
+
+@pytest.fixture(scope="session")
+def viewer_headers(app, auth_headers):
+    """Shared read-only ('prueba') user, created + logged in exactly once
+    per suite run (see admin_headers note about the login budget)."""
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/users",
+            json={"username": "suiteviewer", "password": "viewerpass", "role": "prueba"},
+            headers=auth_headers,
+        )
+        assert r.status_code in (201, 409), r.text
+        r = c.post("/api/auth/login", json={"username": "suiteviewer", "password": "viewerpass"})
+        assert r.status_code == 200, r.text
+        token = r.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

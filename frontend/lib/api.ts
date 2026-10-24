@@ -220,6 +220,72 @@ export interface CrmContactInput {
   notes?: string;
 }
 
+// ---------- Academia (Plataforma Unificada — Fase 2, módulo Estudiar) ----------
+
+export type CourseKind = "ebook" | "pack" | "academia";
+
+export interface AcademyDownload {
+  course_id: number;
+  title: string;
+  filename: string;
+}
+
+export interface AcademyCourse {
+  id: number;
+  slug: string;
+  title: string;
+  description: string;
+  price_usd: string;
+  kind: CourseKind;
+  buy_url: string;
+  delivery_note: string;
+  sort_order: number;
+  students_count: number;
+  downloads: AcademyDownload[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AcademyEnrollment {
+  id: number;
+  contact_id: number;
+  course_id: number;
+  contact_name: string;
+  contact_email: string;
+  course_title: string;
+  purchased: boolean;
+  delivered: boolean;
+  purchased_at: string | null;
+  delivered_at: string | null;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+// ---------- Crear (Plataforma Unificada — Fase 3) ----------
+
+export type CopyPlatform = "instagram" | "threads" | "facebook";
+export type CopyTone = "directo" | "educativo" | "divertido" | "profesional";
+
+export interface CopyDraft {
+  id: number;
+  topic: string;
+  platform: CopyPlatform;
+  tone: string;
+  text: string;
+  demo: boolean;
+  created_at: string | null;
+}
+
+export interface TrendNote {
+  id: number;
+  title: string;
+  source: string;
+  summary: string;
+  published_on: string | null;
+  created_at: string | null;
+}
+
 // ---------- fetch core ----------
 
 // Default per-request timeout: a hung backend must never block the UI forever.
@@ -351,4 +417,62 @@ export const api = {
     request<CrmContact>(`/api/crm/contacts/${id}`, { method: "PUT", auth: true, body }),
   deleteContact: (id: number) =>
     request<void>(`/api/crm/contacts/${id}`, { method: "DELETE", auth: true }),
+  listCourses: () => request<AcademyCourse[]>("/api/academy/courses", { auth: true }),
+  updateCourse: (
+    id: number,
+    body: { title?: string; description?: string; price_usd?: string; kind?: CourseKind; buy_url?: string; delivery_note?: string },
+  ) => request<AcademyCourse>(`/api/academy/courses/${id}`, { method: "PUT", auth: true, body }),
+  listStudents: (courseId: number) =>
+    request<AcademyEnrollment[]>(`/api/academy/courses/${courseId}/students`, { auth: true }),
+  createEnrollment: (body: { contact_id: number; course_id: number; purchased?: boolean; delivered?: boolean; notes?: string }) =>
+    request<AcademyEnrollment>("/api/academy/enrollments", { method: "POST", auth: true, body }),
+  updateEnrollment: (id: number, body: { purchased?: boolean; delivered?: boolean; notes?: string }) =>
+    request<AcademyEnrollment>(`/api/academy/enrollments/${id}`, { method: "PATCH", auth: true, body }),
+  deleteEnrollment: (id: number) =>
+    request<void>(`/api/academy/enrollments/${id}`, { method: "DELETE", auth: true }),
+
+  // Descarga de un PDF real de la Academia: fetch con el token guardado ->
+  // blob -> descarga del navegador (el endpoint exige autenticación).
+  downloadCoursePdf: async (courseId: number, filename: string): Promise<void> => {
+    const token = getToken();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/api/academy/courses/${courseId}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: "no-store",
+        signal: ctrl.signal,
+      });
+    } catch {
+      clearTimeout(timer);
+      throw new ApiError(0, `API unreachable (${API_URL})`);
+    }
+    clearTimeout(timer);
+    if (!res.ok) throw new ApiError(res.status, `No se pudo descargar el PDF (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+  generateCopy: (body: { topic: string; platform: CopyPlatform; tone: CopyTone }) =>
+    request<CopyDraft>("/api/crear/copies/generate", {
+      method: "POST",
+      auth: true,
+      body,
+      timeoutMs: AI_TIMEOUT_MS,
+    }),
+  listCopies: () => request<CopyDraft[]>("/api/crear/copies", { auth: true }),
+  deleteCopy: (id: number) =>
+    request<void>(`/api/crear/copies/${id}`, { method: "DELETE", auth: true }),
+  listTrends: () => request<TrendNote[]>("/api/crear/trends", { auth: true }),
+  createTrend: (body: { title: string; source?: string; summary?: string; published_on?: string | null }) =>
+    request<TrendNote>("/api/crear/trends", { method: "POST", auth: true, body }),
+  deleteTrend: (id: number) =>
+    request<void>(`/api/crear/trends/${id}`, { method: "DELETE", auth: true }),
 };

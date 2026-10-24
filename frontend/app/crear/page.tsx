@@ -1,5 +1,6 @@
 "use client";
 
+import { CrearPanel } from "../../components/CrearPanel";
 import { ModuleShell } from "../../components/ModuleShell";
 import { Panel } from "../../components/Panel";
 
@@ -33,21 +34,7 @@ export default function CrearPage() {
           <p className="mt-2 font-mono text-xs text-zinc-500">{FORGE_URL}</p>
         </Panel>
 
-        <Panel
-          title="Generador de copies e investigación de tendencias"
-          badge={
-            <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
-              Próximamente
-            </span>
-          }
-        >
-          <p className="text-sm leading-relaxed text-zinc-500">
-            En la Fase 3 vivirán aquí el generador de copies con la capa de IA y el panel
-            de investigación de tendencias: la tendencia alimenta el copy, el copy trae
-            leads y los leads caen directo en el CRM. Este módulo todavía no está
-            construido.
-          </p>
-        </Panel>
+        <CrearPanel />
       </div>
     </ModuleShell>
   );

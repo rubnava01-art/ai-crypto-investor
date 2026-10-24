@@ -10,14 +10,34 @@ import {
 } from "../lib/api";
 import { Panel } from "../components/Panel";
 import { ModuleNav } from "../components/ModuleNav";
-import { AiAssistant } from "../components/AiAssistant";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
-import { UsersPanel } from "../components/UsersPanel";
-import { InvestorPanel } from "../components/InvestorPanel";
 import type { MeResponse } from "../lib/api";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { Footer } from "../components/Footer";
+import dynamic from "next/dynamic";
+
+// Carga diferida (optimización): los paneles que NO son la vista inicial del
+// dashboard se descargan solo cuando se renderizan — Usuarios e Invertir son
+// solo-admin y el Asistente IA va al final de la página. MarketPanel (precios
+// en vivo, arriba) se queda en el bundle principal.
+const panelLoading = () => (
+  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500">
+    Cargando panel…
+  </div>
+);
+const UsersPanel = dynamic(
+  () => import("../components/UsersPanel").then((m) => m.UsersPanel),
+  { ssr: false, loading: panelLoading },
+);
+const InvestorPanel = dynamic(
+  () => import("../components/InvestorPanel").then((m) => m.InvestorPanel),
+  { ssr: false, loading: panelLoading },
+);
+const AiAssistant = dynamic(
+  () => import("../components/AiAssistant").then((m) => m.AiAssistant),
+  { ssr: false, loading: panelLoading },
+);
 
 const money = (s: string | null) =>
   s == null || s === "" ? "—" : `$${Number(s).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
