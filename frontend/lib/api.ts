@@ -343,6 +343,30 @@ export interface ReferralInput {
   notes?: string;
 }
 
+// ---------- Business (Plataforma Unificada — módulo Business) ----------
+// Cada área (Marketing, Ventas, Legal, Administrativo) tiene sus PROPIAS
+// notas y tareas: el backend las filtra por área y nunca las mezcla.
+
+export type BusinessArea = "marketing" | "ventas" | "legal" | "administrativo";
+
+export interface BusinessNote {
+  id: number;
+  area: BusinessArea;
+  title: string;
+  body: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface BusinessTask {
+  id: number;
+  area: BusinessArea;
+  title: string;
+  done: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 // ---------- fetch core ----------
 
 // Default per-request timeout: a hung backend must never block the UI forever.
@@ -548,4 +572,20 @@ export const api = {
     request<Referral>(`/api/referrals/campaigns/${campaignId}/referrals`, { method: "POST", auth: true, body }),
   updateReferralStatus: (id: number, status: ReferralStatus) =>
     request<Referral>(`/api/referrals/referrals/${id}`, { method: "PATCH", auth: true, body: { status } }),
+  listBusinessNotes: (area: BusinessArea) =>
+    request<BusinessNote[]>(`/api/business/${area}/notes`, { auth: true }),
+  createBusinessNote: (area: BusinessArea, body: { title: string; body?: string }) =>
+    request<BusinessNote>(`/api/business/${area}/notes`, { method: "POST", auth: true, body }),
+  updateBusinessNote: (id: number, body: { title?: string; body?: string }) =>
+    request<BusinessNote>(`/api/business/notes/${id}`, { method: "PUT", auth: true, body }),
+  deleteBusinessNote: (id: number) =>
+    request<void>(`/api/business/notes/${id}`, { method: "DELETE", auth: true }),
+  listBusinessTasks: (area: BusinessArea) =>
+    request<BusinessTask[]>(`/api/business/${area}/tasks`, { auth: true }),
+  createBusinessTask: (area: BusinessArea, body: { title: string }) =>
+    request<BusinessTask>(`/api/business/${area}/tasks`, { method: "POST", auth: true, body }),
+  updateBusinessTask: (id: number, body: { title?: string; done?: boolean }) =>
+    request<BusinessTask>(`/api/business/tasks/${id}`, { method: "PATCH", auth: true, body }),
+  deleteBusinessTask: (id: number) =>
+    request<void>(`/api/business/tasks/${id}`, { method: "DELETE", auth: true }),
 };

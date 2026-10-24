@@ -506,3 +506,46 @@ class Referral(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class BusinessNote(Base):
+    """A note inside one Business area (Plataforma Unificada — módulo Business).
+
+    Notes are scoped per area and never mixed: each row belongs to
+    exactly one area (marketing|ventas|legal|administrativo) and the
+    API only ever lists or creates notes inside the requested area.
+    """
+
+    __tablename__ = "business_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    area: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class BusinessTask(Base):
+    """A task inside one Business area (Plataforma Unificada — módulo Business).
+
+    Same per-area scoping as BusinessNote. `done` toggles without
+    deleting the row so completed work stays visible in its area.
+    """
+
+    __tablename__ = "business_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    area: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
