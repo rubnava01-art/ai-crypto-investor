@@ -181,15 +181,15 @@ export interface OrderOut {
 }
 
 export interface DashboardResponse {
-  system: SystemStatus;
-  balances: BalancesResponse;
-  performance: PerformanceResponse;
-  signals: SignalsResponse;
-  strategies: StrategyOut[];
-  modes: SimulationModes;
-  operations: OperationsResponse;
-  risk: RiskLimits;
-  logs: LogEntry[];
+  system: SystemStatus | null;
+  balances: BalancesResponse | null;
+  performance: PerformanceResponse | null;
+  signals: SignalsResponse | null;
+  strategies: StrategyOut[] | null;
+  modes: SimulationModes | null;
+  operations: OperationsResponse | null;
+  risk: RiskLimits | null;
+  logs: LogEntry[] | null;
 }
 
 // ---------- CRM (Plataforma Unificada — Fase 1) ----------
@@ -284,6 +284,63 @@ export interface TrendNote {
   summary: string;
   published_on: string | null;
   created_at: string | null;
+}
+
+// ---------- Referidos (Plataforma Unificada — módulo Referidos) ----------
+// Las recompensas solo se REGISTRAN (pendiente/confirmada/recompensada):
+// v1 no procesa pagos ni mueve dinero.
+
+export type ReferralRewardType = "fixed" | "percentage";
+export type ReferralCampaignStatus = "active" | "paused" | "ended";
+export type ReferralStatus = "pending" | "confirmed" | "rewarded";
+
+export interface ReferralCampaign {
+  id: number;
+  name: string;
+  business_contact_id: number | null;
+  business_name: string | null;
+  share_code: string;
+  reward_type: ReferralRewardType;
+  reward_value: string;
+  reward_note: string;
+  status: ReferralCampaignStatus;
+  referrals_count: number;
+  confirmed_count: number;
+  rewarded_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ReferralCampaignInput {
+  name: string;
+  business_contact_id?: number | null;
+  reward_type?: ReferralRewardType;
+  reward_value?: string;
+  reward_note?: string;
+  status?: ReferralCampaignStatus;
+}
+
+export interface Referral {
+  id: number;
+  campaign_id: number;
+  referrer_name: string;
+  referrer_contact: string;
+  referred_name: string;
+  referred_contact: string;
+  code: string;
+  status: ReferralStatus;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ReferralInput {
+  referrer_name: string;
+  referrer_contact?: string;
+  referred_name: string;
+  referred_contact?: string;
+  code?: string;
+  notes?: string;
 }
 
 // ---------- fetch core ----------
@@ -475,4 +532,20 @@ export const api = {
     request<TrendNote>("/api/crear/trends", { method: "POST", auth: true, body }),
   deleteTrend: (id: number) =>
     request<void>(`/api/crear/trends/${id}`, { method: "DELETE", auth: true }),
+  listReferralCampaigns: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<ReferralCampaign[]>(`/api/referrals/campaigns${qs}`, { auth: true });
+  },
+  createReferralCampaign: (body: ReferralCampaignInput) =>
+    request<ReferralCampaign>("/api/referrals/campaigns", { method: "POST", auth: true, body }),
+  updateReferralCampaign: (id: number, body: ReferralCampaignInput) =>
+    request<ReferralCampaign>(`/api/referrals/campaigns/${id}`, { method: "PUT", auth: true, body }),
+  listReferrals: (campaignId: number, status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<Referral[]>(`/api/referrals/campaigns/${campaignId}/referrals${qs}`, { auth: true });
+  },
+  registerReferral: (campaignId: number, body: ReferralInput) =>
+    request<Referral>(`/api/referrals/campaigns/${campaignId}/referrals`, { method: "POST", auth: true, body }),
+  updateReferralStatus: (id: number, status: ReferralStatus) =>
+    request<Referral>(`/api/referrals/referrals/${id}`, { method: "PATCH", auth: true, body: { status } }),
 };

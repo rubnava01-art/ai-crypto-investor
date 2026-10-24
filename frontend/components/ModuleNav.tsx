@@ -8,6 +8,7 @@ const MODULES = [
   { href: "/estudiar", label: "Estudiar", hint: "Academia" },
   { href: "/crear", label: "Crear", hint: "Forge · copies · tendencias" },
   { href: "/crm", label: "CRM", hint: "Contactos y clientes" },
+  { href: "/referidos", label: "Referidos", hint: "Campañas con recompensas" },
 ];
 
 export function ModuleNav() {

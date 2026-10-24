@@ -433,3 +433,76 @@ class CourseEnrollment(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class ReferralCampaign(Base):
+    """Referral campaign (Plataforma Unificada — módulo Referidos).
+
+    A business (optionally an existing CRM contact) runs a campaign:
+    existing customers share the campaign's share_code, and when a
+    referred person becomes a new client the referral is tracked here.
+
+    `reward_type`: fixed (a fixed amount, currency of the business) or
+    percentage (a % of the referred client's first purchase).
+    `status`: active|paused|ended.
+    Rewards are TRACKED only (pending/confirmed/rewarded on the
+    Referral row) — v1 processes no actual money movement.
+    """
+
+    __tablename__ = "referral_campaigns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    business_contact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("crm_contacts.id"), nullable=True
+    )
+    share_code: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    reward_type: Mapped[str] = mapped_column(
+        String(16), default="fixed", nullable=False
+    )  # fixed|percentage
+    reward_value: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0"), nullable=False
+    )
+    reward_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="active", nullable=False
+    )  # active|paused|ended
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class Referral(Base):
+    """One tracked referral inside a campaign.
+
+    `code` is the referral code presented when the referred person was
+    brought in — it defaults to the campaign's share_code and may be a
+    referrer-specific code set by the admin.
+    `status`: pending (referred, not yet a client) -> confirmed (became
+    a client) -> rewarded (reward recorded as given). Forward-only.
+    """
+
+    __tablename__ = "referrals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(
+        ForeignKey("referral_campaigns.id"), nullable=False
+    )
+    referrer_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    referrer_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    referred_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    referred_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="pending", nullable=False
+    )  # pending|confirmed|rewarded
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

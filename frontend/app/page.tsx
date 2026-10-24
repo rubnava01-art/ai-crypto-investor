@@ -95,6 +95,13 @@ export default function DashboardPage() {
         setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
         setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
         setOffline(false);
+        // Tolerancia parcial del backend: una sección nula significa que esa
+        // sección falló, no que todo el dashboard esté caído. Avisar sin
+        // esconder el resto de los datos.
+        if ([d.system, d.balances, d.performance, d.signals, d.strategies,
+             d.modes, d.operations, d.risk, d.logs].some((s) => s == null)) {
+          setActionError("Algunas secciones del dashboard no cargaron; el resto se muestra con normalidad.");
+        }
         api.me().then(setMe).catch(() => setMe(null));
         return;
       } catch (err) {

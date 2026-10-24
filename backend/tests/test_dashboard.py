@@ -29,3 +29,19 @@ def test_dashboard_matches_individual_endpoints(client):
     indiv = client.get("/api/system/status", headers=h).json()
     assert agg["system"]["mode"] == indiv["mode"]
     assert agg["modes"]["current"] == client.get("/api/simulation/modes", headers=h).json()["current"]
+
+
+def test_dashboard_partial_failure_degrades_to_null(client, monkeypatch):
+    """One failing section must not 500 the whole dashboard."""
+    from app.api import dashboard as dashboard_mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated section failure")
+
+    monkeypatch.setattr(dashboard_mod.misc, "logs", _boom)
+    r = client.get("/api/dashboard", headers=_auth(client))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["logs"] is None
+    assert "equity_usd" in body["balances"]
+    assert body["system"] is not None
