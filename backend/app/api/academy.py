@@ -14,6 +14,8 @@ Permissions follow the platform RBAC:
 Delivery tracking links the Academy to the CRM: an enrollment ties one
 CRM contact to one course, with purchased/delivered flags + timestamps.
 """
+import base64
+import logging
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -47,6 +49,34 @@ PDF_FILES: dict[str, str] = {
     # The Pack has no single file: it is the 6 ebook PDFs (see downloads).
 }
 PACK_SLUG = "pack-creador-completo"
+
+logger = logging.getLogger(__name__)
+
+
+def ensure_pdf_file(filename: str) -> Path | None:
+    """Return the PDF path, materializing it from its .b64 sibling if needed.
+
+    The deploy pipeline (GitHub push-files) only accepts UTF-8 text, so the
+    repo ALSO ships each PDF as base64 text (``<name>.pdf.b64``) next to the
+    binary. On hosts where the binary itself did not survive the deploy
+    (e.g. Render), decode the .b64 into the real .pdf on first use.
+    Idempotent, and never raises: on any failure it logs and returns None so
+    the caller answers its usual 404.
+    """
+    path = PDF_DIR / filename
+    if path.is_file():
+        return path
+    b64_path = PDF_DIR / f"{filename}.b64"
+    if not b64_path.is_file():
+        return None
+    try:
+        data = base64.b64decode(b64_path.read_text(encoding="ascii"))
+        path.write_bytes(data)
+        logger.info("Materialized PDF %s from its base64 source", filename)
+    except Exception:  # defensive: a corrupt .b64 must not break downloads
+        logger.exception("Failed to materialize PDF %s from base64", filename)
+        return None
+    return path if path.is_file() else None
 
 # --- Real catalog (documented 2026-10-07 / academia-campaign) --------------
 # (slug, title, description, price_usd, kind, buy_url, delivery_note)
@@ -341,8 +371,8 @@ def download_course_pdf(
             status_code=404,
             detail="Este producto no tiene un PDF único; descarga los PDFs desde cada ebook.",
         )
-    path = PDF_DIR / filename
-    if not path.is_file():
+    path = ensure_pdf_file(filename)
+    if path is None:
         raise HTTPException(status_code=404, detail="PDF file not available")
     return FileResponse(
         path,
