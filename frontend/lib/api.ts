@@ -374,6 +374,29 @@ export interface BusinessTask {
 const DEFAULT_TIMEOUT_MS = 30_000;
 const AI_TIMEOUT_MS = 120_000;
 
+// Único punto de fetch con timeout: request() (JSON) y downloadCoursePdf
+// (blob) lo comparten en vez de duplicar el AbortController. Un timeout se
+// reporta como timeout, no como "API unreachable".
+async function fetchTimed(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  label: string,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, `API timeout (${timeoutMs / 1000}s) en ${label}`);
+    }
+    throw new ApiError(0, `API unreachable (${API_URL})`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function request<T>(
   path: string,
   opts: {
@@ -392,27 +415,18 @@ async function request<T>(
   if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchTimed(
+    `${API_URL}${path}`,
+    {
       method: opts.method ?? "GET",
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       cache: "no-store",
-      signal: ctrl.signal,
-    });
-  } catch (err) {
-    clearTimeout(timer);
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new ApiError(0, `API timeout (${timeoutMs / 1000}s) en ${path}`);
-    }
-    throw new ApiError(0, `API unreachable (${API_URL})`);
-  } finally {
-    clearTimeout(timer);
-  }
+    },
+    timeoutMs,
+    path,
+  );
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -516,20 +530,16 @@ export const api = {
   // blob -> descarga del navegador (el endpoint exige autenticación).
   downloadCoursePdf: async (courseId: number, filename: string): Promise<void> => {
     const token = getToken();
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
-    let res: Response;
-    try {
-      res = await fetch(`${API_URL}/api/academy/courses/${courseId}/download`, {
+    const path = `/api/academy/courses/${courseId}/download`;
+    const res = await fetchTimed(
+      `${API_URL}${path}`,
+      {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         cache: "no-store",
-        signal: ctrl.signal,
-      });
-    } catch {
-      clearTimeout(timer);
-      throw new ApiError(0, `API unreachable (${API_URL})`);
-    }
-    clearTimeout(timer);
+      },
+      DEFAULT_TIMEOUT_MS,
+      path,
+    );
     if (!res.ok) throw new ApiError(res.status, `No se pudo descargar el PDF (${res.status})`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
