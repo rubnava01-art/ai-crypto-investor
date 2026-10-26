@@ -8,7 +8,7 @@ const FORGE_URL = "https://rubnava01-art.github.io/New/";
 
 export default function CrearPage() {
   return (
-    <ModuleShell moduleTitle="Crear" subtitle="Forge · copies · tendencias">
+    <ModuleShell moduleTitle="Crear" subtitle="Forge · copies · logos · mockups · tendencias">
       <div className="space-y-4">
         <Panel
           title="NEST Forge AI"

@@ -286,6 +286,15 @@ export interface TrendNote {
   created_at: string | null;
 }
 
+// ---------- Espacio (meditación y revelaciones) ----------
+
+export interface Revelation {
+  id: number;
+  title: string;
+  text: string;
+  created_at: string | null;
+}
+
 // ---------- Referidos (Plataforma Unificada — módulo Referidos) ----------
 // Las recompensas solo se REGISTRAN (pendiente/confirmada/recompensada):
 // v1 no procesa pagos ni mueve dinero.
@@ -438,7 +447,14 @@ async function request<T>(
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Robustez: un 2xx con cuerpo vacío o no-JSON (p. ej. un error del proxy
+  // de Render que llega con 200) antes lanzaba un SyntaxError crudo que
+  // ningún panel sabía mostrar; ahora es un ApiError como cualquier otro.
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new ApiError(0, `Respuesta no válida del API en ${path}`);
+  }
 }
 
 // ---------- endpoints ----------
@@ -566,6 +582,11 @@ export const api = {
     request<TrendNote>("/api/crear/trends", { method: "POST", auth: true, body }),
   deleteTrend: (id: number) =>
     request<void>(`/api/crear/trends/${id}`, { method: "DELETE", auth: true }),
+  listRevelations: () => request<Revelation[]>("/api/espacio/revelations", { auth: true }),
+  createRevelation: (body: { title: string; text?: string }) =>
+    request<Revelation>("/api/espacio/revelations", { method: "POST", auth: true, body }),
+  deleteRevelation: (id: number) =>
+    request<void>(`/api/espacio/revelations/${id}`, { method: "DELETE", auth: true }),
   listReferralCampaigns: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<ReferralCampaign[]>(`/api/referrals/campaigns${qs}`, { auth: true });

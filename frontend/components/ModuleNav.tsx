@@ -10,6 +10,7 @@ const MODULES = [
   { href: "/crm", label: "CRM", hint: "Contactos y clientes" },
   { href: "/referidos", label: "Referidos", hint: "Campañas con recompensas" },
   { href: "/business", label: "Business", hint: "Marketing · Ventas · Legal · Admin" },
+  { href: "/espacio", label: "Espacio", hint: "Meditación · revelaciones" },
 ];
 
 export function ModuleNav() {

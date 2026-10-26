@@ -6,6 +6,8 @@ import {
   type AIStatusResponse, type CopyDraft, type CopyPlatform, type CopyTone, type MeResponse, type TrendNote,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { LogoGenerator } from "./LogoGenerator";
+import { ShirtMockupGenerator } from "./ShirtMockupGenerator";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -312,6 +314,8 @@ export function CrearPanel() {
   return (
     <div className="space-y-4">
       <CopyGenerator isAdmin={isAdmin} />
+      <LogoGenerator />
+      <ShirtMockupGenerator />
       <TrendsPanel isAdmin={isAdmin} />
     </div>
   );

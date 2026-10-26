@@ -366,6 +366,24 @@ class TrendNote(Base):
     )
 
 
+class Revelation(Base):
+    """A personal revelation/reflection note in the Espacio module.
+
+    Written by Rubén himself (meditation reflections, ideas, lessons) —
+    never generated or invented by the system. Any authenticated user
+    reads; only admins write/delete.
+    """
+
+    __tablename__ = "revelations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Course(Base):
     """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
 
