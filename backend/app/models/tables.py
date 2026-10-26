@@ -384,6 +384,33 @@ class Revelation(Base):
     )
 
 
+class Invoice(Base):
+    """An invoice generated in the Facturas module.
+
+    Items are stored as JSON: [{description, qty, unit_price}]. Totals
+    are computed from items + tax_rate; the backend never invents
+    amounts — every line comes from the admin's form (or from the
+    materials calculator, which the admin reviews before adding).
+    `status`: borrador|enviada|pagada. v1 tracks invoices only; it does
+    not charge cards or move money.
+    """
+
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    number: Mapped[str] = mapped_column(String(40), nullable=False)
+    client_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    client_email: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    client_phone: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    items: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="borrador", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Course(Base):
     """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
 

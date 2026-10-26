@@ -295,6 +295,29 @@ export interface Revelation {
   created_at: string | null;
 }
 
+// ---------- Facturas ----------
+
+export interface InvoiceItem {
+  description: string;
+  qty: number;
+  unit_price: number;
+}
+
+export type InvoiceStatus = "borrador" | "enviada" | "pagada";
+
+export interface Invoice {
+  id: number;
+  number: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  items: InvoiceItem[];
+  tax_rate: number;
+  status: InvoiceStatus;
+  notes: string;
+  created_at: string | null;
+}
+
 // ---------- Referidos (Plataforma Unificada — módulo Referidos) ----------
 // Las recompensas solo se REGISTRAN (pendiente/confirmada/recompensada):
 // v1 no procesa pagos ni mueve dinero.
@@ -587,6 +610,13 @@ export const api = {
     request<Revelation>("/api/espacio/revelations", { method: "POST", auth: true, body }),
   deleteRevelation: (id: number) =>
     request<void>(`/api/espacio/revelations/${id}`, { method: "DELETE", auth: true }),
+  listInvoices: () => request<Invoice[]>("/api/facturas/invoices", { auth: true }),
+  createInvoice: (body: { number?: string; client_name: string; client_email?: string; client_phone?: string; items: InvoiceItem[]; tax_rate?: number; notes?: string }) =>
+    request<Invoice>("/api/facturas/invoices", { method: "POST", auth: true, body }),
+  updateInvoiceStatus: (id: number, status: InvoiceStatus) =>
+    request<Invoice>(`/api/facturas/invoices/${id}`, { method: "PATCH", auth: true, body: { status } }),
+  deleteInvoice: (id: number) =>
+    request<void>(`/api/facturas/invoices/${id}`, { method: "DELETE", auth: true }),
   listReferralCampaigns: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<ReferralCampaign[]>(`/api/referrals/campaigns${qs}`, { auth: true });

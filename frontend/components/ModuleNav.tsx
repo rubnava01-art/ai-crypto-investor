@@ -11,6 +11,7 @@ const MODULES = [
   { href: "/referidos", label: "Referidos", hint: "Campañas con recompensas" },
   { href: "/business", label: "Business", hint: "Marketing · Ventas · Legal · Admin" },
   { href: "/espacio", label: "Espacio", hint: "Meditación · revelaciones" },
+  { href: "/facturas", label: "Facturas", hint: "Facturas · materiales" },
 ];
 
 export function ModuleNav() {
