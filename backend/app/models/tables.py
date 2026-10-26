@@ -411,6 +411,32 @@ class Invoice(Base):
     )
 
 
+class EduClass(Base):
+    """A class in the Estudiar module: recorded or live.
+
+    `kind`: grabada (a recorded video: url points to the recording) or
+    envivo (a scheduled live session: url points to the meeting room and
+    scheduled_at is the start time). Classes are added by the admin only
+    — the system never invents classes, links, or schedules. Lists start
+    empty.
+    """
+
+    __tablename__ = "edu_classes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    scheduled_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Course(Base):
     """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
 

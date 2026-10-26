@@ -295,6 +295,21 @@ export interface Revelation {
   created_at: string | null;
 }
 
+// ---------- Clases (Estudiar) ----------
+
+export type EduClassKind = "grabada" | "envivo";
+
+export interface EduClass {
+  id: number;
+  kind: EduClassKind;
+  title: string;
+  description: string;
+  url: string;
+  scheduled_at: string | null;
+  duration_min: number | null;
+  created_at: string | null;
+}
+
 // ---------- Facturas ----------
 
 export interface InvoiceItem {
@@ -617,6 +632,12 @@ export const api = {
     request<Invoice>(`/api/facturas/invoices/${id}`, { method: "PATCH", auth: true, body: { status } }),
   deleteInvoice: (id: number) =>
     request<void>(`/api/facturas/invoices/${id}`, { method: "DELETE", auth: true }),
+  listClasses: (kind?: EduClassKind) =>
+    request<EduClass[]>(`/api/clases/classes${kind ? `?kind=${kind}` : ""}`, { auth: true }),
+  createClass: (body: { kind: EduClassKind; title: string; description?: string; url?: string; scheduled_at?: string | null; duration_min?: number | null }) =>
+    request<EduClass>("/api/clases/classes", { method: "POST", auth: true, body }),
+  deleteClass: (id: number) =>
+    request<void>(`/api/clases/classes/${id}`, { method: "DELETE", auth: true }),
   listReferralCampaigns: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<ReferralCampaign[]>(`/api/referrals/campaigns${qs}`, { auth: true });
