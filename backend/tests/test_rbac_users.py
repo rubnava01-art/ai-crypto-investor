@@ -17,10 +17,12 @@ def _make_viewer(client):
 
 
 def test_me_reports_role(client):
+    # Acceso 2026-10-26: the seeded owner admin holds the super admin tier.
     r = client.get("/api/auth/me", headers=_admin(client))
     assert r.status_code == 200
-    assert r.json()["role"] == "admin"
+    assert r.json()["role"] == "super_admin"
     assert r.json()["is_admin"] is True
+    assert r.json()["is_super_admin"] is True
 
 
 def test_admin_user_crud(client):

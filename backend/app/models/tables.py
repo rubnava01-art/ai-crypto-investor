@@ -35,6 +35,26 @@ class User(Base):
     )
 
 
+class SuperAdminGrant(Base):
+    """Marks a user as super admin — the tier above admin (Acceso, 2026-10-26).
+
+    Kept as a separate table (not a column on users) so existing databases
+    need no migration: create_all adds it, and the seed grants it to the
+    owner admin account. A super admin passes every admin gate and, in
+    addition, is the only tier that can grant/revoke super admin status
+    or touch another super admin's account.
+    """
+
+    __tablename__ = "super_admin_grants"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    granted_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class ExchangeConnection(Base):
     """Phase 1: stores metadata only. Real API secrets are NEVER stored in Phase 1.
 

@@ -75,3 +75,33 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
             detail="Admin only: this account can view and run tests, but not change controls.",
         )
     return user
+
+
+def is_super_admin(user: User, db: Session) -> bool:
+    """True when the user holds a row in super_admin_grants."""
+    from app.models.tables import SuperAdminGrant
+
+    return (
+        db.query(SuperAdminGrant).filter(SuperAdminGrant.user_id == user.id).first()
+        is not None
+    )
+
+
+def require_super_admin(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> User:
+    """Gate for super-admin-only actions (granting super status, touching
+    another super admin's account)."""
+    if not is_super_admin(user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin only.",
+        )
+    return user
+
+
+def effective_role(user: User, db: Session) -> str:
+    """Display role: super_admin > admin > prueba."""
+    if is_super_admin(user, db):
+        return "super_admin"
+    return "admin" if user.is_admin else "prueba"

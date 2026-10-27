@@ -158,15 +158,22 @@ export interface MarketPricesResponse {
 export interface MeResponse {
   username: string;
   is_admin: boolean;
-  role: "admin" | "prueba";
+  is_super_admin: boolean;
+  role: "admin" | "prueba" | "super_admin";
 }
 
 export interface AdminUser {
   id: number;
   username: string;
-  role: "admin" | "prueba";
+  role: "admin" | "prueba" | "super_admin";
   is_admin: boolean;
+  is_super_admin: boolean;
   created_at: string | null;
+}
+
+export interface RegisterChallenge {
+  challenge_id: string;
+  question: string;
 }
 
 export interface OrderOut {
@@ -556,14 +563,17 @@ export const api = {
   me: () => request<MeResponse>("/api/auth/me", { auth: true }),
   marketPrices: () => request<MarketPricesResponse>("/api/market/prices", { auth: true }),
   listUsers: () => request<AdminUser[]>("/api/users", { auth: true }),
-  createUser: (username: string, password: string, role: "admin" | "prueba") =>
+  createUser: (username: string, password: string, role: "admin" | "prueba" | "super_admin") =>
     request<AdminUser>("/api/users", {
       method: "POST",
       auth: true,
       body: { username, password, role },
     }),
-  updateUser: (id: number, patch: { role?: "admin" | "prueba"; password?: string }) =>
+  updateUser: (id: number, patch: { role?: "admin" | "prueba" | "super_admin"; password?: string }) =>
     request<AdminUser>(`/api/users/${id}`, { method: "PATCH", auth: true, body: patch }),
+  registerChallenge: () => request<RegisterChallenge>("/api/auth/register-challenge"),
+  register: (body: { username: string; password: string; challenge_id: string; answer: number }) =>
+    request<AdminUser>("/api/auth/register", { method: "POST", body }),
   deleteUser: (id: number) =>
     request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),
   dashboard: () => request<DashboardResponse>("/api/dashboard", { auth: true }),

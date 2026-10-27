@@ -29,6 +29,20 @@ def seed_demo_data() -> None:
                     is_admin=True,
                 )
             )
+        # Super admin tier (Acceso, 2026-10-26): the owner admin account
+        # holds the top tier. Runs on every startup (not only on empty DB)
+        # so existing databases gain it without a migration.
+        from app.models.tables import SuperAdminGrant
+
+        owner = db.query(User).filter(User.username == settings.admin_username).first()
+        if owner is not None and (
+            db.query(SuperAdminGrant)
+            .filter(SuperAdminGrant.user_id == owner.id)
+            .first()
+            is None
+        ):
+            db.add(SuperAdminGrant(user_id=owner.id))
+            db.commit()
         # Demo read-only "prueba" account (view + tests only, no controls).
         if db.query(User).filter(User.username == "prueba").first() is None:
             db.add(
