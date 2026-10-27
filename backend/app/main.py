@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
 from app.core.security import hash_password
@@ -182,6 +183,10 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(MetricsMiddleware)
+    # Added last = outermost: compresses every JSON response (typical
+    # list/dashboard payloads shrink ~70-80% on the wire). Binary PDF
+    # downloads are already compressed and stay untouched in practice.
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.include_router(auth.router)
     app.include_router(system.router)
     app.include_router(portfolio.router)
