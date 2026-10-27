@@ -79,7 +79,7 @@ export default function LoginPage() {
         <h1 className="mb-1 text-xl font-bold tracking-tight">AI CRYPTO INVESTOR</h1>
         <p className="mb-6 text-sm text-zinc-400">
           {mode === "login"
-            ? "Sign in to the dashboard (demo mode)."
+            ? "Sign in to your business platform."
             : "Crea tu cuenta. Las cuentas nuevas entran como Prueba (solo ver y probar); un administrador puede subirte de rol."}
         </p>
 

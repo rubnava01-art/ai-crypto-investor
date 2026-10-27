@@ -475,6 +475,20 @@ async function fetchTimed(
   }
 }
 
+// Detalle de error del backend cuando lo hay (FastAPI: {"detail": "..."});
+// si el cuerpo no es JSON (p. ej. página del proxy), cae al statusText.
+// Lo comparten request() (JSON) y downloadCoursePdf() (blob) para que un
+// fallo de descarga muestre la causa real y no solo el código HTTP.
+async function errorDetail(res: Response): Promise<string> {
+  try {
+    const j = await res.json();
+    if (typeof j?.detail === "string") return j.detail;
+  } catch {
+    /* cuerpo no-JSON: usa statusText */
+  }
+  return res.statusText;
+}
+
 async function request<T>(
   path: string,
   opts: {
@@ -506,14 +520,7 @@ async function request<T>(
     path,
   );
   if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const j = await res.json();
-      if (typeof j?.detail === "string") detail = j.detail;
-    } catch {
-      /* keep statusText */
-    }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, await errorDetail(res));
   }
   if (res.status === 204) return undefined as T;
   // Robustez: un 2xx con cuerpo vacío o no-JSON (p. ej. un error del proxy
@@ -628,7 +635,10 @@ export const api = {
       DEFAULT_TIMEOUT_MS,
       path,
     );
-    if (!res.ok) throw new ApiError(res.status, `No se pudo descargar el PDF (${res.status})`);
+    if (!res.ok) {
+      const detail = await errorDetail(res);
+      throw new ApiError(res.status, detail || `No se pudo descargar el PDF (${res.status})`);
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

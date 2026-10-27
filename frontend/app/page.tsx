@@ -165,9 +165,13 @@ export default function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">PLATAFORMA</h1>
+          <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            Plataforma unificada
+          </p>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Invertir</h1>
           <p className="text-sm text-zinc-400">
-            Invertir · AI Crypto Investor — {system ? <>Mode: <span className="font-mono">{system.mode}</span></> : "Loading…"}
+            AI Crypto Investor — {system ? <>Mode: <span className="font-mono">{system.mode}</span></> : "Loading…"}
           </p>
         </div>
         <div className="flex items-center gap-2">
