@@ -12,12 +12,13 @@ const MODULES = [
   { href: "/business", label: "Business", hint: "Marketing · Ventas · Legal · Admin" },
   { href: "/espacio", label: "Espacio", hint: "Meditación · revelaciones" },
   { href: "/facturas", label: "Facturas", hint: "Facturas · materiales" },
+  { href: "/correos", label: "Correos", hint: "Plantillas · CRM · registro" },
 ];
 
 export function ModuleNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Módulos de la plataforma" className="flex flex-wrap gap-2">
+    <nav aria-label="Módulos de la plataforma" className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
       {MODULES.map((m) => {
         const active = pathname === m.href;
         return (
@@ -27,8 +28,8 @@ export function ModuleNav() {
             aria-current={active ? "page" : undefined}
             className={
               active
-                ? "rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                : "rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                ? "whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+                : "whitespace-nowrap rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
             }
           >
             {m.label}

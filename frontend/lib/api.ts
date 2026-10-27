@@ -310,6 +310,30 @@ export interface EduClass {
   created_at: string | null;
 }
 
+// ---------- Correos ----------
+
+export interface EmailTemplate {
+  id: number;
+  name: string;
+  subject: string;
+  body: string;
+  created_at: string | null;
+}
+
+export type EmailLogStatus = "preparado" | "enviado";
+
+export interface EmailLog {
+  id: number;
+  contact_id: number | null;
+  contact_name: string;
+  contact_email: string;
+  template_name: string;
+  subject: string;
+  body: string;
+  status: EmailLogStatus;
+  created_at: string | null;
+}
+
 // ---------- Facturas ----------
 
 export interface InvoiceItem {
@@ -638,6 +662,18 @@ export const api = {
     request<EduClass>("/api/clases/classes", { method: "POST", auth: true, body }),
   deleteClass: (id: number) =>
     request<void>(`/api/clases/classes/${id}`, { method: "DELETE", auth: true }),
+  listEmailTemplates: () => request<EmailTemplate[]>("/api/correos/templates", { auth: true }),
+  createEmailTemplate: (body: { name: string; subject?: string; body?: string }) =>
+    request<EmailTemplate>("/api/correos/templates", { method: "POST", auth: true, body }),
+  deleteEmailTemplate: (id: number) =>
+    request<void>(`/api/correos/templates/${id}`, { method: "DELETE", auth: true }),
+  listEmailLogs: () => request<EmailLog[]>("/api/correos/logs", { auth: true }),
+  createEmailLog: (body: { contact_id?: number | null; contact_name: string; contact_email?: string; template_name?: string; subject?: string; body?: string }) =>
+    request<EmailLog>("/api/correos/logs", { method: "POST", auth: true, body }),
+  updateEmailLogStatus: (id: number, status: EmailLogStatus) =>
+    request<EmailLog>(`/api/correos/logs/${id}`, { method: "PATCH", auth: true, body: { status } }),
+  deleteEmailLog: (id: number) =>
+    request<void>(`/api/correos/logs/${id}`, { method: "DELETE", auth: true }),
   listReferralCampaigns: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<ReferralCampaign[]>(`/api/referrals/campaigns${qs}`, { auth: true });

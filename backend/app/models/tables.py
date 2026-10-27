@@ -437,6 +437,50 @@ class EduClass(Base):
     )
 
 
+class EmailTemplate(Base):
+    """A reusable email template in the Correos module (HubSpot-style).
+
+    Body supports personalization tokens replaced at compose time:
+    {{nombre}}, {{negocio}}, {{telefono}}, {{email}}. Templates are
+    written by the admin — never generated or invented by the system.
+    """
+
+    __tablename__ = "email_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    subject: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class EmailLog(Base):
+    """A record of an email prepared (or sent) from the Correos module.
+
+    v1 does NOT send mail from the server (no SMTP configured): the
+    composer produces a ready email + a Gmail compose link, and the admin
+    sends it from his own inbox. `status`: preparado (ready, not yet
+    sent by the admin) or enviado (admin confirmed he sent it). The log
+    is the contact's email timeline — the HubSpot-style activity record.
+    """
+
+    __tablename__ = "email_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    contact_email: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    template_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    subject: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="preparado", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Course(Base):
     """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
 
