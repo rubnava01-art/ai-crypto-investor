@@ -475,6 +475,21 @@ async function fetchTimed(
   }
 }
 
+// Sesión expirada: un 401 en una petición autenticada significa que el
+// token guardado ya no vale. Antes cada panel mostraba su propio error y
+// dejaba al usuario atascado en una página que ya no podía cargar nada
+// (el shell solo comprobaba que hubiera un token, no que fuera válido).
+// Ahora el cliente centraliza el caso: borra el token inválido y vuelve
+// al login. Solo aplica a peticiones con auth: true, así un 401 de login
+// por contraseña incorrecta sigue mostrando su error en la misma página
+// sin redirigir, y nunca se redirige estando ya en /login.
+function handleUnauthorized() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+  setToken(null);
+  window.location.replace("/login");
+}
+
 // Detalle de error del backend cuando lo hay (FastAPI: {"detail": "..."});
 // si el cuerpo no es JSON (p. ej. página del proxy), cae al statusText.
 // Lo comparten request() (JSON) y downloadCoursePdf() (blob) para que un
@@ -520,6 +535,7 @@ async function request<T>(
     path,
   );
   if (!res.ok) {
+    if (res.status === 401 && opts.auth) handleUnauthorized();
     throw new ApiError(res.status, await errorDetail(res));
   }
   if (res.status === 204) return undefined as T;
@@ -636,6 +652,7 @@ export const api = {
       path,
     );
     if (!res.ok) {
+      if (res.status === 401) handleUnauthorized();
       const detail = await errorDetail(res);
       throw new ApiError(res.status, detail || `No se pudo descargar el PDF (${res.status})`);
     }
