@@ -788,3 +788,56 @@ class DigitalTask(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class TrendSearch(Base):
+    """A keyword a user researched in the Tendencias module.
+
+    User-scoped history only (keyword + date) — no volumes, no trend
+    scores, nothing invented. The research itself comes from live Google
+    autocomplete suggestions (see tendencias.py); this table only
+    remembers what the user already searched.
+    """
+
+    __tablename__ = "trend_searches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    keyword: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class WebAudit(Base):
+    """A single-page web audit from the Auditor module.
+
+    Only what was actually fetched and measured is stored: HTTP status,
+    final URL, redirect count, TTFB, total time, size, HTTPS flag, the
+    SEO checklist (as JSON) and the transparent score (% of checks
+    passed). No crawl, no sitemap check, no Core Web Vitals — the UI
+    says so explicitly.
+    """
+
+    __tablename__ = "web_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    final_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    status: Mapped[int] = mapped_column(Integer, nullable=False)
+    redirect_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ttfb_ms: Mapped[float] = mapped_column(nullable=False)
+    total_ms: Mapped[float] = mapped_column(nullable=False)
+    size_kb: Mapped[float] = mapped_column(nullable=False)
+    is_https: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    checks_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

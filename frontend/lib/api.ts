@@ -259,6 +259,49 @@ export interface DigitalTask {
   created_at: string | null;
 }
 
+// ---------- Tendencias ----------
+
+export interface TrendResearch {
+  keyword: string;
+  es: string[];
+  en: string[];
+  warning: string | null;
+  source_note: string;
+}
+
+export interface TrendSearch {
+  id: number;
+  keyword: string;
+  created_at: string | null;
+}
+
+// ---------- Auditor web ----------
+
+export interface AuditCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  value: string;
+  ideal: string;
+}
+
+export interface WebAudit {
+  id: number;
+  url: string;
+  final_url: string;
+  status: number;
+  redirect_count: number;
+  ttfb_ms: number;
+  total_ms: number;
+  size_kb: number;
+  is_https: boolean;
+  score: number | null;
+  checks: AuditCheck[];
+  note: string;
+  owner_username: string | null;
+  created_at: string | null;
+}
+
 export interface AdminUser {
   id: number;
   username: string;
@@ -915,4 +958,14 @@ export const api = {
     request<DigitalTask>(`/api/desarrollo/tasks/${id}`, { method: "PATCH", auth: true, body }),
   deleteDigitalTask: (id: number) =>
     request<void>(`/api/desarrollo/tasks/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Tendencias ----------
+  researchTrends: (keyword: string) =>
+    request<TrendResearch>(`/api/tendencias/research?keyword=${encodeURIComponent(keyword)}`, { auth: true }),
+  listTrendSearches: () => request<TrendSearch[]>("/api/tendencias/searches", { auth: true }),
+
+  // ---------- Auditor web ----------
+  runWebAudit: (url: string) =>
+    request<WebAudit>("/api/auditor/audits", { method: "POST", auth: true, body: { url } }),
+  listWebAudits: () => request<WebAudit[]>("/api/auditor/audits", { auth: true }),
 };

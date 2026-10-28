@@ -107,6 +107,23 @@ const MODULES = [
     hint: "Adaptación digital para empresas",
     icon: <Icon d="M5 21V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17M9 21v-4h6v4M9 10h.01M15 10h.01M12 7v0" />,
   },
+  {
+    href: "/tendencias",
+    label: "Tendencias",
+    hint: "Palabras · campañas · anuncios",
+    icon: <Icon d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" />,
+  },
+  {
+    href: "/auditor",
+    label: "Auditor web",
+    hint: "Velocidad · SEO de una página",
+    icon: (
+      <Icon>
+        <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+        <path d="M12 12l4-4" />
+      </Icon>
+    ),
+  },
 ];
 
 export function ModuleNav() {
