@@ -841,3 +841,39 @@ class WebAudit(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class ComplianceItem(Base):
+    """A privacy / compliance task (módulo Privacidad, 2026-10-28).
+
+    Centralizes the privacy, data-protection, accessibility and legal
+    compliance work for the site in one section, grouped in the six
+    categories Rubén defined: documentos legales, cookies y
+    consentimiento, protección y gestión de datos, transparencia y
+    prácticas comerciales, accesibilidad y contenido, e información del
+    negocio. `status`: pendiente|en_proceso|completado. Admin CRUD,
+    prueba read-only.
+
+    Honest boundary: this is an INTERNAL task center. It does not
+    publish legal texts and does not claim the site complies — the
+    document items (privacy policy, terms, refunds, cookies) are tasks
+    to draft and maintain those documents, with their links/text kept
+    in `notes` by the admin.
+    """
+
+    __tablename__ = "compliance_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="pendiente", nullable=False
+    )  # pendiente|en_proceso|completado
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

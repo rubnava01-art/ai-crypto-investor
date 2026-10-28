@@ -108,6 +108,11 @@ def seed_demo_data() -> None:
         from app.api.crear import seed_trend_notes
 
         seed_trend_notes(db)
+        # Módulo Privacidad (2026-10-28): seed the compliance checklist
+        # Rubén defined (20 items in 6 categories) when empty.
+        from app.api.privacidad import seed_privacidad_items
+
+        seed_privacidad_items(db)
         db.commit()
     finally:
         db.close()
@@ -178,7 +183,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import academy, auth, auditor, backtest, business, chat, clases, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, market, misc, portfolio, profile, recomendaciones, referrals, signals, strategy, system, tendencias, users
+    from app.api import academy, auth, auditor, backtest, business, chat, clases, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, market, misc, portfolio, privacidad, profile, recomendaciones, referrals, signals, strategy, system, tendencias, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -232,6 +237,7 @@ def create_app() -> FastAPI:
     app.include_router(desarrollo.router)
     app.include_router(tendencias.router)
     app.include_router(auditor.router)
+    app.include_router(privacidad.router)
     app.include_router(ai_api.router)
     return app
 

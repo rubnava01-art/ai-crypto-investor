@@ -219,6 +219,37 @@ export interface RecommendationInput {
   category?: RecommendationCategory;
 }
 
+// ---------- Privacidad y cumplimiento ----------
+
+export type ComplianceCategory =
+  | "documentos"
+  | "cookies"
+  | "datos"
+  | "transparencia"
+  | "accesibilidad"
+  | "negocio";
+
+export type ComplianceStatus = "pendiente" | "en_proceso" | "completado";
+
+export interface ComplianceItem {
+  id: number;
+  title: string;
+  category: ComplianceCategory;
+  description: string;
+  status: ComplianceStatus;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ComplianceItemInput {
+  title: string;
+  category?: ComplianceCategory;
+  description?: string;
+  status?: ComplianceStatus;
+  notes?: string;
+}
+
 // ---------- Desarrollo digital ----------
 
 export type DigitalStage = "diagnostico" | "propuesta" | "desarrollo" | "entrega";
@@ -968,4 +999,14 @@ export const api = {
   runWebAudit: (url: string) =>
     request<WebAudit>("/api/auditor/audits", { method: "POST", auth: true, body: { url } }),
   listWebAudits: () => request<WebAudit[]>("/api/auditor/audits", { auth: true }),
+
+  // ---------- Privacidad y cumplimiento ----------
+  listComplianceItems: () =>
+    request<ComplianceItem[]>("/api/privacidad/items", { auth: true }),
+  createComplianceItem: (body: ComplianceItemInput) =>
+    request<ComplianceItem>("/api/privacidad/items", { method: "POST", auth: true, body }),
+  updateComplianceItem: (id: number, body: Partial<ComplianceItemInput>) =>
+    request<ComplianceItem>(`/api/privacidad/items/${id}`, { method: "PUT", auth: true, body }),
+  deleteComplianceItem: (id: number) =>
+    request<void>(`/api/privacidad/items/${id}`, { method: "DELETE", auth: true }),
 };
