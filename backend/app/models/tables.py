@@ -30,6 +30,14 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Perfil editable (paquete 2026-10-28): nombre, correo, dirección y
+    # foto. Todo opcional y vacío al inicio — nunca se inventa contenido.
+    # La foto es un data URL (base64, máx. ~500KB) guardado en la DB para
+    # que sobreviva a los reinicios del tier gratuito de Render (sin disco).
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    avatar_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -683,4 +691,100 @@ class BusinessTask(Base):
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ChatMessage(Base):
+    """A message in the Chat en vivo module (paquete 2026-10-28).
+
+    Any authenticated user (admin or prueba) can read and post; only
+    admins delete (moderation). The panel polls every ~5s — near-real-time
+    without WebSocket infra, which the free tier does not support well.
+    `author_label` snapshots the author's display name at post time so
+    history stays readable if the profile changes later. No seed
+    messages: the chat starts empty.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    author_username: Mapped[str] = mapped_column(String(64), nullable=False)
+    author_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Recommendation(Base):
+    """An admin-managed recommendation (módulo Recomendaciones, 2026-10-28).
+
+    Recommends Estudiar courses and Crear tools: `category` is
+    curso|herramienta, `url` points at the course/tool. Starts EMPTY —
+    the system never invents recommendations. Admin CRUD, prueba
+    read-only.
+    """
+
+    __tablename__ = "recommendations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    url: Mapped[str] = mapped_column(String(512), default="", nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(16), default="curso", nullable=False
+    )  # curso|herramienta
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class DigitalProject(Base):
+    """A business digital-adaptation project (módulo Desarrollo digital).
+
+    Linked to an existing CRM contact (the company being adapted).
+    `stage`: diagnostico|propuesta|desarrollo|entrega, forward in
+    practice but editable back by the admin. `notes` holds the
+    adaptation plan / meeting notes. Starts EMPTY. Admin CRUD, prueba
+    read-only.
+    """
+
+    __tablename__ = "digital_projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("crm_contacts.id"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    stage: Mapped[str] = mapped_column(
+        String(32), default="diagnostico", nullable=False
+    )  # diagnostico|propuesta|desarrollo|entrega
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class DigitalTask(Base):
+    """A task inside a digital-adaptation project (Desarrollo digital)."""
+
+    __tablename__ = "digital_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("digital_projects.id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
     )

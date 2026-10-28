@@ -13,6 +13,7 @@ export function setToken(token: string | null) {
   if (typeof window === "undefined") return;
   if (token) window.localStorage.setItem(TOKEN_KEY, token);
   else window.localStorage.removeItem(TOKEN_KEY);
+  clearMeCache();
 }
 
 export class ApiError extends Error {
@@ -160,6 +161,102 @@ export interface MeResponse {
   is_admin: boolean;
   is_super_admin: boolean;
   role: "admin" | "prueba" | "super_admin";
+  // Perfil editable (paquete 2026-10-28): vacíos hasta que el usuario
+  // los llene — nunca se inventan.
+  display_name: string | null;
+  email: string | null;
+  address: string | null;
+  avatar_data_url: string | null;
+}
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  role: "admin" | "prueba" | "super_admin";
+  is_admin: boolean;
+  display_name: string | null;
+  email: string | null;
+  address: string | null;
+  avatar_data_url: string | null;
+  created_at: string | null;
+}
+
+export interface UserProfileInput {
+  display_name?: string;
+  email?: string;
+  address?: string;
+  avatar_data_url?: string;
+}
+
+// ---------- Chat en vivo ----------
+
+export interface ChatMessage {
+  id: number;
+  author_username: string;
+  author_label: string;
+  text: string;
+  created_at: string | null;
+}
+
+// ---------- Recomendaciones ----------
+
+export type RecommendationCategory = "curso" | "herramienta";
+
+export interface Recommendation {
+  id: number;
+  title: string;
+  description: string;
+  url: string;
+  category: RecommendationCategory;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RecommendationInput {
+  title: string;
+  description?: string;
+  url?: string;
+  category?: RecommendationCategory;
+}
+
+// ---------- Desarrollo digital ----------
+
+export type DigitalStage = "diagnostico" | "propuesta" | "desarrollo" | "entrega";
+
+export interface DigitalProject {
+  id: number;
+  contact_id: number | null;
+  contact_name: string | null;
+  title: string;
+  stage: DigitalStage;
+  notes: string;
+  tasks_count: number;
+  done_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface DigitalProjectInput {
+  title: string;
+  contact_id?: number | null;
+  stage?: DigitalStage;
+  notes?: string;
+}
+
+export interface DigitalProjectUpdate {
+  title?: string;
+  contact_id?: number | null;
+  clear_contact?: boolean;
+  stage?: DigitalStage;
+  notes?: string;
+}
+
+export interface DigitalTask {
+  id: number;
+  project_id: number;
+  title: string;
+  done: boolean;
+  created_at: string | null;
 }
 
 export interface AdminUser {
@@ -452,6 +549,19 @@ export interface BusinessTask {
 const DEFAULT_TIMEOUT_MS = 30_000;
 const AI_TIMEOUT_MS = 120_000;
 
+// /me, memoizado: antes cada panel (más ProfileMenu) pedía /me al montar,
+// así que una sola página disparaba 3-4 peticiones idénticas. Ahora el
+// cliente comparte una respuesta válida 60s y deduplica peticiones en
+// vuelo. La caché se invalida al cambiar el token y al guardar el perfil.
+const ME_CACHE_TTL_MS = 60_000;
+let meCache: { at: number; data: MeResponse } | null = null;
+let meInflight: Promise<MeResponse> | null = null;
+
+export function clearMeCache() {
+  meCache = null;
+  meInflight = null;
+}
+
 // Único punto de fetch con timeout: request() (JSON) y downloadCoursePdf
 // (blob) lo comparten en vez de duplicar el AbortController. Un timeout se
 // reporta como timeout, no como "API unreachable".
@@ -583,7 +693,22 @@ export const api = {
       timeoutMs: AI_TIMEOUT_MS,
     }),
   aiLessons: () => request<AILessonsResponse>("/api/ai/lessons", { auth: true }),
-  me: () => request<MeResponse>("/api/auth/me", { auth: true }),
+  me: () => {
+    if (meCache && Date.now() - meCache.at < ME_CACHE_TTL_MS) {
+      return Promise.resolve(meCache.data);
+    }
+    if (!meInflight) {
+      meInflight = request<MeResponse>("/api/auth/me", { auth: true })
+        .then((data) => {
+          meCache = { at: Date.now(), data };
+          return data;
+        })
+        .finally(() => {
+          meInflight = null;
+        });
+    }
+    return meInflight;
+  },
   marketPrices: () => request<MarketPricesResponse>("/api/market/prices", { auth: true }),
   listUsers: () => request<AdminUser[]>("/api/users", { auth: true }),
   createUser: (username: string, password: string, role: "admin" | "prueba" | "super_admin") =>
@@ -743,4 +868,51 @@ export const api = {
     request<BusinessTask>(`/api/business/tasks/${id}`, { method: "PATCH", auth: true, body }),
   deleteBusinessTask: (id: number) =>
     request<void>(`/api/business/tasks/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Perfil (paquete 2026-10-28) ----------
+  getMyProfile: () => request<UserProfile>("/api/profile/me", { auth: true }),
+  updateMyProfile: (body: UserProfileInput) => {
+    const p = request<UserProfile>("/api/profile/me", { method: "PUT", auth: true, body });
+    // El /me memoizado no incluye el perfil, pero se invalida igual para
+    // que ningún panel conserve datos viejos del usuario.
+    p.then(() => clearMeCache()).catch(() => undefined);
+    return p;
+  },
+  getUserProfile: (id: number) =>
+    request<UserProfile>(`/api/profile/users/${id}`, { auth: true }),
+
+  // ---------- Chat en vivo ----------
+  listChatMessages: () => request<ChatMessage[]>("/api/chat/messages", { auth: true }),
+  postChatMessage: (body: { text: string }) =>
+    request<ChatMessage>("/api/chat/messages", { method: "POST", auth: true, body }),
+  deleteChatMessage: (id: number) =>
+    request<void>(`/api/chat/messages/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Recomendaciones ----------
+  listRecommendations: () =>
+    request<Recommendation[]>("/api/recomendaciones", { auth: true }),
+  createRecommendation: (body: RecommendationInput) =>
+    request<Recommendation>("/api/recomendaciones", { method: "POST", auth: true, body }),
+  updateRecommendation: (id: number, body: Partial<RecommendationInput>) =>
+    request<Recommendation>(`/api/recomendaciones/${id}`, { method: "PUT", auth: true, body }),
+  deleteRecommendation: (id: number) =>
+    request<void>(`/api/recomendaciones/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Desarrollo digital ----------
+  listDigitalProjects: () =>
+    request<DigitalProject[]>("/api/desarrollo/projects", { auth: true }),
+  createDigitalProject: (body: DigitalProjectInput) =>
+    request<DigitalProject>("/api/desarrollo/projects", { method: "POST", auth: true, body }),
+  updateDigitalProject: (id: number, body: DigitalProjectUpdate) =>
+    request<DigitalProject>(`/api/desarrollo/projects/${id}`, { method: "PUT", auth: true, body }),
+  deleteDigitalProject: (id: number) =>
+    request<void>(`/api/desarrollo/projects/${id}`, { method: "DELETE", auth: true }),
+  listDigitalTasks: (projectId: number) =>
+    request<DigitalTask[]>(`/api/desarrollo/projects/${projectId}/tasks`, { auth: true }),
+  createDigitalTask: (projectId: number, body: { title: string }) =>
+    request<DigitalTask>(`/api/desarrollo/projects/${projectId}/tasks`, { method: "POST", auth: true, body }),
+  updateDigitalTask: (id: number, body: { title?: string; done?: boolean }) =>
+    request<DigitalTask>(`/api/desarrollo/tasks/${id}`, { method: "PATCH", auth: true, body }),
+  deleteDigitalTask: (id: number) =>
+    request<void>(`/api/desarrollo/tasks/${id}`, { method: "DELETE", auth: true }),
 };

@@ -89,6 +89,24 @@ const MODULES = [
     hint: "Plantillas · CRM · registro",
     icon: <Icon d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6" />,
   },
+  {
+    href: "/chat",
+    label: "Chat",
+    hint: "Chat en vivo",
+    icon: <Icon d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z" />,
+  },
+  {
+    href: "/recomendaciones",
+    label: "Recomendaciones",
+    hint: "Cursos y herramientas",
+    icon: <Icon d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1L12 2z" />,
+  },
+  {
+    href: "/desarrollo",
+    label: "Desarrollo digital",
+    hint: "Adaptación digital para empresas",
+    icon: <Icon d="M5 21V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17M9 21v-4h6v4M9 10h.01M15 10h.01M12 7v0" />,
+  },
 ];
 
 export function ModuleNav() {
