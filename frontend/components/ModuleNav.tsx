@@ -23,6 +23,12 @@ function Icon({ d, children }: { d?: string; children?: React.ReactNode }) {
 
 const MODULES = [
   {
+    href: "/inicio",
+    label: "Inicio",
+    hint: "Noticias y comentarios",
+    icon: <Icon d="M3 12l9-9 9 9M5 10v10h14V10M9 20v-6h6v6" />,
+  },
+  {
     href: "/",
     label: "Invertir",
     hint: "Trading y mercados",
@@ -129,6 +135,23 @@ const MODULES = [
     label: "Privacidad",
     hint: "Políticas · datos · cumplimiento",
     icon: <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  },
+  {
+    href: "/inventario",
+    label: "Inventario",
+    hint: "Control de stock",
+    icon: <Icon d="M20 7H4a2 2 0 0 1 0-4h16a2 2 0 0 1 0 4zM4 7v13h16V7M9 7v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M9 13h6M9 17h4" />,
+  },
+  {
+    href: "/perfil",
+    label: "Mi perfil",
+    hint: "Foto y datos del usuario",
+    icon: (
+      <Icon>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21v-1a8 8 0 0 1 16 0v1" />
+      </Icon>
+    ),
   },
 ];
 

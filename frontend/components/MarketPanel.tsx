@@ -59,7 +59,13 @@ export function MarketPanel() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 60_000);
+    // Como el Chat (optimización 2026-10-28): con la pestaña oculta el
+    // sondeo REST de 60s no aporta nada — los ticks del WebSocket ya
+    // mantienen el precio en vivo al volver — y solo gasta peticiones.
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      load();
+    }, 60_000);
 
     // Ticks en tiempo real directo del WebSocket público de Kraken (sin clave),
     // con reconexión automática con backoff exponencial si la conexión cae.

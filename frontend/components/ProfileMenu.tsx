@@ -10,7 +10,7 @@ const MAX_AVATAR_BYTES = 500 * 1024;
 
 /** Profile editor: nombre, correo, dirección y foto. All fields optional
  * and empty at first — nothing is ever invented for the user. */
-function ProfileEditor({
+export function ProfileEditor({
   initial,
   onClose,
   onSaved,

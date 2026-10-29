@@ -219,6 +219,58 @@ export interface RecommendationInput {
   category?: RecommendationCategory;
 }
 
+// ---------- Inicio: noticias y comentarios ----------
+export interface HomePost {
+  id: number;
+  title: string;
+  body: string;
+  author_name: string;
+  comment_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface HomePostInput {
+  title: string;
+  body?: string;
+}
+
+export interface HomeComment {
+  id: number;
+  post_id: number;
+  author_name: string;
+  body: string;
+  created_at: string | null;
+  can_delete: boolean;
+}
+
+// ---------- Inventario ----------
+export type InventoryUnit = "pieza" | "kg" | "litro" | "metro" | "caja" | "otro";
+
+export interface InventoryItem {
+  id: number;
+  name: string;
+  description: string;
+  sku: string;
+  quantity: number;
+  unit: InventoryUnit;
+  unit_price: number;
+  min_stock: number;
+  low_stock: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface InventoryItemInput {
+  name: string;
+  description?: string;
+  sku?: string;
+  quantity?: number;
+  unit?: InventoryUnit;
+  unit_price?: number;
+  min_stock?: number;
+}
+
 // ---------- Privacidad y cumplimiento ----------
 
 export type ComplianceCategory =
@@ -971,6 +1023,30 @@ export const api = {
     request<Recommendation>(`/api/recomendaciones/${id}`, { method: "PUT", auth: true, body }),
   deleteRecommendation: (id: number) =>
     request<void>(`/api/recomendaciones/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Inicio: noticias y comentarios ----------
+  listHomePosts: () => request<HomePost[]>("/api/inicio/posts", { auth: true }),
+  createHomePost: (body: HomePostInput) =>
+    request<HomePost>("/api/inicio/posts", { method: "POST", auth: true, body }),
+  updateHomePost: (id: number, body: Partial<HomePostInput>) =>
+    request<HomePost>(`/api/inicio/posts/${id}`, { method: "PUT", auth: true, body }),
+  deleteHomePost: (id: number) =>
+    request<void>(`/api/inicio/posts/${id}`, { method: "DELETE", auth: true }),
+  listHomeComments: (postId: number) =>
+    request<HomeComment[]>(`/api/inicio/posts/${postId}/comments`, { auth: true }),
+  createHomeComment: (postId: number, body: { body: string }) =>
+    request<HomeComment>(`/api/inicio/posts/${postId}/comments`, { method: "POST", auth: true, body }),
+  deleteHomeComment: (id: number) =>
+    request<void>(`/api/inicio/comments/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Inventario ----------
+  listInventoryItems: () => request<InventoryItem[]>("/api/inventario/items", { auth: true }),
+  createInventoryItem: (body: InventoryItemInput) =>
+    request<InventoryItem>("/api/inventario/items", { method: "POST", auth: true, body }),
+  updateInventoryItem: (id: number, body: Partial<InventoryItemInput>) =>
+    request<InventoryItem>(`/api/inventario/items/${id}`, { method: "PUT", auth: true, body }),
+  deleteInventoryItem: (id: number) =>
+    request<void>(`/api/inventario/items/${id}`, { method: "DELETE", auth: true }),
 
   // ---------- Desarrollo digital ----------
   listDigitalProjects: () =>

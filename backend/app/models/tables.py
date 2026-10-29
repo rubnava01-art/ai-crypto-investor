@@ -351,6 +351,7 @@ class Contact(Base):
     )
 
 
+
 class CopyDraft(Base):
     """A generated social-media copy kept in the Crear module (Fase 3).
 
@@ -871,6 +872,89 @@ class ComplianceItem(Base):
         String(16), default="pendiente", nullable=False
     )  # pendiente|en_proceso|completado
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+class HomePost(Base):
+    """A platform news / update post (módulo Inicio, 2026-10-29).
+
+    Admin-only publishing (news and platform updates); any
+    authenticated user reads and comments. The list starts EMPTY —
+    the system never invents news. Deleting a post deletes its
+    comments (DB cascade + ORM cascade).
+    """
+
+    __tablename__ = "home_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+    comments: Mapped[list["HomeComment"]] = relationship(
+        "HomeComment",
+        back_populates="post",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class HomeComment(Base):
+    """A comment on a HomePost (módulo Inicio, 2026-10-29).
+
+    Any authenticated user comments; a comment can be deleted by
+    its own author or by an admin.
+    """
+
+    __tablename__ = "home_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("home_posts.id", ondelete="CASCADE"), nullable=False
+    )
+    author_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    post: Mapped["HomePost"] = relationship("HomePost", back_populates="comments")
+
+
+class InventoryItem(Base):
+    """An inventory item (módulo Inventario, 2026-10-29).
+
+    Simple stock control for the business side of the platform:
+    quantity on hand, unit, unit price and a minimum-stock threshold
+    (quantity <= min_stock flags the item as low stock). The list
+    starts EMPTY — the system never invents stock. Admin CRUD,
+    prueba read-only.
+    """
+
+    __tablename__ = "inventory_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    sku: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    unit: Mapped[str] = mapped_column(String(16), default="pieza", nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(
+        Numeric(24, 2), default=Decimal("0"), nullable=False
+    )
+    min_stock: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
