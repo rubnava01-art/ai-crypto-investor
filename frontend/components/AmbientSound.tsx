@@ -1,208 +1,124 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ------------------------------------------------------------------ */
-/* Sonido ambiental para meditación: 100% sintetizado en el navegador  */
-/* con Web Audio API. Sin archivos de audio, sin URLs externas, sin    */
-/* descargas, sin dependencias nuevas y sin backend.                   */
+/* Sonido ambiental para meditación: 3 grabaciones reales en bucle,   */
+/* empaquetadas en la app (public/sounds/). Sin URLs externas, sin    */
+/* descargas en tiempo de uso, sin dependencias nuevas y sin backend. */
 /*                                                                     */
-/* - "Ruido blanco": ruido blanco suavizado con filtro pasa-bajos.     */
-/* - "Lluvia suave": ruido filtrado más grave, con un vaivén lento    */
-/*   (LFO) que imita la irregularidad de la lluvia lejana.             */
-/* - "Tonos suaves": acorde ambiental (do-mi-sol) con osciladores y   */
-/*   un vaivén muy lento en el filtro, sin ritmo ni melodía.           */
+/* Procedencia (nota CC0): grabaciones de SnugSounds, dominio público */
+/* CC0, sin atribución obligatoria. Copias locales:                   */
+/*   - ruido-blanco.mp3: "sound of white noise"                       */
+/*   - lluvia-suave.mp3: "cozy rain on window" (lluvia sobre ventana) */
+/*   - tonos-suaves.mp3: "healing frequencies" (grabación ambiental   */
+/*     suave y sostenida; no se describe como pad ni se le atribuyen  */
+/*     efectos: es solo un fondo ambiental).                          */
 /*                                                                     */
-/* El AudioContext se crea y se reanuda solo dentro del clic en        */
-/* "Reproducir" (los navegadores, y en especial iOS, lo exigen así).  */
+/* REGLA CRÍTICA iOS: audio.play() se llama SINCRÓNICAMENTE dentro    */
+/* del manejador del clic, sin ningún await antes. El fallo anterior  */
+/* era esperar a ctx.resume() antes de arrancar el sonido, lo que     */
+/* rompía el requisito de gesto del usuario en iOS y dejaba la UI en  */
+/* "Sonando" sin sonido. Aquí "Sonando" solo se muestra cuando la     */
+/* promesa de play() se resuelve; si rechaza, se muestra un error     */
+/* visible y no se muestra "Sonando".                                 */
+/*                                                                     */
 /* El sonido se detiene al desmontar el componente (salir de Espacio)  */
-/* y no toca el temporizador 4-4-6: estado y temporizadores propios.   */
+/* y no toca el temporizador 4-4-6: estado y controles propios.       */
 /* ------------------------------------------------------------------ */
 
 type SoundId = "blanco" | "lluvia" | "tonos";
 
-const SOUNDS: { id: SoundId; label: string; hint: string }[] = [
-  { id: "blanco", label: "Ruido blanco", hint: "Constante y parejo, para tapar el ruido de fondo." },
-  { id: "lluvia", label: "Lluvia suave", hint: "Ruido filtrado y grave, con vaivén lento como lluvia lejana." },
-  { id: "tonos", label: "Tonos suaves", hint: "Acorde ambiental lento, sin ritmo ni melodía." },
+const SOUNDS: { id: SoundId; label: string; hint: string; src: string }[] = [
+  {
+    id: "blanco",
+    label: "Ruido blanco",
+    hint: "Grabación real de ruido blanco en bucle, para tapar el ruido de fondo.",
+    src: "/sounds/ruido-blanco.mp3",
+  },
+  {
+    id: "lluvia",
+    label: "Lluvia suave",
+    hint: "Grabación real de lluvia suave sobre una ventana, en bucle.",
+    src: "/sounds/lluvia-suave.mp3",
+  },
+  {
+    id: "tonos",
+    label: "Tonos suaves",
+    hint: "Grabación ambiental suave y sostenida, en bucle.",
+    src: "/sounds/tonos-suaves.mp3",
+  },
 ];
 
 const selectCls =
   "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-teal-500 focus:outline-none";
 
-function makeNoiseBuffer(ctx: AudioContext, seconds = 2): AudioBuffer {
-  const len = Math.floor(ctx.sampleRate * seconds);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-  return buf;
-}
-
-type SoundGraph = { stop: () => void };
-
-function startGraph(ctx: AudioContext, out: GainNode, id: SoundId): SoundGraph {
-  if (id === "tonos") {
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 900;
-    filter.connect(out);
-    const oscs = [261.63, 329.63, 392.0].map((freq, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = i === 0 ? "sine" : "triangle";
-      osc.frequency.value = freq;
-      osc.detune.value = (i - 1) * 4;
-      const g = ctx.createGain();
-      g.gain.value = 0;
-      // Entrada lenta (sin clic) y nivel bajo: es fondo, no protagonista.
-      g.gain.setTargetAtTime(0.07, ctx.currentTime, 1.5);
-      osc.connect(g);
-      g.connect(filter);
-      osc.start();
-      return osc;
-    });
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.07;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 250;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-    lfo.start();
-    return {
-      stop: () => {
-        oscs.forEach((o) => {
-          try {
-            o.stop();
-          } catch {
-            /* ya detenido */
-          }
-        });
-        try {
-          lfo.stop();
-        } catch {
-          /* ya detenido */
-        }
-      },
-    };
-  }
-
-  // Ruido blanco y lluvia suave comparten la fuente; cambia el filtro.
-  const src = ctx.createBufferSource();
-  src.buffer = makeNoiseBuffer(ctx);
-  src.loop = true;
-  const filter = ctx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.frequency.value = id === "blanco" ? 1200 : 500;
-  const srcGain = ctx.createGain();
-  srcGain.gain.value = 1;
-  src.connect(filter);
-  filter.connect(srcGain);
-  srcGain.connect(out);
-  src.start();
-
-  let lfo: OscillatorNode | null = null;
-  if (id === "lluvia") {
-    lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.25;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.25;
-    lfo.connect(lfoGain);
-    lfoGain.connect(srcGain.gain);
-    lfo.start();
-  }
-
-  return {
-    stop: () => {
-      try {
-        src.stop();
-      } catch {
-        /* ya detenido */
-      }
-      if (lfo) {
-        try {
-          lfo.stop();
-        } catch {
-          /* ya detenido */
-        }
-      }
-    },
-  };
-}
-
 export function AmbientSound() {
   const [sound, setSound] = useState<SoundId>("blanco");
   const [volume, setVolume] = useState(50);
   const [playing, setPlaying] = useState(false);
-  const [supported, setSupported] = useState(true);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const masterRef = useRef<GainNode | null>(null);
-  const graphRef = useRef<SoundGraph | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const stop = useCallback(() => {
-    graphRef.current?.stop();
-    graphRef.current = null;
-    setPlaying(false);
-  }, []);
-
-  // Al salir de Espacio (o cerrar la pestaña) el sonido se detiene:
-  // se cierran las fuentes y el contexto de audio.
+  // Al salir de Espacio el sonido se detiene.
   useEffect(
     () => () => {
-      graphRef.current?.stop();
-      graphRef.current = null;
-      if (ctxRef.current) {
-        void ctxRef.current.close().catch(() => {});
-        ctxRef.current = null;
-      }
+      const audio = audioRef.current;
+      if (audio) audio.pause();
     },
     []
   );
 
-  // Debe llamarse desde un clic del usuario: crea (o reutiliza) el
-  // contexto, lo reanuda si está suspendido y arranca el sonido.
-  const play = useCallback(
-    async (id: SoundId) => {
-      let ctx = ctxRef.current;
-      if (!ctx) {
-        const AC =
-          window.AudioContext ??
-          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-        if (!AC) {
-          setSupported(false);
-          return;
+  // Debe llamarse desde un clic del usuario: play() SINCRÓNICO, sin
+  // await antes. Solo después se atienden la resolución y el rechazo.
+  const play = (id: SoundId) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const target = SOUNDS.find((s) => s.id === id) ?? SOUNDS[0];
+    if (audio.getAttribute("src") !== target.src) audio.setAttribute("src", target.src);
+    audio.volume = volume / 100;
+    audio.loop = true;
+    setError(null);
+    const result = audio.play();
+    if (result) {
+      result.then(
+        () => setPlaying(true),
+        () => {
+          setPlaying(false);
+          setError("No se pudo reproducir el sonido. Toca Reproducir de nuevo.");
         }
-        ctx = new AC();
-        ctxRef.current = ctx;
-        const master = ctx.createGain();
-        master.gain.value = volume / 100;
-        master.connect(ctx.destination);
-        masterRef.current = master;
-      }
-      if (ctx.state === "suspended") {
-        try {
-          await ctx.resume();
-        } catch {
-          /* el navegador decide; el botón queda disponible para reintentar */
-        }
-      }
-      const master = masterRef.current;
-      if (!master) return;
-      graphRef.current?.stop();
-      graphRef.current = startGraph(ctx, master, id);
+      );
+    } else {
       setPlaying(true);
-    },
-    [volume]
-  );
+    }
+  };
+
+  const stop = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setPlaying(false);
+  };
 
   const onVolume = (v: number) => {
     setVolume(v);
-    const ctx = ctxRef.current;
-    const master = masterRef.current;
-    if (ctx && master) master.gain.setTargetAtTime(v / 100, ctx.currentTime, 0.05);
+    const audio = audioRef.current;
+    if (audio) audio.volume = v / 100;
   };
 
   const onSound = (id: SoundId) => {
     setSound(id);
-    if (playing) void play(id);
+    // Cambiar de sonido mientras suena cambia al instante; el clic en
+    // el selector es un gesto del usuario, así que play() sigue siendo
+    // sincrónico aquí.
+    if (playing) play(id);
+  };
+
+  const onAudioError = () => {
+    setPlaying(false);
+    setError("No se pudo cargar el sonido. Revisa tu conexión y toca Reproducir de nuevo.");
   };
 
   const current = SOUNDS.find((s) => s.id === sound) ?? SOUNDS[0];
@@ -211,10 +127,20 @@ export function AmbientSound() {
     <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
       <p className="text-sm font-semibold text-zinc-100">Sonido ambiental</p>
       <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-        Sonido generado en tu navegador, sin archivos ni internet: acompaña la
-        respiración o el temporizador. Se detiene solo al salir de Espacio o al
-        cerrar la pestaña.
+        Grabaciones reales libres (CC0) en bucle, guardadas en la app: acompañan
+        la respiración o el temporizador. Se detienen solas al salir de Espacio
+        o al cerrar la pestaña. En iPhone hay que tocar Reproducir.
       </p>
+
+      {/* Elemento de audio sin controles visibles; loop y precarga activos. */}
+      <audio
+        ref={audioRef}
+        src={SOUNDS[0].src}
+        loop
+        preload="auto"
+        onError={onAudioError}
+        aria-hidden="true"
+      />
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
@@ -256,7 +182,7 @@ export function AmbientSound() {
 
       <button
         type="button"
-        onClick={() => (playing ? stop() : void play(sound))}
+        onClick={() => (playing ? stop() : play(sound))}
         className="mt-3 w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500"
       >
         {playing ? "Detener sonido" : "Reproducir sonido"}
@@ -266,9 +192,9 @@ export function AmbientSound() {
           Sonando: {current.label} · volumen {volume}%
         </p>
       )}
-      {!supported && (
+      {error && (
         <p role="alert" className="mt-2 text-center text-xs text-red-400">
-          Este navegador no soporta audio sintetizado.
+          {error}
         </p>
       )}
     </div>
