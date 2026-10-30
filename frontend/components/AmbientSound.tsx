@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "../lib/i18n";
 
 /* ------------------------------------------------------------------ */
 /* Sonido ambiental para meditación: 3 grabaciones reales en bucle,   */
@@ -29,36 +30,39 @@ import { useEffect, useRef, useState } from "react";
 
 type SoundId = "blanco" | "lluvia" | "tonos";
 
-const SOUNDS: { id: SoundId; label: string; hint: string; src: string }[] = [
-  {
-    id: "blanco",
-    label: "Ruido blanco",
-    hint: "Grabación real de ruido blanco en bucle, para tapar el ruido de fondo.",
-    src: "/sounds/ruido-blanco.mp3",
-  },
-  {
-    id: "lluvia",
-    label: "Lluvia suave",
-    hint: "Grabación real de lluvia suave sobre una ventana, en bucle.",
-    src: "/sounds/lluvia-suave.mp3",
-  },
-  {
-    id: "tonos",
-    label: "Tonos suaves",
-    hint: "Grabación ambiental suave y sostenida, en bucle.",
-    src: "/sounds/tonos-suaves.mp3",
-  },
-];
-
 const selectCls =
   "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-teal-500 focus:outline-none";
 
 export function AmbientSound() {
+  const { t } = useLanguage();
   const [sound, setSound] = useState<SoundId>("blanco");
   const [volume, setVolume] = useState(50);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Las etiquetas se resuelven desde el diccionario; los ids y las rutas
+  // de archivo no cambian (son identificadores, no texto traducible).
+  const SOUNDS: { id: SoundId; label: string; hint: string; src: string }[] = [
+    {
+      id: "blanco",
+      label: t.ambient.whiteLabel,
+      hint: t.ambient.whiteHint,
+      src: "/sounds/ruido-blanco.mp3",
+    },
+    {
+      id: "lluvia",
+      label: t.ambient.rainLabel,
+      hint: t.ambient.rainHint,
+      src: "/sounds/lluvia-suave.mp3",
+    },
+    {
+      id: "tonos",
+      label: t.ambient.tonesLabel,
+      hint: t.ambient.tonesHint,
+      src: "/sounds/tonos-suaves.mp3",
+    },
+  ];
 
   // Al salir de Espacio el sonido se detiene.
   useEffect(
@@ -85,7 +89,7 @@ export function AmbientSound() {
         () => setPlaying(true),
         () => {
           setPlaying(false);
-          setError("No se pudo reproducir el sonido. Toca Reproducir de nuevo.");
+          setError(t.ambient.playError);
         }
       );
     } else {
@@ -118,18 +122,16 @@ export function AmbientSound() {
 
   const onAudioError = () => {
     setPlaying(false);
-    setError("No se pudo cargar el sonido. Revisa tu conexión y toca Reproducir de nuevo.");
+    setError(t.ambient.loadError);
   };
 
   const current = SOUNDS.find((s) => s.id === sound) ?? SOUNDS[0];
 
   return (
     <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <p className="text-sm font-semibold text-zinc-100">Sonido ambiental</p>
+      <p className="text-sm font-semibold text-zinc-100">{t.ambient.title}</p>
       <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-        Grabaciones reales libres (CC0) en bucle, guardadas en la app: acompañan
-        la respiración o el temporizador. Se detienen solas al salir de Espacio
-        o al cerrar la pestaña. En iPhone hay que tocar Reproducir.
+        {t.ambient.intro}
       </p>
 
       {/* Elemento de audio sin controles visibles; loop y precarga activos. */}
@@ -145,11 +147,11 @@ export function AmbientSound() {
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="sonido-ambiental" className="text-xs font-semibold text-zinc-400">
-            Sonido
+            {t.ambient.soundLabel}
           </label>
           <select
             id="sonido-ambiental"
-            aria-label="Sonido ambiental"
+            aria-label={t.ambient.soundAria}
             className={selectCls}
             value={sound}
             onChange={(e) => onSound(e.target.value as SoundId)}
@@ -165,11 +167,11 @@ export function AmbientSound() {
 
         <div>
           <label htmlFor="volumen-ambiental" className="text-xs font-semibold text-zinc-400">
-            Volumen: {volume}%
+            {t.ambient.volume.replace("{nombre}", String(volume))}
           </label>
           <input
             id="volumen-ambiental"
-            aria-label="Volumen del sonido ambiental"
+            aria-label={t.ambient.volumeAria}
             className="mt-2 w-full accent-teal-500"
             type="range"
             min={0}
@@ -191,7 +193,7 @@ export function AmbientSound() {
           disabled={playing}
           className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Reproducir
+          {t.ambient.play}
         </button>
         <button
           type="button"
@@ -199,7 +201,7 @@ export function AmbientSound() {
           disabled={!playing}
           className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Detener
+          {t.ambient.stop}
         </button>
       </div>
       {/* Estado siempre visible para que se vea claro si opera o no:
@@ -217,10 +219,10 @@ export function AmbientSound() {
         />
         {playing ? (
           <span className="text-teal-300">
-            Sonando: {current.label} · volumen {volume}%
+            {t.ambient.playing.replace("{nombre}", current.label)} · {t.ambient.volumeWord} {volume}%
           </span>
         ) : (
-          <span className="text-zinc-500">Detenido — toca Reproducir para empezar</span>
+          <span className="text-zinc-500">{t.ambient.stopped}</span>
         )}
       </p>
       {error && (

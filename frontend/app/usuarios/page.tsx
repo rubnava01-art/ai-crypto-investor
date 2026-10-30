@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "../../lib/api";
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 import { UsersPanel } from "../../components/UsersPanel";
 
 /** Módulo Control de usuarios (2026-10-30): el control maestro de
@@ -11,6 +12,7 @@ import { UsersPanel } from "../../components/UsersPanel";
  * restablecer claves, borrar usuarios. Solo administradores: cualquier
  * otro rol es devuelto al dashboard. */
 export default function UsuariosPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
 
@@ -30,15 +32,15 @@ export default function UsuariosPage() {
   if (!allowed) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6">
-        <p className="text-sm text-zinc-400">Cargando…</p>
+        <p className="text-sm text-zinc-400">{t.usuarios.loading}</p>
       </main>
     );
   }
 
   return (
     <ModuleShell
-      moduleTitle="Control de usuarios"
-      subtitle="Control maestro: aprobar cuentas nuevas, cambiar roles y claves, restablecer accesos"
+      moduleTitle={t.usuarios.title}
+      subtitle={t.usuarios.subtitle}
     >
       <UsersPanel />
     </ModuleShell>

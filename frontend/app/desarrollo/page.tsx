@@ -2,10 +2,12 @@
 
 import { DesarrolloPanel } from "../../components/DesarrolloPanel";
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 
 export default function DesarrolloPage() {
+  const { t } = useLanguage();
   return (
-    <ModuleShell moduleTitle="Desarrollo digital" subtitle="Adaptación digital para empresas">
+    <ModuleShell moduleTitle={t.desarrollo.pageTitle} subtitle={t.desarrollo.pageSubtitle}>
       <DesarrolloPanel />
     </ModuleShell>
   );

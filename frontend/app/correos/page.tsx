@@ -2,10 +2,12 @@
 
 import { CorreosPanel } from "../../components/CorreosPanel";
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 
 export default function CorreosPage() {
+  const { t } = useLanguage();
   return (
-    <ModuleShell moduleTitle="Correos" subtitle="Plantillas · redacción con datos del CRM · registro">
+    <ModuleShell moduleTitle={t.correos.title} subtitle={t.correos.subtitle}>
       <CorreosPanel />
     </ModuleShell>
   );

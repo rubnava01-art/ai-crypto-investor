@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, ApiError, type CoinPrice } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const COIN_STYLE: Record<string, { bg: string; glyph: string }> = {
   BTC: { bg: "#F7931A", glyph: "₿" },
@@ -43,6 +44,7 @@ export function MarketPanel() {
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<Record<string, number>>({});
   const [wsLive, setWsLive] = useState(false);
+  const { t } = useLanguage();
 
   const load = useCallback(async () => {
     try {
@@ -51,8 +53,8 @@ export function MarketPanel() {
       setMeta({ source: r.source, updated: r.updated_utc, stale: r.stale });
       setError(null);
     } catch (e) {
-      if (!(e instanceof ApiError)) setError("No se pudo cargar el mercado.");
-      else if (e.status === 503) setError("Mercado no disponible (sin conexión al exchange).");
+      if (!(e instanceof ApiError)) setError(t.market.loadFailed);
+      else if (e.status === 503) setError(t.market.unavailable);
       else setError(e.message);
     }
   }, []);
@@ -137,18 +139,18 @@ export function MarketPanel() {
         <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
       </span>
-      EN VIVO
+      {t.market.live}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-700/40 px-2.5 py-1 text-xs font-semibold text-zinc-400">
-      actualizando…
+      {t.market.updating}
     </span>
   );
 
   return (
-    <Panel title="Mercado en vivo" badge={liveBadge}>
+    <Panel title={t.market.title} badge={liveBadge}>
       {error && <p role="alert" className="py-4 text-center text-sm text-amber-400">{error}</p>}
-      {!error && !prices && <p className="py-4 text-center text-sm text-zinc-500">Cargando precios…</p>}
+      {!error && !prices && <p className="py-4 text-center text-sm text-zinc-500">{t.market.loadingPrices}</p>}
       {prices && (
         <ul className="divide-y divide-zinc-800/70">
           {prices.map((c) => {
@@ -189,8 +191,8 @@ export function MarketPanel() {
       {meta && (
         <p className="mt-1 text-[11px] text-zinc-600">
           {wsLive
-            ? "Precios en tiempo real (WebSocket público de Kraken) · cambio 24h cada minuto"
-            : `Precios públicos de Kraken (solo lectura) · ${new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false })} UTC`}
+            ? t.market.liveNote
+            : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))}
         </p>
       )}
     </Panel>

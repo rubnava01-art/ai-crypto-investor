@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -28,6 +29,7 @@ export function InvestorPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -70,12 +72,16 @@ export function InvestorPanel({
         crypto.randomUUID()
       );
       setResult(
-        `Orden #${order.id} ${side === "buy" ? "de compra" : "de venta"} ${symbol} — estado: ${order.status} (modo ${order.mode}).`
+        (side === "buy" ? t.invertir.resultBuy : t.invertir.resultSell)
+          .replace("{id}", String(order.id))
+          .replace("{symbol}", symbol)
+          .replace("{status}", order.status)
+          .replace("{mode}", order.mode)
       );
       setStep("done");
       onExecuted();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "La orden no se pudo ejecutar.");
+      setError(err instanceof ApiError ? err.message : t.invertir.orderFailed);
       setStep("form");
     } finally {
       setBusy(false);
@@ -91,15 +97,15 @@ export function InvestorPanel({
 
   return (
     <Panel
-      title="Invertir"
+      title={t.invertir.title}
       badge={
         isReal ? (
           <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-bold text-red-400">
-            ⚠ DINERO REAL · tope $20
+            {t.invertir.realBadge}
           </span>
         ) : (
           <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">
-            {orderMode === "paper" ? "PAPER" : "SIMULACIÓN"} · sin dinero real
+            {orderMode === "paper" ? t.invertir.paperBadge : t.invertir.simBadge} · {t.invertir.noRealMoney}
           </span>
         )
       }
@@ -111,45 +117,44 @@ export function InvestorPanel({
             onClick={reset}
             className="mt-3 w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
           >
-            Nueva operación
+            {t.invertir.newOperation}
           </button>
         </div>
       ) : step === "validate" ? (
         <div className="py-1">
           {isReal && (
             <div className="mb-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-200">
-              ⚠️ <strong>Esto ejecuta con dinero REAL en Kraken.</strong> Tope acumulado de
-              compras reales: $20. La llave no tiene permiso de retiros. Revisa todo dos veces.
+              ⚠️ <strong>{t.invertir.realWarningTitle}</strong> {t.invertir.realWarningBody}
             </div>
           )}
-          <p className="text-sm font-semibold text-zinc-100">Valida tu orden antes de ejecutarla:</p>
+          <p className="text-sm font-semibold text-zinc-100">{t.invertir.validateTitle}</p>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-zinc-400">Operación</dt>
+              <dt className="text-zinc-400">{t.invertir.operation}</dt>
               <dd className={`font-semibold ${side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
-                {side === "buy" ? "ENTRAR (comprar)" : "SALIR (vender)"} {symbol}
+                {side === "buy" ? t.invertir.enterBuy : t.invertir.exitSell} {symbol}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">Monto</dt>
+              <dt className="text-zinc-400">{t.invertir.amount}</dt>
               <dd className="font-mono">${amountNum.toFixed(2)} USD</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">Precio actual</dt>
+              <dt className="text-zinc-400">{t.invertir.currentPrice}</dt>
               <dd className="font-mono">${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">Cantidad estimada</dt>
+              <dt className="text-zinc-400">{t.invertir.estQty}</dt>
               <dd className="font-mono">{qty.toFixed(8)}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">% de tu capital</dt>
+              <dt className="text-zinc-400">{t.invertir.pctCapital}</dt>
               <dd className="font-mono">{pctCapital != null ? `${pctCapital.toFixed(1)}%` : "—"}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">Modo</dt>
+              <dt className="text-zinc-400">{t.invertir.mode}</dt>
               <dd className="font-mono">
-                {isReal ? "REAL · Kraken" : orderMode} (el guardia de riesgo la revisa al ejecutar)
+                {isReal ? t.invertir.modeReal : orderMode} {t.invertir.riskGuardNote}
               </dd>
             </div>
           </dl>
@@ -162,14 +167,14 @@ export function InvestorPanel({
                 side === "buy" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
               }`}
             >
-              {busy ? "Ejecutando…" : isReal ? (side === "buy" ? "Confirmar entrada REAL" : "Confirmar salida REAL") : side === "buy" ? "Confirmar entrada" : "Confirmar salida"}
+              {busy ? t.invertir.executing : isReal ? (side === "buy" ? t.invertir.confirmRealEnter : t.invertir.confirmRealExit) : side === "buy" ? t.invertir.confirmEnter : t.invertir.confirmExit}
             </button>
             <button
               onClick={() => setStep("form")}
               disabled={busy}
               className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
             >
-              Volver
+              {t.invertir.back}
             </button>
           </div>
         </div>
@@ -185,7 +190,7 @@ export function InvestorPanel({
                   : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
               }`}
             >
-              ↗ ENTRAR
+              {t.invertir.enterBtn}
             </button>
             <button
               onClick={() => setSide("sell")}
@@ -196,30 +201,30 @@ export function InvestorPanel({
                   : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
               }`}
             >
-              ↘ SALIR
+              {t.invertir.exitBtn}
             </button>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <select aria-label="Símbolo" className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-              <option value="BTC/USD">Bitcoin (BTC/USD)</option>
-              <option value="ETH/USD">Ethereum (ETH/USD)</option>
+            <select aria-label={t.invertir.symbolAria} className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
+              <option value="BTC/USD">{t.invertir.bitcoin}</option>
+              <option value="ETH/USD">{t.invertir.ethereum}</option>
             </select>
-            <input aria-label="Monto en USD (ej. 5)"
+            <input aria-label={t.invertir.amountPlaceholder}
               className={inputCls}
               type="number"
               min="0"
               step="0.01"
-              placeholder="Monto en USD (ej. 5)"
+              placeholder={t.invertir.amountPlaceholder}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
           <p className="mt-2 text-xs text-zinc-500">
-            Precio {symbol}:{" "}
+            {t.invertir.price} {symbol}:{" "}
             {price
               ? `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
-              : "cargando…"}{" "}
-            · Capital: {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
+              : t.invertir.loadingPrice}{" "}
+            · {t.invertir.capital} {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
           </p>
           {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
           <button
@@ -230,7 +235,7 @@ export function InvestorPanel({
             disabled={!validAmount || !price}
             className="mt-3 w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-900 hover:bg-white disabled:opacity-40"
           >
-            VALIDAR ORDEN →
+            {t.invertir.validateOrder}
           </button>
         </div>
       )}

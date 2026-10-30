@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type MeResponse, type Recommendation, type RecommendationCategory } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -11,6 +12,7 @@ const inputCls =
  * de Crear. La lista empieza VACÍA — aquí nada se inventa. Prueba solo
  * lee. */
 export function RecomendacionesPanel() {
+  const { t } = useLanguage();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<Recommendation[] | null>(null);
   const [title, setTitle] = useState("");
@@ -53,28 +55,28 @@ export function RecomendacionesPanel() {
     try {
       if (editing) {
         await api.updateRecommendation(editing.id, { title: title.trim(), description, url, category });
-        setMsg("Recomendación actualizada.");
+        setMsg(t.recomendaciones.msgUpdated);
       } else {
         await api.createRecommendation({ title: title.trim(), description, url, category });
-        setMsg("Recomendación guardada.");
+        setMsg(t.recomendaciones.msgSaved);
       }
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
+      setError(err instanceof ApiError ? err.message : t.recomendaciones.errSave);
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (r: Recommendation) => {
-    if (!window.confirm(`¿Borrar la recomendación "${r.title}"?`)) return;
+    if (!window.confirm(t.recomendaciones.confirmDelete.replace("{titulo}", r.title))) return;
     setError(null);
     try {
       await api.deleteRecommendation(r.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : t.recomendaciones.errDelete);
     }
   };
 
@@ -88,29 +90,28 @@ export function RecomendacionesPanel() {
 
   return (
     <Panel
-      title="Recomendaciones"
+      title={t.recomendaciones.panelTitle}
       badge={
         <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
-          {rows === null ? "Cargando…" : `${rows.length} recomendaciones`}
+          {rows === null ? t.recomendaciones.badgeLoading : `${rows.length} ${t.recomendaciones.recsWord}`}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Cursos de Estudiar y herramientas de Crear que vale la pena destacar.
-        Solo el administrador las publica y edita.
-        {!isAdmin && " Tu rol de prueba es de solo lectura."}
+        {t.recomendaciones.intro}
+        {!isAdmin && t.recomendaciones.readonly}
       </p>
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input aria-label="Título" className={inputCls} placeholder="Título *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label="Descripción" className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input aria-label="Enlace (https://…)" className={inputCls} placeholder="Enlace (https://…)" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
+          <input aria-label={t.recomendaciones.titleAria} className={inputCls} placeholder={t.recomendaciones.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label={t.recomendaciones.descAria} className={inputCls} placeholder={t.recomendaciones.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <input aria-label={t.recomendaciones.urlAria} className={inputCls} placeholder={t.recomendaciones.urlPlaceholder} value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-zinc-400">Categoría</span>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.recomendaciones.categoryLabel}</span>
             <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as RecommendationCategory)}>
-              <option value="curso">Curso</option>
-              <option value="herramienta">Herramienta</option>
+              <option value="curso">{t.recomendaciones.catCourse}</option>
+              <option value="herramienta">{t.recomendaciones.catTool}</option>
             </select>
           </label>
           <div className="flex gap-2">
@@ -119,11 +120,11 @@ export function RecomendacionesPanel() {
               disabled={busy || !title.trim()}
               className="flex-1 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
             >
-              {busy ? "Guardando…" : editing ? "Actualizar recomendación" : "Publicar recomendación"}
+              {busy ? t.recomendaciones.saveBusy : editing ? t.recomendaciones.update : t.recomendaciones.publish}
             </button>
             {editing && (
               <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
-                Cancelar
+                {t.recomendaciones.cancelBtn}
               </button>
             )}
           </div>
@@ -134,10 +135,10 @@ export function RecomendacionesPanel() {
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {rows === null ? (
-          <p className="py-2 text-sm text-zinc-500">Cargando recomendaciones…</p>
+          <p className="py-2 text-sm text-zinc-500">{t.recomendaciones.loadingRecs}</p>
         ) : rows.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
-            Todavía no hay recomendaciones publicadas.
+            {t.recomendaciones.emptyRecs}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -145,16 +146,16 @@ export function RecomendacionesPanel() {
               <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
-                    {r.category === "curso" ? "Curso" : "Herramienta"}
+                    {r.category === "curso" ? t.recomendaciones.catCourse : t.recomendaciones.catTool}
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{r.title}</span>
                   {isAdmin && (
                     <span className="ml-auto flex gap-2">
                       <button onClick={() => startEdit(r)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
-                        Editar
+                        {t.recomendaciones.editBtn}
                       </button>
                       <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
-                        Borrar
+                        {t.recomendaciones.deleteBtn}
                       </button>
                     </span>
                   )}

@@ -8,24 +8,11 @@ import {
   type ReferralRewardType, type ReferralStatus,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
 
-const CAMPAIGN_STATUSES: { value: ReferralCampaignStatus; label: string }[] = [
-  { value: "active", label: "Activa" },
-  { value: "paused", label: "Pausada" },
-  { value: "ended", label: "Terminada" },
-];
-
-const REFERRAL_STATUSES: { value: ReferralStatus; label: string }[] = [
-  { value: "pending", label: "Pendiente" },
-  { value: "confirmed", label: "Confirmada" },
-  { value: "rewarded", label: "Recompensada" },
-];
-
-const campaignStatusLabel = (s: string) => CAMPAIGN_STATUSES.find((x) => x.value === s)?.label ?? s;
-const referralStatusLabel = (s: string) => REFERRAL_STATUSES.find((x) => x.value === s)?.label ?? s;
 
 const campaignBadge: Record<string, string> = {
   active: "bg-emerald-500/15 text-emerald-300",
@@ -39,10 +26,6 @@ const referralBadge: Record<string, string> = {
   rewarded: "bg-emerald-500/15 text-emerald-300",
 };
 
-const rewardLabel = (c: ReferralCampaign) =>
-  c.reward_type === "percentage"
-    ? `${Number(c.reward_value)}% de la primera compra`
-    : `$${Number(c.reward_value)} fijos`;
 
 interface CampaignForm {
   name: string;
@@ -81,6 +64,23 @@ const emptyReferralForm: ReferralForm = {
 };
 
 export function ReferidosPanel() {
+  const { t } = useLanguage();
+  const campaignStatuses: { value: ReferralCampaignStatus; label: string }[] = [
+    { value: "active", label: t.referidos.campaignActive },
+    { value: "paused", label: t.referidos.campaignPaused },
+    { value: "ended", label: t.referidos.campaignEnded },
+  ];
+  const referralStatuses: { value: ReferralStatus; label: string }[] = [
+    { value: "pending", label: t.referidos.referralPending },
+    { value: "confirmed", label: t.referidos.referralConfirmed },
+    { value: "rewarded", label: t.referidos.referralRewarded },
+  ];
+  const campaignStatusLabel = (s: string) => campaignStatuses.find((x) => x.value === s)?.label ?? s;
+  const referralStatusLabel = (s: string) => referralStatuses.find((x) => x.value === s)?.label ?? s;
+  const rewardLabel = (c: ReferralCampaign) =>
+    c.reward_type === "percentage"
+      ? t.referidos.rewardPercent.replace("{valor}", String(Number(c.reward_value)))
+      : t.referidos.rewardFixedValue.replace("{valor}", String(Number(c.reward_value)));
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
@@ -145,7 +145,7 @@ export function ReferidosPanel() {
     setReferralForm((f) => ({ ...f, [k]: e.target.value }));
 
   const fail = (err: unknown) =>
-    setError(err instanceof ApiError ? `${err.message} (${err.status})` : "Error inesperado");
+    setError(err instanceof ApiError ? `${err.message} (${err.status})` : t.referidos.errUnexpected);
 
   const submitCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,10 +163,10 @@ export function ReferidosPanel() {
     try {
       if (editingCampaignId !== null) {
         await api.updateReferralCampaign(editingCampaignId, body);
-        setMsg("Campaña actualizada.");
+        setMsg(t.referidos.msgCampaignUpdated);
       } else {
         const created = await api.createReferralCampaign(body);
-        setMsg(`Campaña creada. Código para compartir: ${created.share_code}`);
+        setMsg(t.referidos.msgCampaignCreated.replace("{codigo}", created.share_code));
         setSelectedId(created.id);
       }
       setCampaignForm(emptyCampaignForm);
@@ -224,7 +224,7 @@ export function ReferidosPanel() {
     };
     try {
       await api.registerReferral(selectedId, body);
-      setMsg("Referido registrado (pendiente de confirmación).");
+      setMsg(t.referidos.msgReferralRegistered);
       setReferralForm(emptyReferralForm);
       setShowReferralForm(false);
       await loadReferrals();
@@ -257,36 +257,35 @@ export function ReferidosPanel() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError("No se pudo copiar el código; cópialo a mano: " + selected.share_code);
+      setError(t.referidos.errCopy.replace("{codigo}", selected.share_code));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-amber-700/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-        Las recompensas aquí solo se <strong>registran</strong> (pendiente → confirmada → recompensada).
-        Esta versión no procesa pagos ni mueve dinero: la entrega de la recompensa la hace el negocio por su cuenta.
+        {t.referidos.banner1}<strong>{t.referidos.bannerStrong}</strong>{t.referidos.banner2}
       </div>
 
       {msg && <div className="rounded-lg bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{msg}</div>}
       {error && <div role="alert" className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
 
-      <Panel title="Campañas de referidos">
+      <Panel title={t.referidos.panelCampaigns}>
         {isAdmin && !showCampaignForm && (
           <button
             onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaignForm); }}
             className="mb-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
           >
-            + Nueva campaña
+            {t.referidos.newCampaign}
           </button>
         )}
         {isAdmin && showCampaignForm && (
           <form onSubmit={submitCampaign} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
-            <input aria-label="Nombre de la campaña" className={inputCls} placeholder="Nombre de la campaña *" value={campaignForm.name} onChange={setC("name")} required />
+            <input aria-label={t.referidos.campaignNameAria} className={inputCls} placeholder={t.referidos.campaignNamePlaceholder} value={campaignForm.name} onChange={setC("name")} required />
             <label className="block text-sm text-zinc-400">
-              Negocio (contacto del CRM, opcional)
+              {t.referidos.businessLabel}
               <select className={inputCls} value={campaignForm.business_contact_id} onChange={setC("business_contact_id")}>
-                <option value="">Sin contacto vinculado</option>
+                <option value="">{t.referidos.noContact}</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -294,40 +293,40 @@ export function ReferidosPanel() {
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm text-zinc-400">
-                Tipo de recompensa
+                {t.referidos.rewardTypeLabel}
                 <select className={inputCls} value={campaignForm.reward_type} onChange={setC("reward_type")}>
-                  <option value="fixed">Monto fijo</option>
-                  <option value="percentage">Porcentaje</option>
+                  <option value="fixed">{t.referidos.rewardFixed}</option>
+                  <option value="percentage">{t.referidos.rewardPercentage}</option>
                 </select>
               </label>
               <label className="block text-sm text-zinc-400">
-                {campaignForm.reward_type === "percentage" ? "Porcentaje (0–100)" : "Monto"}
+                {campaignForm.reward_type === "percentage" ? t.referidos.rewardPercentLabel : t.referidos.rewardAmountLabel}
                 <input className={inputCls} type="number" min="0" max={campaignForm.reward_type === "percentage" ? 100 : undefined} step="any" value={campaignForm.reward_value} onChange={setC("reward_value")} />
               </label>
             </div>
-            <input aria-label="Nota de la recompensa" className={inputCls} placeholder="Nota de la recompensa (ej. descuento en la próxima visita)" value={campaignForm.reward_note} onChange={setC("reward_note")} />
+            <input aria-label={t.referidos.rewardNoteAria} className={inputCls} placeholder={t.referidos.rewardNotePlaceholder} value={campaignForm.reward_note} onChange={setC("reward_note")} />
             <label className="block text-sm text-zinc-400">
-              Estado
+              {t.referidos.statusLabel}
               <select className={inputCls} value={campaignForm.status} onChange={setC("status")}>
-                {CAMPAIGN_STATUSES.map((s) => (
+                {campaignStatuses.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </label>
             <div className="flex gap-2">
               <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                {editingCampaignId !== null ? "Guardar cambios" : "Crear campaña"}
+                {editingCampaignId !== null ? t.referidos.saveChanges : t.referidos.createCampaign}
               </button>
               <button type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">
-                Cancelar
+                {t.referidos.cancel}
               </button>
             </div>
           </form>
         )}
 
-        {campaigns === null && <p className="text-sm text-zinc-400">Cargando campañas…</p>}
+        {campaigns === null && <p className="text-sm text-zinc-400">{t.referidos.loadingCampaigns}</p>}
         {campaigns !== null && campaigns.length === 0 && (
-          <p className="text-sm text-zinc-400">Aún no hay campañas. Crea la primera para que tus clientes empiecen a referir.</p>
+          <p className="text-sm text-zinc-400">{t.referidos.emptyCampaigns}</p>
         )}
         <ul className="space-y-3">
           {campaigns?.map((c) => (
@@ -338,28 +337,28 @@ export function ReferidosPanel() {
                     {c.name}
                   </button>
                   <p className="text-sm text-zinc-400">
-                    Recompensa: {rewardLabel(c)}
+                    {t.referidos.rewardPrefix}{rewardLabel(c)}
                     {c.reward_note ? ` — ${c.reward_note}` : ""}
-                    {c.business_name ? ` · Negocio: ${c.business_name}` : ""}
+                    {c.business_name ? t.referidos.businessSuffix.replace("{nombre}", c.business_name) : ""}
                   </p>
                   <p className="text-sm text-zinc-400">
-                    Código para compartir: <span className="font-mono font-semibold text-emerald-300">{c.share_code}</span>
-                    {" · "}{c.referrals_count} referidos · {c.confirmed_count} confirmados · {c.rewarded_count} recompensados
+                    {t.referidos.shareCode}<span className="font-mono font-semibold text-emerald-300">{c.share_code}</span>
+                    {t.referidos.countsLine.replace("{referidos}", String(c.referrals_count)).replace("{confirmados}", String(c.confirmed_count)).replace("{recompensados}", String(c.rewarded_count))}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${campaignBadge[c.status]}`}>{campaignStatusLabel(c.status)}</span>
                   {isAdmin && (
                     <>
-                      <button onClick={() => startEditCampaign(c)} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Editar</button>
+                      <button onClick={() => startEditCampaign(c)} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.edit}</button>
                       {c.status === "active" && (
-                        <button onClick={() => setCampaignStatus(c, "paused")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Pausar</button>
+                        <button onClick={() => setCampaignStatus(c, "paused")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.pause}</button>
                       )}
                       {c.status === "paused" && (
-                        <button onClick={() => setCampaignStatus(c, "active")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Reanudar</button>
+                        <button onClick={() => setCampaignStatus(c, "active")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.resume}</button>
                       )}
                       {c.status !== "ended" && (
-                        <button onClick={() => setCampaignStatus(c, "ended")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Terminar</button>
+                        <button onClick={() => setCampaignStatus(c, "ended")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.end}</button>
                       )}
                     </>
                   )}
@@ -371,20 +370,20 @@ export function ReferidosPanel() {
       </Panel>
 
       {selected && (
-        <Panel title={`Referidos de “${selected.name}”`}>
+        <Panel title={t.referidos.selectedTitle.replace("{nombre}", selected.name)}>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <p className="text-sm text-zinc-300">
-              Comparte este código con tus clientes:{" "}
+              {t.referidos.shareWithClients}
               <span className="font-mono text-lg font-bold text-emerald-300">{selected.share_code}</span>
             </p>
             <button onClick={copyShareCode} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">
-              {copied ? "¡Copiado!" : "Copiar código"}
+              {copied ? t.referidos.copied : t.referidos.copyCode}
             </button>
             <label className="ml-auto flex items-center gap-2 text-sm text-zinc-400">
-              Estado
+              {t.referidos.statusLabel}
               <select className={inputCls} style={{ width: "auto" }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">Todos</option>
-                {REFERRAL_STATUSES.map((s) => (
+                <option value="">{t.referidos.allFilter}</option>
+                {referralStatuses.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
@@ -393,32 +392,32 @@ export function ReferidosPanel() {
 
           {isAdmin && selected.status === "active" && !showReferralForm && (
             <button onClick={() => setShowReferralForm(true)} className="mb-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
-              + Registrar referido
+              {t.referidos.registerReferral}
             </button>
           )}
           {isAdmin && selected.status !== "active" && (
-            <p className="mb-4 text-sm text-amber-300">Campaña {campaignStatusLabel(selected.status).toLowerCase()}: no se pueden registrar nuevos referidos.</p>
+            <p className="mb-4 text-sm text-amber-300">{t.referidos.campaignInactive.replace("{estado}", campaignStatusLabel(selected.status).toLowerCase())}</p>
           )}
           {isAdmin && showReferralForm && (
             <form onSubmit={submitReferral} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
               <div className="grid grid-cols-2 gap-3">
-                <input aria-label="Quien refiere (nombre)" className={inputCls} placeholder="Quien refiere (nombre) *" value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
-                <input aria-label="Contacto de quien refiere" className={inputCls} placeholder="Contacto de quien refiere" value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
-                <input aria-label="Persona referida (nombre)" className={inputCls} placeholder="Persona referida (nombre) *" value={referralForm.referred_name} onChange={setR("referred_name")} required />
-                <input aria-label="Contacto de la persona referida" className={inputCls} placeholder="Contacto de la persona referida" value={referralForm.referred_contact} onChange={setR("referred_contact")} />
+                <input aria-label={t.referidos.referrerNameAria} className={inputCls} placeholder={t.referidos.referrerNamePlaceholder} value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
+                <input aria-label={t.referidos.referrerContactAria} className={inputCls} placeholder={t.referidos.referrerContactPlaceholder} value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
+                <input aria-label={t.referidos.referredNameAria} className={inputCls} placeholder={t.referidos.referredNamePlaceholder} value={referralForm.referred_name} onChange={setR("referred_name")} required />
+                <input aria-label={t.referidos.referredContactAria} className={inputCls} placeholder={t.referidos.referredContactPlaceholder} value={referralForm.referred_contact} onChange={setR("referred_contact")} />
               </div>
-              <input aria-label="Código usado" className={inputCls} placeholder={`Código usado (opcional; por defecto ${selected.share_code})`} value={referralForm.code} onChange={setR("code")} />
-              <input aria-label="Notas" className={inputCls} placeholder="Notas" value={referralForm.notes} onChange={setR("notes")} />
+              <input aria-label={t.referidos.codeAria} className={inputCls} placeholder={t.referidos.codePlaceholder.replace("{codigo}", selected.share_code)} value={referralForm.code} onChange={setR("code")} />
+              <input aria-label={t.referidos.notesAria} className={inputCls} placeholder={t.referidos.notesPlaceholder} value={referralForm.notes} onChange={setR("notes")} />
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Registrar</button>
-                <button type="button" onClick={() => setShowReferralForm(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">Cancelar</button>
+                <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{t.referidos.register}</button>
+                <button type="button" onClick={() => setShowReferralForm(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">{t.referidos.cancel}</button>
               </div>
             </form>
           )}
 
-          {referrals === null && <p className="text-sm text-zinc-400">Cargando referidos…</p>}
+          {referrals === null && <p className="text-sm text-zinc-400">{t.referidos.loadingReferrals}</p>}
           {referrals !== null && referrals.length === 0 && (
-            <p className="text-sm text-zinc-400">Aún no hay referidos en esta campaña.</p>
+            <p className="text-sm text-zinc-400">{t.referidos.emptyReferrals}</p>
           )}
           <ul className="space-y-3">
             {referrals?.map((r) => (
@@ -426,22 +425,22 @@ export function ReferidosPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold text-zinc-100">
-                      {r.referrer_name} <span className="font-normal text-zinc-500">refirió a</span> {r.referred_name}
+                      {r.referrer_name} <span className="font-normal text-zinc-500">{t.referidos.referredBy}</span> {r.referred_name}
                     </p>
                     <p className="text-sm text-zinc-400">
-                      Código: <span className="font-mono text-zinc-300">{r.code}</span>
-                      {r.referrer_contact ? ` · Refiere: ${r.referrer_contact}` : ""}
-                      {r.referred_contact ? ` · Referido: ${r.referred_contact}` : ""}
+                      {t.referidos.codePrefix}<span className="font-mono text-zinc-300">{r.code}</span>
+                      {r.referrer_contact ? t.referidos.referrerSuffix.replace("{contacto}", r.referrer_contact) : ""}
+                      {r.referred_contact ? t.referidos.referredSuffix.replace("{contacto}", r.referred_contact) : ""}
                       {r.notes ? ` · ${r.notes}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${referralBadge[r.status]}`}>{referralStatusLabel(r.status)}</span>
                     {isAdmin && r.status === "pending" && (
-                      <button onClick={() => advanceReferral(r, "confirmed")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Confirmar cliente</button>
+                      <button onClick={() => advanceReferral(r, "confirmed")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.confirmClient}</button>
                     )}
                     {isAdmin && r.status === "confirmed" && (
-                      <button onClick={() => advanceReferral(r, "rewarded")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">Marcar recompensa</button>
+                      <button onClick={() => advanceReferral(r, "rewarded")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.markReward}</button>
                     )}
                   </div>
                 </div>

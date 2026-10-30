@@ -3,20 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AdminUser } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
 
-const roleLabel = (u: AdminUser) =>
-  u.status === "pending"
-    ? "Pendiente de activación · entrará como Prueba"
-    : u.is_super_admin
-      ? "Super admin · control total + gestión de super admins"
-      : u.is_admin
-        ? "Administrador · control total"
-        : "Prueba · solo ver y probar";
 
 export function UsersPanel() {
+  const { t } = useLanguage();
+  const roleLabel = (u: AdminUser) =>
+    u.status === "pending"
+      ? t.usuarios.rolePending
+      : u.is_super_admin
+        ? t.usuarios.roleSuper
+        : u.is_admin
+          ? t.usuarios.roleAdmin
+          : t.usuarios.roleTrial;
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [meSuper, setMeSuper] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function UsersPanel() {
       setUsers(await api.listUsers());
     } catch {
       setUsers([]);
-      setLoadError("No se pudieron cargar los usuarios. Inténtalo de nuevo.");
+      setLoadError(t.usuarios.loadError);
     }
     try {
       setMeSuper((await api.me()).is_super_admin);
@@ -65,11 +67,11 @@ export function UsersPanel() {
       setPassword("");
       setRole("prueba");
       setMsg(
-        `Usuario creado con rol ${role === "super_admin" ? "Super admin" : role === "admin" ? "Administrador" : "Prueba"}.`
+        t.usuarios.msgUserCreated.replace("{rol}", role === "super_admin" ? t.usuarios.roleSuperName : role === "admin" ? t.usuarios.roleAdminName : t.usuarios.roleTrialName)
       );
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo crear el usuario.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errCreateUser);
     } finally {
       setBusy(false);
     }
@@ -82,7 +84,7 @@ export function UsersPanel() {
       await api.updateUser(u.id, { role: u.is_admin ? "prueba" : "admin" });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el rol.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errChangeRole);
     }
   };
 
@@ -93,12 +95,12 @@ export function UsersPanel() {
       await api.updateUser(u.id, { role: grant ? "super_admin" : "admin" });
       setMsg(
         grant
-          ? `"${u.username}" ahora es super admin.`
-          : `"${u.username}" ya no es super admin (queda como administrador).`
+          ? t.usuarios.msgNowSuper.replace("{nombre}", u.username)
+          : t.usuarios.msgNoLongerSuper.replace("{nombre}", u.username)
       );
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el rol.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errChangeRole);
     }
   };
 
@@ -107,29 +109,29 @@ export function UsersPanel() {
     setMsg(null);
     try {
       await api.approveUser(u.id);
-      setMsg(`"${u.username}" activado: ya puede iniciar sesión.`);
+      setMsg(t.usuarios.msgActivated.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo activar el usuario.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errActivate);
     }
   };
 
   const reject = async (u: AdminUser) => {
-    if (!window.confirm(`¿Rechazar a "${u.username}"? La cuenta se borrará y nunca entró.`)) return;
+    if (!window.confirm(t.usuarios.confirmReject.replace("{nombre}", u.username))) return;
     setError(null);
     setMsg(null);
     try {
       await api.rejectUser(u.id);
-      setMsg(`"${u.username}" rechazado y borrado.`);
+      setMsg(t.usuarios.msgRejected.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo rechazar el usuario.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errReject);
     }
   };
 
   const savePassword = async (u: AdminUser) => {
     if (pwValue.trim().length < 4) {
-      setError("La clave nueva debe tener al menos 4 caracteres.");
+      setError(t.usuarios.errPwShort);
       return;
     }
     setPwBusy(true);
@@ -137,12 +139,12 @@ export function UsersPanel() {
     setMsg(null);
     try {
       await api.updateUser(u.id, { password: pwValue });
-      setMsg(`Clave de "${u.username}" actualizada.`);
+      setMsg(t.usuarios.msgPwUpdated.replace("{nombre}", u.username));
       setPwValue("");
       setPwTemp(null);
       setPwUserId(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar la clave.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errChangePw);
     } finally {
       setPwBusy(false);
     }
@@ -161,47 +163,38 @@ export function UsersPanel() {
     try {
       await api.updateUser(u.id, { password: temp });
       setPwTemp(temp);
-      setMsg(`Clave de "${u.username}" restablecida. Pásale la temporal que se muestra abajo.`);
+      setMsg(t.usuarios.msgPwReset.replace("{nombre}", u.username));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo restablecer la clave.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errResetPw);
     } finally {
       setPwBusy(false);
     }
   };
 
   const remove = async (u: AdminUser) => {
-    if (!window.confirm(`¿Borrar al usuario "${u.username}"? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(t.usuarios.confirmDeleteUser.replace("{nombre}", u.username))) return;
     setError(null);
     setMsg(null);
     try {
       await api.deleteUser(u.id);
-      setMsg(`Usuario "${u.username}" borrado.`);
+      setMsg(t.usuarios.msgUserDeleted.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar el usuario.");
+      setError(err instanceof ApiError ? err.message : t.usuarios.errDeleteUser);
     }
   };
 
   return (
     <Panel
-      title="Usuarios y control"
+      title={t.usuarios.panelTitle}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-          Solo admin
+          {t.usuarios.adminBadge}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        <strong className="text-zinc-300">Super admin:</strong> todo lo del administrador, más
-        otorgar/quitar el nivel super admin y gestionar cuentas super admin.{" "}
-        <strong className="text-zinc-300">Administrador:</strong> control total (usuarios, ajustes,
-        escáner, modos, kill switch). <strong className="text-zinc-300">Prueba:</strong> solo puede
-        ver el panel y correr pruebas (backtests y evaluación) — ningún control.{" "}
-        <strong className="text-zinc-300">Cuentas nuevas:</strong> quedan pendientes de activación
-        hasta que un administrador las apruebe; mientras tanto no pueden entrar.{" "}
-        <strong className="text-zinc-300">Claves:</strong> el admin puede cambiar la clave de
-        cualquier usuario o restablecerla con una temporal (la plataforma no envía correo, la
-        temporal se le pasa al usuario por otro canal).
+        <strong className="text-zinc-300">{t.usuarios.introSuperLabel}</strong>{t.usuarios.introSuperBody}<strong className="text-zinc-300">{t.usuarios.introAdminLabel}</strong>{t.usuarios.introAdminBody}<strong className="text-zinc-300">{t.usuarios.introTrialLabel}</strong>{t.usuarios.introTrialBody}<strong className="text-zinc-300">{t.usuarios.introNewLabel}</strong>{t.usuarios.introNewBody}<strong className="text-zinc-300">{t.usuarios.introKeysLabel}</strong>{t.usuarios.introKeysBody}
       </p>
 
       {loadError && (
@@ -211,9 +204,9 @@ export function UsersPanel() {
       )}
 
       {users === null ? (
-        <p className="py-3 text-center text-sm text-zinc-500">Cargando usuarios…</p>
+        <p className="py-3 text-center text-sm text-zinc-500">{t.usuarios.loadingUsers}</p>
       ) : users.length === 0 ? (
-        <p className="py-3 text-center text-sm text-zinc-500">Sin usuarios todavía.</p>
+        <p className="py-3 text-center text-sm text-zinc-500">{t.usuarios.emptyUsers}</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {users.map((u) => (
@@ -237,7 +230,7 @@ export function UsersPanel() {
                     {u.username}
                     {u.status === "pending" && (
                       <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">
-                        Pendiente
+                        {t.usuarios.pendingBadge}
                       </span>
                     )}
                   </p>
@@ -248,16 +241,16 @@ export function UsersPanel() {
                     <button
                       onClick={() => approve(u)}
                       className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
-                      title="Aprobar: la cuenta podrá iniciar sesión"
+                      title={t.usuarios.approveTitle}
                     >
-                      Activar
+                      {t.usuarios.activate}
                     </button>
                     <button
                       onClick={() => reject(u)}
                       className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
-                      title="Rechazar: la cuenta se borra"
+                      title={t.usuarios.rejectTitle}
                     >
-                      Rechazar
+                      {t.usuarios.reject}
                     </button>
                   </>
                 ) : (
@@ -267,9 +260,9 @@ export function UsersPanel() {
                         <button
                           onClick={() => setSuper(u, false)}
                           className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-                          title="Quitar nivel super admin (queda como administrador)"
+                          title={t.usuarios.removeSuperTitle}
                         >
-                          Quitar super admin
+                          {t.usuarios.removeSuper}
                         </button>
                       )
                     ) : (
@@ -277,17 +270,17 @@ export function UsersPanel() {
                         <button
                           onClick={() => toggleRole(u)}
                           className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-                          title="Cambiar rol"
+                          title={t.usuarios.changeRoleTitle}
                         >
-                          {u.is_admin ? "Hacer prueba" : "Hacer admin"}
+                          {u.is_admin ? t.usuarios.makeTrial : t.usuarios.makeAdmin}
                         </button>
                         {meSuper && (
                           <button
                             onClick={() => setSuper(u, true)}
                             className="rounded-lg border border-violet-900/60 px-2.5 py-1 text-xs text-violet-300 hover:bg-violet-950/50"
-                            title="Otorgar nivel super admin"
+                            title={t.usuarios.grantSuperTitle}
                           >
-                            Hacer super admin
+                            {t.usuarios.makeSuper}
                           </button>
                         )}
                       </>
@@ -299,16 +292,16 @@ export function UsersPanel() {
                         setPwTemp(null);
                       }}
                       className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-                      title="Cambiar o restablecer la clave"
+                      title={t.usuarios.pwTitle}
                     >
-                      Clave
+                      {t.usuarios.pwButton}
                     </button>
                     <button
                       onClick={() => remove(u)}
                       className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
-                      title="Borrar usuario"
+                      title={t.usuarios.deleteTitle}
                     >
-                      Borrar
+                      {t.usuarios.delete}
                     </button>
                   </>
                 )}
@@ -316,9 +309,9 @@ export function UsersPanel() {
               {pwUserId === u.id && u.status !== "pending" && (
                 <div className="mt-2 flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 sm:flex-row sm:items-center">
                   <input
-                    aria-label={`Clave nueva para ${u.username}`}
+                    aria-label={t.usuarios.newPwAria.replace("{nombre}", u.username)}
                     className={inputCls}
-                    placeholder="Clave nueva (mín. 4 caracteres)"
+                    placeholder={t.usuarios.newPwPlaceholder}
                     type="password"
                     value={pwValue}
                     onChange={(e) => setPwValue(e.target.value)}
@@ -329,23 +322,22 @@ export function UsersPanel() {
                     disabled={pwBusy}
                     className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                   >
-                    Guardar nueva clave
+                    {t.usuarios.saveNewPw}
                   </button>
                   <button
                     onClick={() => resetPassword(u)}
                     disabled={pwBusy}
                     className="shrink-0 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-                    title="Genera una clave temporal y la muestra una sola vez"
+                    title={t.usuarios.resetTempTitle}
                   >
-                    Restablecer (temporal)
+                    {t.usuarios.resetTemp}
                   </button>
                 </div>
               )}
               {pwUserId === u.id && pwTemp && (
                 <p className="mt-2 rounded-lg border border-amber-700/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-                  Clave temporal de &ldquo;{u.username}&rdquo;:{" "}
-                  <code className="font-mono font-semibold">{pwTemp}</code> — se muestra una sola
-                  vez; pásasela al usuario y dile que la cambie al entrar.
+                  {t.usuarios.tempPrefix.replace("{nombre}", u.username)}
+                  <code className="font-mono font-semibold">{pwTemp}</code>{t.usuarios.tempSuffix}
                 </p>
               )}
             </li>
@@ -354,20 +346,20 @@ export function UsersPanel() {
       )}
 
       <form onSubmit={create} className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-        <p className="text-sm font-semibold text-zinc-200">Añadir usuario</p>
+        <p className="text-sm font-semibold text-zinc-200">{t.usuarios.addUser}</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <input aria-label="Usuario"
+          <input aria-label={t.usuarios.userAria}
             className={inputCls}
-            placeholder="Usuario"
+            placeholder={t.usuarios.userPlaceholder}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
             minLength={3}
             autoComplete="off"
           />
-          <input aria-label="Contraseña"
+          <input aria-label={t.usuarios.passwordAria}
             className={inputCls}
-            placeholder="Contraseña"
+            placeholder={t.usuarios.passwordPlaceholder}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -375,14 +367,14 @@ export function UsersPanel() {
             minLength={4}
             autoComplete="new-password"
           />
-          <select aria-label="Rol"
+          <select aria-label={t.usuarios.roleAria}
             className={inputCls}
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "prueba" | "super_admin")}
           >
-            <option value="prueba">Prueba (solo ver y probar)</option>
-            <option value="admin">Administrador (control total)</option>
-            {meSuper && <option value="super_admin">Super admin (nivel máximo)</option>}
+            <option value="prueba">{t.usuarios.roleTrialOption}</option>
+            <option value="admin">{t.usuarios.roleAdminOption}</option>
+            {meSuper && <option value="super_admin">{t.usuarios.roleSuperOption}</option>}
           </select>
         </div>
         <button
@@ -390,7 +382,7 @@ export function UsersPanel() {
           disabled={busy}
           className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
         >
-          {busy ? "Creando…" : "Crear usuario"}
+          {busy ? t.usuarios.creating : t.usuarios.createUser}
         </button>
         {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}

@@ -4,20 +4,22 @@ import { useEffect, useState } from "react";
 import { api, type UserProfile } from "../lib/api";
 import { Panel } from "./Panel";
 import { ProfileEditor } from "./ProfileMenu";
-
-const ROLE_LABEL: Record<UserProfile["role"], string> = {
-  super_admin: "Super administrador",
-  admin: "Administrador",
-  prueba: "Prueba · solo ver y probar",
-};
+import { useLanguage } from "../lib/i18n";
 
 /** Mi perfil como dashboard: foto, datos del usuario y edición. Los
  * campos vacíos se muestran como "Sin registrar" — aquí nada se
  * inventa. La edición reutiliza el mismo editor del menú de perfil. */
 export function PerfilPanel() {
+  const { lang, t } = useLanguage();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  const ROLE_LABEL: Record<UserProfile["role"], string> = {
+    super_admin: t.perfil.roleSuperAdmin,
+    admin: t.perfil.roleAdmin,
+    prueba: t.perfil.rolePrueba,
+  };
 
   useEffect(() => {
     api.getMyProfile().then(setProfile).catch(() => setFailed(true));
@@ -25,23 +27,23 @@ export function PerfilPanel() {
 
   const fmtDate = (iso: string | null) =>
     iso
-      ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
-      : "Sin registrar";
+      ? new Date(iso).toLocaleDateString(lang === "en" ? "en-US" : "es-MX", { day: "numeric", month: "long", year: "numeric" })
+      : t.perfil.notRegistered;
 
   return (
-    <Panel title="Mi perfil">
+    <Panel title={t.perfil.title}>
       {failed ? (
         <p className="py-2 text-sm text-zinc-500">
-          No se pudo cargar el perfil. Recarga la página e inténtalo de nuevo.
+          {t.perfil.loadFailed}
         </p>
       ) : profile === null ? (
-        <p className="py-2 text-sm text-zinc-500">Cargando perfil…</p>
+        <p className="py-2 text-sm text-zinc-500">{t.perfil.loadingProfile}</p>
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-4">
             {profile.avatar_data_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatar_data_url} alt="Foto de perfil" className="h-24 w-24 rounded-full object-cover" />
+              <img src={profile.avatar_data_url} alt={t.perfil.photoAlt} className="h-24 w-24 rounded-full object-cover" />
             ) : (
               <span className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-600 text-3xl font-bold text-white">
                 {(profile.display_name || profile.username).slice(0, 1).toUpperCase()}
@@ -58,38 +60,37 @@ export function PerfilPanel() {
               onClick={() => setEditing(true)}
               className="ml-auto rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
             >
-              Editar perfil
+              {t.perfil.editProfile}
             </button>
           </div>
 
           <dl className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
-              <dt className="text-xs font-medium text-zinc-500">Nombre</dt>
+              <dt className="text-xs font-medium text-zinc-500">{t.perfil.name}</dt>
               <dd className="mt-1 break-words text-sm text-zinc-100">
-                {profile.display_name?.trim() || "Sin registrar"}
+                {profile.display_name?.trim() || t.perfil.notRegistered}
               </dd>
             </div>
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
-              <dt className="text-xs font-medium text-zinc-500">Correo</dt>
+              <dt className="text-xs font-medium text-zinc-500">{t.perfil.email}</dt>
               <dd className="mt-1 break-words text-sm text-zinc-100">
-                {profile.email?.trim() || "Sin registrar"}
+                {profile.email?.trim() || t.perfil.notRegistered}
               </dd>
             </div>
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 sm:col-span-2">
-              <dt className="text-xs font-medium text-zinc-500">Dirección</dt>
+              <dt className="text-xs font-medium text-zinc-500">{t.perfil.address}</dt>
               <dd className="mt-1 break-words text-sm text-zinc-100">
-                {profile.address?.trim() || "Sin registrar"}
+                {profile.address?.trim() || t.perfil.notRegistered}
               </dd>
             </div>
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
-              <dt className="text-xs font-medium text-zinc-500">Miembro desde</dt>
+              <dt className="text-xs font-medium text-zinc-500">{t.perfil.memberSince}</dt>
               <dd className="mt-1 text-sm text-zinc-100">{fmtDate(profile.created_at)}</dd>
             </div>
           </dl>
 
           <p className="text-xs leading-relaxed text-zinc-500">
-            Tu foto y tus datos solo se usan en tu perfil. La foto debe ser
-            PNG, JPEG, GIF o WebP y pesar como máximo 500 KB.
+            {t.perfil.note}
           </p>
         </div>
       )}

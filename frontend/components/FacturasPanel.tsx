@@ -6,6 +6,7 @@ import {
   type CrmContact, type Invoice, type InvoiceItem, type InvoiceStatus, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -13,14 +14,8 @@ const inputCls =
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
-
-const STATUS_LABEL: Record<InvoiceStatus, string> = {
-  borrador: "Borrador",
-  enviada: "Enviada",
-  pagada: "Pagada",
-};
+const fmtDate = (iso: string | null, locale: string) =>
+  iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
 const emptyItem = (): InvoiceItem => ({ description: "", qty: 1, unit_price: 0 });
 
@@ -42,6 +37,11 @@ function printInvoiceHtml(opts: {
   items: InvoiceItem[];
   taxRate: number;
   notes: string;
+  txt: {
+    title: string; heading: string; concept: string; qty: string; price: string;
+    amount: string; subtotal: string; tax: string; total: string; client: string;
+    notes: string; thanks: string;
+  };
 }) {
   const t = totals(opts.items, opts.taxRate);
   const rows = opts.items
@@ -49,15 +49,15 @@ function printInvoiceHtml(opts: {
       (it) => `<tr><td>${it.description}</td><td style="text-align:center">${it.qty}</td><td style="text-align:right">${money(it.unit_price)}</td><td style="text-align:right">${money(it.qty * it.unit_price)}</td></tr>`
     )
     .join("");
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Factura ${opts.number}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.txt.title} ${opts.number}</title>
   <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.tot{margin-top:20px;text-align:right;font-size:16px}.tot b{font-size:20px}.mut{color:#555}</style>
-  </head><body><h1>FACTURA ${opts.number}</h1><p class="mut">${opts.date}</p>
+  </head><body><h1>${opts.txt.heading} ${opts.number}</h1><p class="mut">${opts.date}</p>
   <p><b>${opts.sellerName}</b><br>${opts.sellerPhone}<br>${opts.sellerEmail}</p>
-  <p><b>Cliente:</b> ${opts.clientName}<br>${opts.clientPhone}<br>${opts.clientEmail}</p>
-  <table><tr><th>Concepto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">Importe</th></tr>${rows}</table>
-  <div class="tot"><p>Subtotal: ${money(t.sub)}</p><p>Impuesto (${opts.taxRate}%): ${money(t.tax)}</p><p><b>Total: ${money(t.total)}</b></p></div>
-  ${opts.notes ? `<p><b>Notas:</b> ${opts.notes}</p>` : ""}
-  <p class="mut">Gracias por su negocio.</p></body></html>`;
+  <p><b>${opts.txt.client}</b> ${opts.clientName}<br>${opts.clientPhone}<br>${opts.clientEmail}</p>
+  <table><tr><th>${opts.txt.concept}</th><th style="text-align:center">${opts.txt.qty}</th><th style="text-align:right">${opts.txt.price}</th><th style="text-align:right">${opts.txt.amount}</th></tr>${rows}</table>
+  <div class="tot"><p>${opts.txt.subtotal} ${money(t.sub)}</p><p>${opts.txt.tax} (${opts.taxRate}%): ${money(t.tax)}</p><p><b>${opts.txt.total} ${money(t.total)}</b></p></div>
+  ${opts.notes ? `<p><b>${opts.txt.notes}</b> ${opts.notes}</p>` : ""}
+  <p class="mut">${opts.txt.thanks}</p></body></html>`;
   const w = window.open("", "_blank");
   if (!w) return;
   w.document.write(html);
@@ -73,6 +73,7 @@ function printInvoiceHtml(opts: {
 type MatRow = { material: string; qty: number; unitCost: number };
 
 function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount: number, qty: number) => void }) {
+  const { t } = useLanguage();
   const [rows, setRows] = useState<MatRow[]>([{ material: "", qty: 1, unitCost: 0 }]);
   const [labor, setLabor] = useState(0);
   const [other, setOther] = useState(0);
@@ -89,60 +90,58 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
 
   return (
     <Panel
-      title="Calculadora de materiales"
+      title={t.facturas.calcTitle}
       badge={
         <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
-          Costos
+          {t.facturas.costsBadge}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Suma lo que cuesta producir (camisetas, estampado, tinta, etc.), agrega
-        mano de obra y otros gastos, y te da el precio sugerido con tu margen.
-        Con un clic lo pasas como concepto a la factura de abajo.
+        {t.facturas.calcIntro}
       </p>
 
       <div className="space-y-2">
         {rows.map((r, i) => (
           <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
-            <input aria-label="Material" className={`${inputCls} col-span-6`} placeholder="Material (p. ej. Camiseta Bella+Canvas)" value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
-            <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" placeholder="Cant." value={r.qty} onChange={(e) => setRow(i, { qty: Number(e.target.value) })} aria-label="Cantidad" />
-            <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" placeholder="Costo c/u" value={r.unitCost} onChange={(e) => setRow(i, { unitCost: Number(e.target.value) })} aria-label="Costo unitario" />
-            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label="Quitar material">×</button>
+            <input aria-label={t.facturas.materialAria} className={`${inputCls} col-span-6`} placeholder={t.facturas.materialPlaceholder} value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
+            <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" placeholder={t.facturas.qtyPlaceholder} value={r.qty} onChange={(e) => setRow(i, { qty: Number(e.target.value) })} aria-label={t.facturas.qtyAria} />
+            <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" placeholder={t.facturas.unitCostPlaceholder} value={r.unitCost} onChange={(e) => setRow(i, { unitCost: Number(e.target.value) })} aria-label={t.facturas.unitCostAria} />
+            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label={t.facturas.removeMaterialAria}>×</button>
           </div>
         ))}
         <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800">
-          + Agregar material
+          {t.facturas.addMaterial}
         </button>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <label className="text-xs text-zinc-500">Mano de obra ($)
+          <label className="text-xs text-zinc-500">{t.facturas.laborLabel}
             <input className={`${inputCls} mt-1`} type="number" min="0" step="0.01" value={labor} onChange={(e) => setLabor(Number(e.target.value))} />
           </label>
-          <label className="text-xs text-zinc-500">Otros gastos ($)
+          <label className="text-xs text-zinc-500">{t.facturas.otherLabel}
             <input className={`${inputCls} mt-1`} type="number" min="0" step="0.01" value={other} onChange={(e) => setOther(Number(e.target.value))} />
           </label>
-          <label className="text-xs text-zinc-500">Unidades a producir
+          <label className="text-xs text-zinc-500">{t.facturas.unitsLabel}
             <input className={`${inputCls} mt-1`} type="number" min="1" step="1" value={units} onChange={(e) => setUnits(Number(e.target.value))} />
           </label>
         </div>
-        <label className="block text-xs text-zinc-500">Margen deseado (%)
+        <label className="block text-xs text-zinc-500">{t.facturas.marginLabel}
           <input className={`${inputCls} mt-1`} type="number" min="0" step="1" value={margin} onChange={(e) => setMargin(Number(e.target.value))} />
         </label>
       </div>
 
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200">
-        <p>Costo de materiales: <b>{money(matCost)}</b></p>
-        <p>Costo total: <b>{money(totalCost)}</b></p>
-        <p>Precio sugerido ({margin}% margen): <b className="text-emerald-400">{money(suggested)}</b>
-          {units > 1 && <> · {money(perUnit)} por unidad</>}
+        <p>{t.facturas.matCost}<b>{money(matCost)}</b></p>
+        <p>{t.facturas.totalCost}<b>{money(totalCost)}</b></p>
+        <p>{t.facturas.suggestedPrice.replace("{margen}", String(margin))}<b className="text-emerald-400">{money(suggested)}</b>
+          {units > 1 && <>{t.facturas.perUnit.replace("{precio}", money(perUnit))}</>}
         </p>
         <button
           type="button"
-          onClick={() => onUsePrice("Producción (materiales + mano de obra)", Math.round(suggested * 100) / 100, 1)}
+          onClick={() => onUsePrice(t.facturas.calcLineDesc, Math.round(suggested * 100) / 100, 1)}
           disabled={suggested <= 0}
           className="mt-3 w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
         >
-          Usar precio sugerido en la factura ↓
+          {t.facturas.usePrice}
         </button>
       </div>
     </Panel>
@@ -154,6 +153,20 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
 /* ------------------------------------------------------------------ */
 
 function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
+  const { t: tt, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const STATUS_LABEL: Record<InvoiceStatus, string> = {
+    borrador: tt.facturas.statusDraft,
+    enviada: tt.facturas.statusSent,
+    pagada: tt.facturas.statusPaid,
+  };
+  const printTxt = {
+    title: tt.facturas.printTitle, heading: tt.facturas.printHeading,
+    concept: tt.facturas.printConcept, qty: tt.facturas.printQty, price: tt.facturas.printPrice,
+    amount: tt.facturas.printAmount, subtotal: tt.facturas.printSubtotal, tax: tt.facturas.printTax,
+    total: tt.facturas.printTotal, client: tt.facturas.printClient, notes: tt.facturas.printNotes,
+    thanks: tt.facturas.printThanks,
+  };
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [saved, setSaved] = useState<Invoice[] | null>(null);
   const [sellerName, setSellerName] = useState("Rubén Navarrete");
@@ -195,7 +208,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       const clean = its.filter((it) => it.description.trim() !== "");
       return [...clean, { description: desc, qty, unit_price: amount }];
     });
-    setMsg("Precio de la calculadora agregado a la factura. Revísalo antes de guardar.");
+    setMsg(tt.facturas.calcAdded);
     document.getElementById("factura-form")?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -216,10 +229,10 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
         tax_rate: taxRate,
         notes,
       });
-      setMsg(`Factura ${inv.number} guardada como borrador.`);
+      setMsg(tt.facturas.msgInvoiceSaved.replace("{numero}", inv.number));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar la factura.");
+      setError(err instanceof ApiError ? err.message : tt.facturas.errSaveInvoice);
     } finally {
       setBusy(false);
     }
@@ -230,36 +243,36 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       await api.updateInvoiceStatus(inv.id, st);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el estado.");
+      setError(err instanceof ApiError ? err.message : tt.facturas.errChangeStatus);
     }
   };
 
   const remove = async (inv: Invoice) => {
-    if (!window.confirm(`¿Borrar la factura ${inv.number}?`)) return;
+    if (!window.confirm(tt.facturas.confirmDeleteInvoice.replace("{numero}", inv.number))) return;
     try {
       await api.deleteInvoice(inv.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : tt.facturas.errDeleteInvoice);
     }
   };
 
   const printCurrent = () =>
     printInvoiceHtml({
-      number: saved ? `BORRADOR` : "BORRADOR",
-      date: new Date().toLocaleDateString("es-MX"),
+      number: tt.facturas.draftLabel,
+      date: new Date().toLocaleDateString(locale),
       sellerName, sellerPhone, sellerEmail,
       clientName, clientEmail, clientPhone,
-      items: validItems, taxRate, notes,
+      items: validItems, taxRate, notes, txt: printTxt,
     });
 
   const printSaved = (inv: Invoice) =>
     printInvoiceHtml({
       number: inv.number,
-      date: fmtDate(inv.created_at) ?? "",
+      date: fmtDate(inv.created_at, locale) ?? "",
       sellerName, sellerPhone, sellerEmail,
       clientName: inv.client_name, clientEmail: inv.client_email, clientPhone: inv.client_phone,
-      items: inv.items, taxRate: inv.tax_rate, notes: inv.notes,
+      items: inv.items, taxRate: inv.tax_rate, notes: inv.notes, txt: printTxt,
     });
 
   return (
@@ -268,73 +281,71 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
 
       <div id="factura-form">
       <Panel
-        title="Generador de facturas"
+        title={tt.facturas.genTitle}
         badge={
           <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {saved === null ? "Cargando…" : `${saved.length} guardadas`}
+            {saved === null ? tt.facturas.badgeLoading : tt.facturas.savedCount.replace("{n}", String(saved.length))}
           </span>
         }
       >
         <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-          Arma la factura, guárdala en la plataforma e imprímela o guárdala en
-          PDF desde el navegador. El cliente puede elegirse del CRM o escribirse
-          a mano. v1 solo registra facturas: no cobra tarjetas ni mueve dinero.
-          {!isAdmin && " Tu rol de prueba es de solo lectura."}
+          {tt.facturas.genIntro}
+          {!isAdmin && tt.facturas.genIntroViewer}
         </p>
 
         {isAdmin && (
           <form onSubmit={save} className="space-y-2">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input aria-label="Tu nombre / negocio" className={inputCls} placeholder="Tu nombre / negocio *" value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
-              <input aria-label="Tu teléfono" className={inputCls} placeholder="Tu teléfono" value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
-              <input aria-label="Tu email" className={inputCls} placeholder="Tu email" value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
+              <input aria-label={tt.facturas.sellerNameAria} className={inputCls} placeholder={tt.facturas.sellerNamePlaceholder} value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
+              <input aria-label={tt.facturas.sellerPhoneAria} className={inputCls} placeholder={tt.facturas.sellerPhonePlaceholder} value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
+              <input aria-label={tt.facturas.sellerEmailAria} className={inputCls} placeholder={tt.facturas.sellerEmailPlaceholder} value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
             </div>
             {contacts.length > 0 && (
-              <select className={inputCls} defaultValue="" onChange={(e) => pickContact(e.target.value)} aria-label="Cliente del CRM">
-                <option value="">Cliente del CRM (opcional)…</option>
+              <select className={inputCls} defaultValue="" onChange={(e) => pickContact(e.target.value)} aria-label={tt.facturas.crmClientAria}>
+                <option value="">{tt.facturas.crmClientOption}</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             )}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input aria-label="Cliente" className={inputCls} placeholder="Cliente *" value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
-              <input aria-label="Email del cliente" className={inputCls} placeholder="Email del cliente" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
-              <input aria-label="Teléfono del cliente" className={inputCls} placeholder="Teléfono del cliente" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
+              <input aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
+              <input aria-label={tt.facturas.clientEmailAria} className={inputCls} placeholder={tt.facturas.clientEmailPlaceholder} value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
+              <input aria-label={tt.facturas.clientPhoneAria} className={inputCls} placeholder={tt.facturas.clientPhonePlaceholder} value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
             </div>
 
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">Conceptos</p>
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">{tt.facturas.conceptsHeading}</p>
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
-                <input aria-label="Descripción" className={`${inputCls} col-span-6`} placeholder="Descripción" value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
-                <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" value={it.qty} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} aria-label="Cantidad" />
-                <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" value={it.unit_price} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, unit_price: Number(e.target.value) } : x)))} aria-label="Precio unitario" />
-                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label="Quitar concepto">×</button>
+                <input aria-label={tt.facturas.descAria} className={`${inputCls} col-span-6`} placeholder={tt.facturas.descPlaceholder} value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
+                <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" value={it.qty} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} aria-label={tt.facturas.qtyAria} />
+                <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" value={it.unit_price} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, unit_price: Number(e.target.value) } : x)))} aria-label={tt.facturas.unitPriceAria} />
+                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label={tt.facturas.removeConceptAria}>×</button>
               </div>
             ))}
             <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800">
-              + Agregar concepto
+              {tt.facturas.addConcept}
             </button>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="text-xs text-zinc-500">Impuesto (%)
+              <label className="text-xs text-zinc-500">{tt.facturas.taxLabel}
                 <input className={`${inputCls} mt-1`} type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
               </label>
-              <input aria-label="Notas (opcional)" className={inputCls} placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
+              <input aria-label={tt.facturas.notesAria} className={inputCls} placeholder={tt.facturas.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
             </div>
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200">
-              <p>Subtotal: <b>{money(t.sub)}</b></p>
-              <p>Impuesto ({taxRate}%): <b>{money(t.tax)}</b></p>
-              <p>Total: <b className="text-emerald-400">{money(t.total)}</b></p>
+              <p>{tt.facturas.subtotal}<b>{money(t.sub)}</b></p>
+              <p>{tt.facturas.taxLine.replace("{tasa}", String(taxRate))}<b>{money(t.tax)}</b></p>
+              <p>{tt.facturas.total}<b className="text-emerald-400">{money(t.total)}</b></p>
             </div>
 
             <div className="flex gap-2">
               <button type="submit" disabled={busy || !clientName.trim() || validItems.length === 0} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
-                {busy ? "Guardando…" : "Guardar factura"}
+                {busy ? tt.facturas.saving : tt.facturas.saveInvoice}
               </button>
               <button type="button" onClick={printCurrent} disabled={validItems.length === 0 || !clientName.trim()} className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
-                Imprimir / PDF
+                {tt.facturas.printPdf}
               </button>
             </div>
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}
@@ -344,12 +355,12 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="mt-4 border-t border-zinc-800 pt-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Facturas guardadas ({saved === null ? "…" : saved.length})
+            {tt.facturas.savedHeading} ({saved === null ? "…" : saved.length})
           </p>
           {saved === null ? (
-            <p className="py-2 text-sm text-zinc-500">Cargando facturas…</p>
+            <p className="py-2 text-sm text-zinc-500">{tt.facturas.loadingInvoices}</p>
           ) : saved.length === 0 ? (
-            <p className="py-2 text-sm text-zinc-500">Todavía no hay facturas guardadas.</p>
+            <p className="py-2 text-sm text-zinc-500">{tt.facturas.emptyInvoices}</p>
           ) : (
             <ul className="divide-y divide-zinc-800/70">
               {saved.map((inv) => {
@@ -362,9 +373,9 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                       <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{STATUS_LABEL[inv.status]}</span>
                       <span className="text-sm font-semibold text-emerald-400">{money(it.total)}</span>
                       <span className="ml-auto flex items-center gap-2">
-                        <span className="text-xs text-zinc-600">{fmtDate(inv.created_at)}</span>
+                        <span className="text-xs text-zinc-600">{fmtDate(inv.created_at, locale)}</span>
                         <button onClick={() => printSaved(inv)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800">
-                          Imprimir
+                          {tt.facturas.print}
                         </button>
                         {isAdmin && (
                           <>
@@ -372,14 +383,14 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                               className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
                               value={inv.status}
                               onChange={(e) => changeStatus(inv, e.target.value as InvoiceStatus)}
-                              aria-label="Estado de la factura"
+                              aria-label={tt.facturas.invoiceStatusAria}
                             >
                               {(Object.keys(STATUS_LABEL) as InvoiceStatus[]).map((s) => (
                                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                               ))}
                             </select>
                             <button onClick={() => remove(inv)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
-                              Borrar
+                              {tt.facturas.delete}
                             </button>
                           </>
                         )}

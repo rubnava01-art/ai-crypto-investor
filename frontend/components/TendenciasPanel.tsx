@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type TrendResearch, type TrendSearch } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -17,6 +18,8 @@ const linkBtnCls =
  * abren esas herramientas con la palabra ya puesta (enlaces externos,
  * no datos dentro de la plataforma). */
 export function TendenciasPanel() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [keyword, setKeyword] = useState("");
   const [result, setResult] = useState<TrendResearch | null>(null);
   const [recent, setRecent] = useState<TrendSearch[]>([]);
@@ -46,7 +49,7 @@ export function TendenciasPanel() {
       setResult(data);
       await loadRecent();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo investigar la palabra.");
+      setError(err instanceof ApiError ? err.message : t.tendencias.errResearch);
     } finally {
       setBusy(false);
     }
@@ -57,17 +60,17 @@ export function TendenciasPanel() {
     ? [
         {
           label: "Google Trends",
-          hint: "Tendencias de búsqueda de la palabra",
+          hint: t.tendencias.trendsHint,
           href: `https://trends.google.com/trends/explore?q=${enc}&hl=es`,
         },
         {
           label: "Facebook Ad Library",
-          hint: "Anuncios activos de la competencia: textos y creativos",
+          hint: t.tendencias.adsHint,
           href: `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&q=${enc}`,
         },
         {
           label: "AnswerThePublic",
-          hint: "Página principal (sin enlace de búsqueda inventado)",
+          hint: t.tendencias.atpHint,
           href: "https://answerthepublic.com/",
         },
       ]
@@ -79,7 +82,7 @@ export function TendenciasPanel() {
         {title} <span className="font-normal text-zinc-500">({items.length})</span>
       </p>
       {items.length === 0 ? (
-        <p className="text-sm text-zinc-500">Sin preguntas encontradas para esta palabra.</p>
+        <p className="text-sm text-zinc-500">{t.tendencias.emptyGroup}</p>
       ) : (
         <ul className="space-y-1">
           {items.map((q) => (
@@ -94,16 +97,14 @@ export function TendenciasPanel() {
 
   return (
     <div className="space-y-4">
-      <Panel title="Investigar palabra clave" badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">ES + EN</span>}>
+      <Panel title={t.tendencias.panelTitle} badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">{t.tendencias.badge}</span>}>
         <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-          Escribe una palabra en español o inglés y descubre qué preguntas hace la gente sobre ella:
-          úsalas para temas de contenido y ángulos de campaña. Las preguntas vienen del autocompletado
-          de Google en vivo — no son volúmenes de búsqueda ni puntajes de tendencia.
+          {t.tendencias.intro}
         </p>
         <form onSubmit={research} className="flex flex-col gap-2 sm:flex-row">
-          <input aria-label="Tema a investigar"
+          <input aria-label={t.tendencias.topicAria}
             className={inputCls}
-            placeholder="Ej. creatina, marketing digital, air fryer…"
+            placeholder={t.tendencias.topicPlaceholder}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             maxLength={100}
@@ -114,7 +115,7 @@ export function TendenciasPanel() {
             disabled={busy || !keyword.trim()}
             className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {busy ? "Investigando…" : "Investigar"}
+            {busy ? t.tendencias.researchBusy : t.tendencias.research}
           </button>
         </form>
         {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
@@ -127,19 +128,17 @@ export function TendenciasPanel() {
               {result.warning}
             </p>
           )}
-          <Panel title={`Preguntas que la gente busca: "${result.keyword}"`}>
+          <Panel title={t.tendencias.resultsTitle.replace("{palabra}", result.keyword)}>
             <p className="mb-3 text-xs leading-relaxed text-zinc-500">{result.source_note}</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {renderGroup("En español", result.es)}
-              {renderGroup("In English", result.en)}
+              {renderGroup(t.tendencias.groupEs, result.es)}
+              {renderGroup(t.tendencias.groupEn, result.en)}
             </div>
           </Panel>
 
-          <Panel title="Abrir en herramientas externas">
+          <Panel title={t.tendencias.toolsTitle}>
             <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-              Estos botones son enlaces externos (se abren en otra pestaña) con tu palabra ya puesta.
-              Úsalos así: en la Ad Library mira los anuncios activos de competidores — sus textos y
-              creativos te dicen qué ángulos ya están probando.
+              {t.tendencias.toolsIntro}
             </p>
             <div className="space-y-2">
               {deepLinks.map((l) => (
@@ -156,9 +155,9 @@ export function TendenciasPanel() {
         </>
       )}
 
-      <Panel title="Búsquedas recientes">
+      <Panel title={t.tendencias.recentTitle}>
         {recent.length === 0 ? (
-          <p className="text-sm text-zinc-500">Todavía no has investigado ninguna palabra.</p>
+          <p className="text-sm text-zinc-500">{t.tendencias.emptyRecent}</p>
         ) : (
           <ul className="space-y-1">
             {recent.map((r) => (
@@ -170,7 +169,7 @@ export function TendenciasPanel() {
                 >
                   {r.keyword}
                   <span className="ml-2 text-xs text-zinc-500">
-                    {r.created_at ? new Date(r.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : ""}
+                    {r.created_at ? new Date(r.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" }) : ""}
                   </span>
                 </button>
               </li>

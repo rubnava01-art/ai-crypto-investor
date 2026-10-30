@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, ApiError, type AnalizarResponse } from "../lib/api";
 import { EmptyState } from "./badges";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -19,6 +20,7 @@ function bandaCls(banda: AnalizarResponse["banda"]) {
  * un veredicto: ningún detector puede afirmar con certeza el origen de un
  * texto. Sin estado, sin llaves externas y sin guardar nada. */
 export function AnalizadorPanel() {
+  const { t } = useLanguage();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function AnalizadorPanel() {
     try {
       setResultado(await api.analizarUrl(limpia));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo analizar el link.");
+      setError(err instanceof ApiError ? err.message : t.analizador.errAnalyze);
     } finally {
       setBusy(false);
     }
@@ -42,25 +44,22 @@ export function AnalizadorPanel() {
 
   return (
     <Panel
-      title="Analizador IA"
+      title={t.analizador.panelTitle}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-          Estimación por indicios
+          {t.analizador.badge}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Pega el link de un artículo o publicación y revisa si su contenido
-        parece creado con IA. El resultado muestra cada indicador con su valor
-        y la regla que da la banda. No es un veredicto: úsalo como una señal
-        más, no como prueba.
+        {t.analizador.intro}
       </p>
 
       <form onSubmit={analizar} className="space-y-2">
         <input
-          aria-label="Link a analizar"
+          aria-label={t.analizador.urlAria}
           className={inputCls}
-          placeholder="https://ejemplo.com/articulo"
+          placeholder={t.analizador.urlPlaceholder}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           required
@@ -73,16 +72,16 @@ export function AnalizadorPanel() {
           disabled={busy || !url.trim()}
           className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
         >
-          {busy ? "Analizando…" : "Analizar link"}
+          {busy ? t.analizador.analyzeBusy : t.analizador.analyze}
         </button>
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       </form>
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {busy ? (
-          <p className="py-2 text-sm text-zinc-500">Descargando y analizando el contenido…</p>
+          <p className="py-2 text-sm text-zinc-500">{t.analizador.analyzing}</p>
         ) : resultado === null ? (
-          <EmptyState text="Todavía no has analizado ningún link. Pega una URL arriba para empezar." />
+          <EmptyState text={t.analizador.empty} />
         ) : (
           <div className="space-y-4">
             <div>
@@ -93,7 +92,7 @@ export function AnalizadorPanel() {
                   {resultado.etiqueta_banda}
                 </span>
                 <span className="text-xs text-zinc-400">
-                  {resultado.puntaje} de 4 puntos · {resultado.palabras} palabras
+                  {t.analizador.scoreLine.replace("{puntaje}", String(resultado.puntaje)).replace("{palabras}", String(resultado.palabras))}
                 </span>
               </p>
             </div>
@@ -106,7 +105,7 @@ export function AnalizadorPanel() {
                     <span className="text-sm text-zinc-100">{ind.valor}</span>
                     {ind.punto && (
                       <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-300">
-                        +1 punto
+                        {t.analizador.pointBadge}
                       </span>
                     )}
                   </div>
@@ -116,7 +115,7 @@ export function AnalizadorPanel() {
             </ul>
 
             <p className="text-xs leading-relaxed text-zinc-500">
-              <span className="font-semibold text-zinc-300">Regla: </span>
+              <span className="font-semibold text-zinc-300">{t.analizador.ruleLabel}</span>
               {resultado.regla}
             </p>
             <p role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-xs leading-relaxed text-amber-200/90">

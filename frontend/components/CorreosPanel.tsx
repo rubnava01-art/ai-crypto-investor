@@ -7,12 +7,13 @@ import {
   type Invoice, type MeResponse, type ReferralCampaign,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
+const fmtDate = (iso: string | null, locale: string) =>
+  iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
 /** Reemplaza {{nombre}}, {{negocio}}, {{telefono}}, {{email}} con datos del contacto. */
 function applyTokens(text: string, c: CrmContact | null, fallbackName: string) {
@@ -24,6 +25,7 @@ function applyTokens(text: string, c: CrmContact | null, fallbackName: string) {
 }
 
 function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: EmailTemplate) => void }) {
+  const { t: tt } = useLanguage();
   const [rows, setRows] = useState<EmailTemplate[] | null>(null);
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
@@ -51,51 +53,51 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
     setMsg(null);
     try {
       await api.createEmailTemplate({ name: name.trim(), subject, body });
-      setMsg("Plantilla guardada.");
+      setMsg(tt.correos.msgTemplateSaved);
       setName("");
       setSubject("");
       setBody("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
+      setError(err instanceof ApiError ? err.message : tt.correos.errSave);
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (t: EmailTemplate) => {
-    if (!window.confirm(`¿Borrar la plantilla "${t.name}"?`)) return;
+    if (!window.confirm(tt.correos.confirmDeleteTemplate.replace("{nombre}", t.name))) return;
     try {
       await api.deleteEmailTemplate(t.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : tt.correos.errDelete);
     }
   };
 
   return (
     <Panel
-      title="Mis plantillas de correo"
+      title={tt.correos.templatesTitle}
       badge={
         <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
-          {rows === null ? "Cargando…" : `${rows.length} plantillas`}
+          {rows === null ? tt.correos.badgeLoading : tt.correos.templatesCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Crea tus propios correos una vez y reutilízalos. En el texto puedes usar
-        {" {{nombre}}, {{negocio}}, {{telefono}} y {{email}} "} y al componer se
-        reemplazan solos con los datos del contacto.
-        {!isAdmin && " Tu rol de prueba es de solo lectura."}
+        {tt.correos.templatesIntro1}
+        {tt.correos.templatesTokens}
+        {tt.correos.templatesIntro2}
+        {!isAdmin && tt.correos.templatesIntroViewer}
       </p>
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-2">
-          <input aria-label="Nombre de la plantilla" className={inputCls} placeholder="Nombre de la plantilla *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
-          <input aria-label="Asunto (puede usar {{nombre}})" className={inputCls} placeholder="Asunto (puede usar {{nombre}})" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
-          <textarea aria-label="Cuerpo del correo" className={inputCls} placeholder="Cuerpo del correo… Hola {{nombre}}, …" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <input aria-label={tt.correos.templateNameAria} className={inputCls} placeholder={tt.correos.templateNamePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
+          <input aria-label={tt.correos.subjectAria} className={inputCls} placeholder={tt.correos.subjectPlaceholder} value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
+          <textarea aria-label={tt.correos.bodyAria} className={inputCls} placeholder={tt.correos.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
           <button type="submit" disabled={busy || !name.trim()} className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50">
-            {busy ? "Guardando…" : "Guardar plantilla"}
+            {busy ? tt.correos.saving : tt.correos.saveTemplate}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
@@ -104,9 +106,9 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {rows === null ? (
-          <p className="py-2 text-sm text-zinc-500">Cargando plantillas…</p>
+          <p className="py-2 text-sm text-zinc-500">{tt.correos.loadingTemplates}</p>
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">Todavía no hay plantillas. Crea la primera arriba.</p>
+          <p className="py-2 text-sm text-zinc-500">{tt.correos.emptyTemplates}</p>
         ) : (
           <ul className="divide-y divide-zinc-800/70">
             {rows.map((t) => (
@@ -118,10 +120,10 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
                     {isAdmin && (
                       <>
                         <button onClick={() => onUse(t)} className="rounded-lg bg-cyan-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-cyan-500">
-                          Usar
+                          {tt.correos.use}
                         </button>
                         <button onClick={() => remove(t)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
-                          Borrar
+                          {tt.correos.delete}
                         </button>
                       </>
                     )}
@@ -143,6 +145,7 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
   templateToUse: EmailTemplate | null;
   onTemplateApplied: () => void;
 }) {
+  const { t } = useLanguage();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [campaigns, setCampaigns] = useState<ReferralCampaign[]>([]);
@@ -179,7 +182,7 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
     setTemplateName(templateToUse.name);
     setSubject(applyTokens(templateToUse.subject, contact, manualName));
     setBody(applyTokens(templateToUse.body, contact, manualName));
-    setMsg(`Plantilla "${templateToUse.name}" cargada. Revisa el texto antes de guardarlo.`);
+    setMsg(t.correos.templateLoaded.replace("{nombre}", templateToUse.name));
     document.getElementById("correo-compositor")?.scrollIntoView({ behavior: "smooth" });
     onTemplateApplied();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,10 +197,10 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(`Para: ${toName} <${toEmail}>\nAsunto: ${subject}\n\n${body}`);
-      setMsg("Correo copiado al portapapeles.");
+      await navigator.clipboard.writeText(t.correos.copyText.replace("{nombre}", toName).replace("{email}", toEmail).replace("{asunto}", subject).replace("{cuerpo}", body));
+      setMsg(t.correos.msgCopied);
     } catch {
-      setError("No se pudo copiar. Selecciónalo a mano.");
+      setError(t.correos.errCopy);
     }
   };
 
@@ -215,10 +218,10 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
         subject,
         body,
       });
-      setMsg("Correo guardado en el registro como preparado.");
+      setMsg(t.correos.msgMailSaved);
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
+      setError(err instanceof ApiError ? err.message : t.correos.errSave);
     } finally {
       setBusy(false);
     }
@@ -227,74 +230,70 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
   return (
     <div id="correo-compositor">
       <Panel
-        title="Redactar correo"
+        title={t.correos.composerTitle}
         badge={
           <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
-            CRM conectado
+            {t.correos.crmBadge}
           </span>
         }
       >
         <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-          Elige un contacto del CRM y la plataforma recupera su información:
-          teléfono, email, etiquetas, estado, notas, sus facturas y sus campañas
-          de referidos. El correo se prepara aquí; el envío lo haces tú desde tu
-          Gmail (esta versión no envía desde el servidor) y luego lo marcas
-          como enviado en el registro.
-          {!isAdmin && " Tu rol de prueba es de solo lectura."}
+          {t.correos.composerIntro}
+          {!isAdmin && t.correos.composerIntroViewer}
         </p>
 
         <div className="space-y-2">
           {contacts.length > 0 && (
-            <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} aria-label="Contacto del CRM">
-              <option value="">Contacto del CRM…</option>
+            <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} aria-label={t.correos.crmContactAria}>
+              <option value="">{t.correos.crmContactOption}</option>
               {contacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           )}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input aria-label="Nombre (si no es del CRM)" className={inputCls} placeholder="Nombre (si no es del CRM)" value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
-            <input aria-label="Email del destinatario" className={inputCls} placeholder="Email del destinatario" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
+            <input aria-label={t.correos.manualNameAria} className={inputCls} placeholder={t.correos.manualNamePlaceholder} value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
+            <input aria-label={t.correos.manualEmailAria} className={inputCls} placeholder={t.correos.manualEmailPlaceholder} value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
           </div>
 
           {contact && recovered && (
             <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm leading-relaxed text-zinc-200">
-              <p className="font-semibold text-cyan-200">Información recuperada de {contact.name}</p>
+              <p className="font-semibold text-cyan-200">{t.correos.recoveredTitle.replace("{nombre}", contact.name)}</p>
               <p className="text-zinc-300">
-                {contact.phone && <>Tel: {contact.phone} · </>}
-                {contact.email && <>Email: {contact.email} · </>}
-                Estado: {contact.status}
-                {contact.tags.length > 0 && <> · Etiquetas: {contact.tags.join(", ")}</>}
+                {contact.phone && <>{t.correos.telLabel}{contact.phone} · </>}
+                {contact.email && <>{t.correos.emailLabel}{contact.email} · </>}
+                {t.correos.statusLabel}{contact.status}
+                {contact.tags.length > 0 && <>{t.correos.tagsLabel}{contact.tags.join(", ")}</>}
               </p>
-              {contact.notes && <p className="text-zinc-400">Notas: {contact.notes}</p>}
+              {contact.notes && <p className="text-zinc-400">{t.correos.notesLabel}{contact.notes}</p>}
               <p className="text-zinc-400">
-                Facturas: {recovered.invoices.length}
+                {t.correos.invoicesLabel}{recovered.invoices.length}
                 {recovered.invoices.length > 0 && <> ({recovered.invoices.map((i) => `${i.number} ${i.status}`).join(", ")})</>}
-                {" · "}Campañas de referidos: {recovered.campaigns.length}
+                {t.correos.campaignsLabel}{recovered.campaigns.length}
                 {recovered.campaigns.length > 0 && <> ({recovered.campaigns.map((c) => c.name).join(", ")})</>}
               </p>
             </div>
           )}
 
           <form onSubmit={save} className="space-y-2">
-            <input aria-label="Asunto" className={inputCls} placeholder="Asunto *" value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
-            <textarea aria-label="Cuerpo del correo" className={inputCls} placeholder="Cuerpo del correo *" value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
+            <input aria-label={t.correos.subjectAria2} className={inputCls} placeholder={t.correos.subjectPlaceholder2} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
+            <textarea aria-label={t.correos.bodyAria2} className={inputCls} placeholder={t.correos.bodyPlaceholder2} value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
-                Copiar correo
+                {t.correos.copyMail}
               </button>
               {gmailUrl ? (
                 <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg bg-cyan-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-cyan-500">
-                  Abrir en Gmail ↗
+                  {t.correos.openGmail}
                 </a>
               ) : (
                 <button type="button" disabled className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-500 disabled:opacity-50">
-                  Falta el email del destinatario
+                  {t.correos.missingEmail}
                 </button>
               )}
               {isAdmin && (
                 <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
-                  {busy ? "Guardando…" : "Guardar en registro"}
+                  {busy ? t.correos.saving : t.correos.saveToLog}
                 </button>
               )}
             </div>
@@ -308,6 +307,8 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
 }
 
 function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: number }) {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [rows, setRows] = useState<EmailLog[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -328,59 +329,58 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
       await api.updateEmailLogStatus(r.id, st);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo cambiar el estado.");
+      setError(err instanceof ApiError ? err.message : t.correos.errChangeStatus);
     }
   };
 
   const remove = async (r: EmailLog) => {
-    if (!window.confirm(`¿Borrar el registro "${r.subject}"?`)) return;
+    if (!window.confirm(t.correos.confirmDeleteLog.replace("{asunto}", r.subject))) return;
     try {
       await api.deleteEmailLog(r.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : t.correos.errDelete);
     }
   };
 
   return (
     <Panel
-      title="Registro de correos"
+      title={t.correos.logsTitle}
       badge={
         <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
-          {rows === null ? "Cargando…" : `${rows.length} correos`}
+          {rows === null ? t.correos.badgeLoading : t.correos.logsCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        La línea de tiempo de correos por contacto, al estilo HubSpot: qué se
-        preparó y qué ya enviaste tú desde tu Gmail.
+        {t.correos.logsIntro}
       </p>
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       {rows === null ? (
-        <p className="py-2 text-sm text-zinc-500">Cargando registro…</p>
+        <p className="py-2 text-sm text-zinc-500">{t.correos.loadingLogs}</p>
       ) : rows.length === 0 ? (
-        <p className="py-2 text-sm text-zinc-500">Todavía no hay correos registrados.</p>
+        <p className="py-2 text-sm text-zinc-500">{t.correos.emptyLogs}</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {rows.map((r) => (
             <li key={r.id} className="py-3">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-sm font-semibold text-zinc-100">{r.subject || "(sin asunto)"}</span>
+                <span className="text-sm font-semibold text-zinc-100">{r.subject || t.correos.noSubject}</span>
                 <span className="text-sm text-zinc-400">→ {r.contact_name}</span>
                 <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${r.status === "enviado" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
-                  {r.status === "enviado" ? "Enviado" : "Preparado"}
+                  {r.status === "enviado" ? t.correos.sentLabel : t.correos.preparedLabel}
                 </span>
                 {r.template_name && <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{r.template_name}</span>}
                 <span className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-zinc-600">{fmtDate(r.created_at)}</span>
+                  <span className="text-xs text-zinc-600">{fmtDate(r.created_at, locale)}</span>
                   {isAdmin && r.status === "preparado" && (
                     <button onClick={() => changeStatus(r, "enviado")} className="rounded-lg border border-emerald-900/60 px-2.5 py-1 text-xs text-emerald-400 hover:bg-emerald-950/50">
-                      Marcar enviado
+                      {t.correos.markSent}
                     </button>
                   )}
                   {isAdmin && (
                     <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
-                      Borrar
+                      {t.correos.delete}
                     </button>
                   )}
                 </span>

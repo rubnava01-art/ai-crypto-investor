@@ -6,18 +6,20 @@ import {
   type BusinessArea, type BusinessNote, type BusinessTask, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
 
-const AREAS: { value: BusinessArea; label: string; hint: string }[] = [
-  { value: "marketing", label: "Marketing", hint: "Campañas, contenido y promoción" },
-  { value: "ventas", label: "Ventas", hint: "Clientes, ofertas y cierres" },
-  { value: "legal", label: "Legal", hint: "Contratos, permisos y cumplimiento" },
-  { value: "administrativo", label: "Administrativo", hint: "Operación, finanzas y oficina" },
-];
 
 export function BusinessPanel() {
+  const { t: tt } = useLanguage();
+  const AREAS: { value: BusinessArea; label: string; hint: string }[] = [
+    { value: "marketing", label: tt.business.areaMarketing, hint: tt.business.hintMarketing },
+    { value: "ventas", label: tt.business.areaVentas, hint: tt.business.hintVentas },
+    { value: "legal", label: tt.business.areaLegal, hint: tt.business.hintLegal },
+    { value: "administrativo", label: tt.business.areaAdministrativo, hint: tt.business.hintAdministrativo },
+  ];
   const [area, setArea] = useState<BusinessArea>("marketing");
   const [me, setMe] = useState<MeResponse | null>(null);
   const [notes, setNotes] = useState<BusinessNote[]>([]);
@@ -47,7 +49,7 @@ export function BusinessPanel() {
       setTasks(t);
       setMe(m);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo cargar el área");
+      setError(e instanceof ApiError ? e.message : tt.business.errLoad);
     } finally {
       setLoading(false);
     }
@@ -68,7 +70,7 @@ export function BusinessPanel() {
       setNoteBody("");
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo crear la nota");
+      setError(e instanceof ApiError ? e.message : tt.business.errCreateNote);
     }
   };
 
@@ -79,7 +81,7 @@ export function BusinessPanel() {
       setEditingNote(null);
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo guardar la nota");
+      setError(e instanceof ApiError ? e.message : tt.business.errSaveNote);
     }
   };
 
@@ -90,7 +92,7 @@ export function BusinessPanel() {
       setTaskTitle("");
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo crear la tarea");
+      setError(e instanceof ApiError ? e.message : tt.business.errCreateTask);
     }
   };
 
@@ -99,7 +101,7 @@ export function BusinessPanel() {
       await api.updateBusinessTask(t.id, { done: !t.done });
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo actualizar la tarea");
+      setError(e instanceof ApiError ? e.message : tt.business.errUpdateTask);
     }
   };
 
@@ -107,7 +109,7 @@ export function BusinessPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Áreas de Business">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={tt.business.areasAria}>
         {AREAS.map((a) => (
           <button
             key={a.value}
@@ -130,23 +132,23 @@ export function BusinessPanel() {
       )}
 
       {loading ? (
-        <p className="text-sm text-zinc-400">Cargando {areaLabel}…</p>
+        <p className="text-sm text-zinc-400">{tt.business.loading.replace("{area}", areaLabel)}</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
-          <Panel title={`Notas — ${areaLabel}`} badge="Solo de esta área">
+          <Panel title={tt.business.notesTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
             {notes.length === 0 && (
-              <p className="text-sm text-zinc-400">Sin notas todavía en {areaLabel}.</p>
+              <p className="text-sm text-zinc-400">{tt.business.emptyNotes.replace("{area}", areaLabel)}</p>
             )}
             <ul className="space-y-3">
               {notes.map((n) => (
                 <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
                   {editingNote?.id === n.id ? (
                     <div className="space-y-2">
-                      <input aria-label="Título de la nota" className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                      <textarea aria-label="Texto de la nota" className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                      <input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                      <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                       <div className="flex gap-2">
-                        <button onClick={saveEdit} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">Guardar</button>
-                        <button onClick={() => setEditingNote(null)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">Cancelar</button>
+                        <button onClick={saveEdit} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">{tt.business.save}</button>
+                        <button onClick={() => setEditingNote(null)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">{tt.business.cancel}</button>
                       </div>
                     </div>
                   ) : (
@@ -159,13 +161,13 @@ export function BusinessPanel() {
                             className="text-emerald-400 hover:underline"
                             onClick={() => { setEditingNote(n); setEditTitle(n.title); setEditBody(n.body); }}
                           >
-                            Editar
+                            {tt.business.edit}
                           </button>
                           <button
                             className="text-red-400 hover:underline"
-                            onClick={async () => { if (!window.confirm(`¿Eliminar la nota "${n.title}"?`)) return; await api.deleteBusinessNote(n.id); refresh(); }}
+                            onClick={async () => { if (!window.confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title))) return; await api.deleteBusinessNote(n.id); refresh(); }}
                           >
-                            Eliminar
+                            {tt.business.delete}
                           </button>
                         </div>
                       )}
@@ -176,29 +178,29 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-                <input aria-label="Título de la nota"
+                <input aria-label={tt.business.noteTitleAria}
                   className={inputCls}
-                  placeholder="Título de la nota"
+                  placeholder={tt.business.noteTitlePlaceholder}
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
                 />
-                <textarea aria-label="Texto de la nota"
+                <textarea aria-label={tt.business.noteBodyAria}
                   className={inputCls}
                   rows={3}
-                  placeholder="Texto de la nota"
+                  placeholder={tt.business.noteBodyPlaceholder}
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
                 />
                 <button onClick={createNote} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
-                  Guardar nota
+                  {tt.business.saveNote}
                 </button>
               </div>
             )}
           </Panel>
 
-          <Panel title={`Tareas — ${areaLabel}`} badge="Solo de esta área">
+          <Panel title={tt.business.tasksTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
             {tasks.length === 0 && (
-              <p className="text-sm text-zinc-400">Sin tareas todavía en {areaLabel}.</p>
+              <p className="text-sm text-zinc-400">{tt.business.emptyTasks.replace("{area}", areaLabel)}</p>
             )}
             <ul className="space-y-2">
               {tasks.map((t) => (
@@ -208,7 +210,7 @@ export function BusinessPanel() {
                     checked={t.done}
                     disabled={!isAdmin}
                     onChange={() => toggleTask(t)}
-                    aria-label={`Marcar ${t.title}`}
+                    aria-label={tt.business.markTask.replace("{titulo}", t.title)}
                   />
                   <span className={`flex-1 text-sm ${t.done ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
                     {t.title}
@@ -216,9 +218,9 @@ export function BusinessPanel() {
                   {isAdmin && (
                     <button
                       className="text-xs text-red-400 hover:underline"
-                      onClick={async () => { if (!window.confirm(`¿Eliminar la tarea "${t.title}"?`)) return; await api.deleteBusinessTask(t.id); refresh(); }}
+                      onClick={async () => { if (!window.confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title))) return; await api.deleteBusinessTask(t.id); refresh(); }}
                     >
-                      Eliminar
+                      {tt.business.delete}
                     </button>
                   )}
                 </li>
@@ -226,15 +228,15 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-4 flex gap-2 border-t border-zinc-800 pt-4">
-                <input aria-label="Nueva tarea"
+                <input aria-label={tt.business.newTaskAria}
                   className={inputCls}
-                  placeholder="Nueva tarea"
+                  placeholder={tt.business.newTaskPlaceholder}
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
                 />
                 <button onClick={createTask} className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
-                  Añadir
+                  {tt.business.add}
                 </button>
               </div>
             )}
@@ -242,7 +244,7 @@ export function BusinessPanel() {
         </div>
       )}
       {!isAdmin && me && (
-        <p className="text-xs text-zinc-500">Rol prueba: puedes leer las notas y tareas, pero solo el admin las crea o edita.</p>
+        <p className="text-xs text-zinc-500">{tt.business.viewerNote}</p>
       )}
     </div>
   );

@@ -2,27 +2,14 @@
 
 import { useRef, useState } from "react";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 import { downloadSvg, downloadSvgAsPng } from "../lib/svgDownload";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
 
-const SHIRT_COLORS: { name: string; hex: string; seam: string }[] = [
-  { name: "Negro", hex: "#18181b", seam: "#000000" },
-  { name: "Blanco", hex: "#f4f4f5", seam: "#d4d4d8" },
-  { name: "Azul marino", hex: "#1e3a5f", seam: "#12233a" },
-  { name: "Gris", hex: "#52525b", seam: "#3f3f46" },
-  { name: "Rojo", hex: "#991b1b", seam: "#7f1d1d" },
-  { name: "Verde oliva", hex: "#3f6212", seam: "#365314" },
-];
-
-const TEXT_COLORS: { name: string; hex: string }[] = [
-  { name: "Blanco", hex: "#ffffff" },
-  { name: "Negro", hex: "#111111" },
-  { name: "Dorado", hex: "#d4af37" },
-  { name: "Amarillo", hex: "#fde047" },
-  { name: "Rojo", hex: "#ef4444" },
-];
+// Colores: hex fijos; las etiquetas visibles salen del diccionario
+// dentro del componente (t.mockup.*).
 
 type Placement = "pecho" | "centro" | "espalda";
 
@@ -30,16 +17,32 @@ const TEE_PATH =
   "M140 30 L100 60 L60 130 L110 160 L140 120 L140 370 L260 370 L260 120 L290 160 L340 130 L300 60 L260 30 C250 55 230 65 200 65 C170 65 150 55 140 30 Z";
 
 export function ShirtMockupGenerator() {
+  const { t } = useLanguage();
+  const shirtColors: { name: string; hex: string; seam: string }[] = [
+    { name: t.mockup.shirtBlack, hex: "#18181b", seam: "#000000" },
+    { name: t.mockup.shirtWhite, hex: "#f4f4f5", seam: "#d4d4d8" },
+    { name: t.mockup.shirtNavy, hex: "#1e3a5f", seam: "#12233a" },
+    { name: t.mockup.shirtGray, hex: "#52525b", seam: "#3f3f46" },
+    { name: t.mockup.shirtRed, hex: "#991b1b", seam: "#7f1d1d" },
+    { name: t.mockup.shirtOlive, hex: "#3f6212", seam: "#365314" },
+  ];
+  const textColors: { name: string; hex: string }[] = [
+    { name: t.mockup.inkWhite, hex: "#ffffff" },
+    { name: t.mockup.inkBlack, hex: "#111111" },
+    { name: t.mockup.inkGold, hex: "#d4af37" },
+    { name: t.mockup.inkYellow, hex: "#fde047" },
+    { name: t.mockup.inkRed, hex: "#ef4444" },
+  ];
   const svgRef = useRef<SVGSVGElement>(null);
   const [shirtIdx, setShirtIdx] = useState(0);
   const [textIdx, setTextIdx] = useState(0);
   const [designText, setDesignText] = useState("NEST");
-  const [subText, setSubText] = useState("TU MARCA");
+  const [subText, setSubText] = useState(t.mockup.defaultSub);
   const [placement, setPlacement] = useState<Placement>("centro");
   const [msg, setMsg] = useState<string | null>(null);
 
-  const shirt = SHIRT_COLORS[shirtIdx];
-  const ink = TEXT_COLORS[textIdx];
+  const shirt = shirtColors[shirtIdx];
+  const ink = textColors[textIdx];
   const isBack = placement === "espalda";
   const fileBase = `mockup-camiseta-${(designText.trim() || "diseno").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
@@ -51,45 +54,42 @@ export function ShirtMockupGenerator() {
   const download = (png: boolean) => {
     if (png) downloadSvgAsPng(svgRef.current, `${fileBase}.png`);
     else downloadSvg(svgRef.current, `${fileBase}.svg`);
-    setMsg(png ? "Mockup descargado en PNG." : "Mockup descargado en SVG (editable).");
+    setMsg(png ? t.mockup.msgPng : t.mockup.msgSvg);
   };
 
   return (
     <Panel
-      title="Generador de mockups de camisetas"
+      title={t.mockup.title}
       badge={
         <span className="rounded-full bg-sky-500/15 px-2.5 py-1 text-xs font-semibold text-sky-300">
-          Plantillas
+          {t.mockup.badge}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Arma un mockup rápido para mostrarle un diseño a un cliente: color de la
-        camiseta, texto, posición (pecho, centro o espalda) y descárgalo en PNG o SVG.
-        Es una vista previa con plantillas, no el arte final para imprimir: para
-        producción usa siempre el logo original del cliente en alta resolución.
+        {t.mockup.intro}
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <input aria-label="Texto del diseño" className={inputCls} placeholder="Texto del diseño *" value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
-          <input aria-label="Texto secundario (opcional)" className={inputCls} placeholder="Texto secundario (opcional)" value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
+          <input aria-label={t.mockup.designAria} className={inputCls} placeholder={t.mockup.designPlaceholder} value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
+          <input aria-label={t.mockup.subAria} className={inputCls} placeholder={t.mockup.subPlaceholder} value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
           <div className="grid grid-cols-2 gap-2">
-            <select className={inputCls} value={shirtIdx} onChange={(e) => setShirtIdx(Number(e.target.value))} aria-label="Color de camiseta">
-              {SHIRT_COLORS.map((c, i) => (
-                <option key={c.name} value={i}>Camiseta: {c.name}</option>
+            <select className={inputCls} value={shirtIdx} onChange={(e) => setShirtIdx(Number(e.target.value))} aria-label={t.mockup.shirtAria}>
+              {shirtColors.map((c, i) => (
+                <option key={c.name} value={i}>{t.mockup.shirtPrefix}{c.name}</option>
               ))}
             </select>
-            <select className={inputCls} value={textIdx} onChange={(e) => setTextIdx(Number(e.target.value))} aria-label="Color del texto">
-              {TEXT_COLORS.map((c, i) => (
-                <option key={c.name} value={i}>Texto: {c.name}</option>
+            <select className={inputCls} value={textIdx} onChange={(e) => setTextIdx(Number(e.target.value))} aria-label={t.mockup.textAria}>
+              {textColors.map((c, i) => (
+                <option key={c.name} value={i}>{t.mockup.textPrefix}{c.name}</option>
               ))}
             </select>
           </div>
-          <select className={inputCls} value={placement} onChange={(e) => setPlacement(e.target.value as Placement)} aria-label="Posición">
-            <option value="pecho">Pecho (logo chico, frente)</option>
-            <option value="centro">Centro (logo grande, frente)</option>
-            <option value="espalda">Espalda (logo grande)</option>
+          <select className={inputCls} value={placement} onChange={(e) => setPlacement(e.target.value as Placement)} aria-label={t.mockup.placementAria}>
+            <option value="pecho">{t.mockup.placeChest}</option>
+            <option value="centro">{t.mockup.placeCenter}</option>
+            <option value="espalda">{t.mockup.placeBack}</option>
           </select>
           <div className="flex gap-2">
             <button
@@ -98,7 +98,7 @@ export function ShirtMockupGenerator() {
               disabled={!designText.trim()}
               className="flex-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
             >
-              Descargar SVG
+              {t.mockup.downloadSvg}
             </button>
             <button
               type="button"
@@ -106,14 +106,14 @@ export function ShirtMockupGenerator() {
               disabled={!designText.trim()}
               className="flex-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
             >
-              Descargar PNG
+              {t.mockup.downloadPng}
             </button>
           </div>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         </div>
 
         <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-          <svg ref={svgRef} viewBox="0 0 400 400" className="h-64 w-64" role="img" aria-label="Vista previa del mockup de camiseta">
+          <svg ref={svgRef} viewBox="0 0 400 400" className="h-64 w-64" role="img" aria-label={t.mockup.previewAria}>
             <rect width="400" height="400" fill="#09090b" />
             <path d={TEE_PATH} fill={shirt.hex} stroke={shirt.seam} strokeWidth="2" />
             {/* Cuello */}
@@ -127,7 +127,7 @@ export function ShirtMockupGenerator() {
               </text>
             )}
             <text x="200" y="392" textAnchor="middle" fontSize="11" fill="#71717a" fontFamily="Arial, sans-serif">
-              {isBack ? "Vista: espalda" : "Vista: frente"}
+              {isBack ? t.mockup.viewBack : t.mockup.viewFront}
             </text>
           </svg>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useLanguage, type NavKey } from "../lib/i18n";
 
 /** Small professional stroke icons (currentColor, 16px) — no emoji, no images. */
 function Icon({ d, children }: { d?: string; children?: React.ReactNode }) {
@@ -176,8 +177,35 @@ const MODULES = [
   },
 ];
 
+// Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
+// descripción visibles salen de ahí, no de los textos fijos de MODULES
+// (que quedan como respaldo si una ruta no tiene entrada).
+const KEY_BY_HREF: Record<string, NavKey> = {
+  "/inicio": "inicio",
+  "/": "invertir",
+  "/estudiar": "estudiar",
+  "/crear": "crear",
+  "/analizador": "analizador",
+  "/crm": "crm",
+  "/referidos": "referidos",
+  "/business": "business",
+  "/espacio": "espacio",
+  "/facturas": "facturas",
+  "/correos": "correos",
+  "/chat": "chat",
+  "/recomendaciones": "recomendaciones",
+  "/desarrollo": "desarrollo",
+  "/tendencias": "tendencias",
+  "/auditor": "auditor",
+  "/privacidad": "privacidad",
+  "/inventario": "inventario",
+  "/perfil": "perfil",
+  "/usuarios": "usuarios",
+};
+
 export function ModuleNav() {
   const pathname = usePathname();
+  const { t } = useLanguage();
   // La entrada de Control de usuarios solo se muestra a administradores.
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
@@ -187,8 +215,11 @@ export function ModuleNav() {
       .catch(() => setIsAdmin(false));
   }, []);
   return (
-    <nav aria-label="Módulos de la plataforma" className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
+    <nav aria-label={t.header.navAria} className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
       {MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin).map((m) => {
+        const navText = t.nav[KEY_BY_HREF[m.href]];
+        const label = navText?.label ?? m.label;
+        const hint = navText?.hint ?? m.hint;
         const active = pathname === m.href;
         return (
           <Link
@@ -202,9 +233,9 @@ export function ModuleNav() {
             }
           >
             {m.icon}
-            {m.label}
+            {label}
             <span className={`hidden text-xs font-normal sm:inline ${active ? "text-emerald-100/80" : "text-zinc-500"}`}>
-              {m.hint}
+              {hint}
             </span>
           </Link>
         );

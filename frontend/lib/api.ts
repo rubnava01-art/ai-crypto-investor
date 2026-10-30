@@ -715,6 +715,19 @@ export function clearMeCache() {
 // Único punto de fetch con timeout: request() (JSON) y downloadCoursePdf
 // (blob) lo comparten en vez de duplicar el AbortController. Un timeout se
 // reporta como timeout, no como "API unreachable".
+// Idioma de los mensajes que construye ESTE cliente (no es un componente
+// React, así que no puede usar useLanguage): lee la misma clave que el
+// diccionario ("aci_lang") en el momento del error; por defecto español.
+// El `detail` del backend pasa verbatim y NO se traduce aquí.
+function uiLang(): "es" | "en" {
+  if (typeof window === "undefined") return "es";
+  try {
+    return window.localStorage.getItem("aci_lang") === "en" ? "en" : "es";
+  } catch {
+    return "es";
+  }
+}
+
 async function fetchTimed(
   url: string,
   init: RequestInit,
@@ -727,7 +740,12 @@ async function fetchTimed(
     return await fetch(url, { ...init, signal: ctrl.signal });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new ApiError(0, `API timeout (${timeoutMs / 1000}s) en ${label}`);
+      throw new ApiError(
+        0,
+        uiLang() === "en"
+          ? `API timeout (${timeoutMs / 1000}s) on ${label}`
+          : `API timeout (${timeoutMs / 1000}s) en ${label}`,
+      );
     }
     throw new ApiError(0, `API unreachable (${API_URL})`);
   } finally {
@@ -805,7 +823,10 @@ async function request<T>(
   try {
     return (await res.json()) as T;
   } catch {
-    throw new ApiError(0, `Respuesta no válida del API en ${path}`);
+    throw new ApiError(
+      0,
+      uiLang() === "en" ? `Invalid API response on ${path}` : `Respuesta no válida del API en ${path}`,
+    );
   }
 }
 
@@ -933,7 +954,13 @@ export const api = {
     if (!res.ok) {
       if (res.status === 401) handleUnauthorized();
       const detail = await errorDetail(res);
-      throw new ApiError(res.status, detail || `No se pudo descargar el PDF (${res.status})`);
+      throw new ApiError(
+        res.status,
+        detail ||
+          (uiLang() === "en"
+            ? `Could not download the PDF (${res.status})`
+            : `No se pudo descargar el PDF (${res.status})`),
+      );
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

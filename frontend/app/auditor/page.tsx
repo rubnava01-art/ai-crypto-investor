@@ -2,10 +2,12 @@
 
 import { AuditorPanel } from "../../components/AuditorPanel";
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 
 export default function AuditorPage() {
+  const { t } = useLanguage();
   return (
-    <ModuleShell moduleTitle="Auditor web" subtitle="Velocidad medida + revisión SEO de una página">
+    <ModuleShell moduleTitle={t.auditor.pageTitle} subtitle={t.auditor.pageSubtitle}>
       <AuditorPanel />
     </ModuleShell>
   );

@@ -14,22 +14,23 @@ import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
 import type { MeResponse } from "../lib/api";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
+import { LanguageToggle, useLanguage } from "../lib/i18n";
 import { Footer } from "../components/Footer";
 import dynamic from "next/dynamic";
 
 // Carga diferida (optimización): los paneles que NO son la vista inicial del
-// dashboard se descargan solo cuando se renderizan — Usuarios e Invertir son
-// solo-admin y el Asistente IA va al final de la página. MarketPanel (precios
-// en vivo, arriba) se queda en el bundle principal.
-const panelLoading = () => (
-  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500">
-    Cargando panel…
-  </div>
-);
-const UsersPanel = dynamic(
-  () => import("../components/UsersPanel").then((m) => m.UsersPanel),
-  { ssr: false, loading: panelLoading },
-);
+// dashboard se descargan solo cuando se renderizan — Invertir es solo-admin
+// y el Asistente IA va al final de la página. MarketPanel (precios en vivo,
+// arriba) se queda en el bundle principal. El control de usuarios vive en
+// su propio módulo (/usuarios) desde 2026-10-30, no incrustado aquí.
+const panelLoading = () => {
+  const { t } = useLanguage();
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500">
+      {t.dashboard.panelLoading}
+    </div>
+  );
+};
 const InvestorPanel = dynamic(
   () => import("../components/InvestorPanel").then((m) => m.InvestorPanel),
   { ssr: false, loading: panelLoading },
@@ -52,20 +53,21 @@ const sideColor: Record<SignalSide, string> = {
 };
 
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
+  const { t } = useLanguage();
   return (
     <div
       role="alert"
       className="mb-6 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
     >
-      <strong className="font-semibold">API sin conexión.</strong> No se pudo contactar a{" "}
-      <code className="text-amber-200">{apiUrl}</code>. El panel se muestra con datos DEMO de ejemplo:
-      no se muestra ningún dato en vivo ni real.
+      <strong className="font-semibold">{t.dashboard.offlineTitle}</strong> {t.dashboard.offlineBefore}{" "}
+      <code className="text-amber-200">{apiUrl}</code>{t.dashboard.offlineAfter}
     </div>
   );
 }
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [offline, setOffline] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmKill, setConfirmKill] = useState(false);
@@ -103,7 +105,7 @@ export default function DashboardPage() {
         // esconder el resto de los datos.
         if ([d.system, d.balances, d.performance, d.signals, d.strategies,
              d.modes, d.operations, d.risk, d.logs].some((s) => s == null)) {
-          setActionError("Algunas secciones del dashboard no cargaron; el resto se muestra con normalidad.");
+          setActionError(t.dashboard.partialError);
         }
         api.me().then(setMe).catch(() => setMe(null));
         return;
@@ -133,7 +135,7 @@ export default function DashboardPage() {
       const state = action === "start" ? await api.scannerStart() : await api.scannerStop();
       setSystem((prev) => (prev ? { ...prev, scanner_running: state.running } : prev));
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Error al ${action === "start" ? "iniciar" : "detener"} el escáner: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? (action === "start" ? t.dashboard.scannerStartError : t.dashboard.scannerStopError).replace("{detail}", err.message) : String(err));
     }
   }
 
@@ -142,7 +144,7 @@ export default function DashboardPage() {
       const res = await api.setSimulationMode(mode);
       setSim(res);
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Error al cambiar el modo: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? t.dashboard.modeError.replace("{detail}", err.message) : String(err));
     }
   }
 
@@ -152,7 +154,7 @@ export default function DashboardPage() {
       setRisk((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
       setSystem((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Error al activar el kill switch: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? t.dashboard.killError.replace("{detail}", err.message) : String(err));
     } finally {
       setConfirmKill(false);
     }
@@ -168,7 +170,7 @@ export default function DashboardPage() {
   if (!checked) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6">
-        <p className="text-sm text-zinc-400">Cargando…</p>
+        <p className="text-sm text-zinc-400">{t.dashboard.loading}</p>
       </main>
     );
   }
@@ -179,20 +181,21 @@ export default function DashboardPage() {
         <div>
           <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            Plataforma unificada
+            {t.header.brand}
           </p>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Invertir</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t.dashboard.title}</h1>
           <p className="text-sm text-zinc-400">
-            AI Crypto Investor — {system ? <>Modo: <span className="font-mono">{system.mode}</span></> : "Cargando…"}
+            AI Crypto Investor — {system ? <>{t.dashboard.modeLabel} <span className="font-mono">{system.mode}</span></> : t.dashboard.loading}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <LanguageToggle />
           <DemoBadge />
           <button
             onClick={load}
             className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            Actualizar
+            {t.dashboard.refresh}
           </button>
           <ProfileMenu onLogout={logout} />
         </div>
@@ -214,30 +217,22 @@ export default function DashboardPage() {
 
       {me && !isAdmin && (
         <div className="mb-4 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
-          <strong className="font-semibold">Modo prueba:</strong> puedes ver todo y correr
-          pruebas (backtests y evaluación), pero los controles — escáner, modos, kill switch y
-          usuarios — son solo del administrador.
-        </div>
-      )}
-
-      {isAdmin && (
-        <div className="mb-4">
-          <UsersPanel />
+          <strong className="font-semibold">{t.dashboard.testModeTitle}</strong> {t.dashboard.testModeBody}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
-        <Panel title="Estado del sistema" badge={<DemoBadge />}>
+        <Panel title={t.dashboard.systemTitle} badge={<DemoBadge />}>
           {system ? (
             <dl className="space-y-2 text-sm">
               {[
-                ["Exchange conectado", <StatusDot key="e" on={system.exchange_connected} />],
-                ["Escáner", <StatusDot key="s" on={system.scanner_running} />],
-                ["Modo simulación", <span key="m" className="font-mono">{system.simulation_mode}</span>],
-                ["Kill switch", <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? "ACTIVADO" : "apagado"}</span>],
-                ["Fuente de datos", <span key="d" className="font-mono">{system.data_source}</span>],
-                ["Última actualización", <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
+                [t.dashboard.exchangeConnected, <StatusDot key="e" on={system.exchange_connected} />],
+                [t.dashboard.scanner, <StatusDot key="s" on={system.scanner_running} />],
+                [t.dashboard.simulationMode, <span key="m" className="font-mono">{system.simulation_mode}</span>],
+                [t.dashboard.killSwitch, <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? t.dashboard.killOn : t.dashboard.killOff}</span>],
+                [t.dashboard.dataSource, <span key="d" className="font-mono">{system.data_source}</span>],
+                [t.dashboard.lastUpdate, <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex items-center justify-between gap-2">
                   <dt className="text-zinc-400">{label}</dt>
@@ -246,53 +241,53 @@ export default function DashboardPage() {
               ))}
             </dl>
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Equity & balance */}
-        <Panel title="Capital y saldo" badge={<DemoBadge />}>
+        <Panel title={t.dashboard.capitalTitle} badge={<DemoBadge />}>
           {balances ? (
             <div>
               <p className="text-3xl font-bold tracking-tight">{money(balances.equity_usd)}</p>
               <p className="mt-1 text-sm text-zinc-400">
-                Disponible: <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
+                {t.dashboard.available} <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
                 <span className="font-mono text-xs">{balances.currency}</span>
               </p>
-              <p className="mt-3 text-xs text-zinc-500">Al {time(balances.as_of_utc)}</p>
+              <p className="mt-3 text-xs text-zinc-500">{t.dashboard.asOf} {time(balances.as_of_utc)}</p>
             </div>
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* P&L + drawdown */}
-        <Panel title="Ganancias y pérdidas" badge={<DemoBadge />}>
+        <Panel title={t.dashboard.pnlTitle} badge={<DemoBadge />}>
           {performance ? (
             <dl className="space-y-2 text-sm">
               {[
-                ["Ganancias realizadas", money(performance.realized_pnl_usd)],
-                ["Ganancias no realizadas", money(performance.unrealized_pnl_usd)],
-                ["Drawdown máximo", pct(performance.max_drawdown_pct)],
-                ["Comisiones pagadas", money(performance.fees_paid_usd)],
+                [t.dashboard.realized, money(performance.realized_pnl_usd)],
+                [t.dashboard.unrealized, money(performance.unrealized_pnl_usd)],
+                [t.dashboard.maxDrawdown, pct(performance.max_drawdown_pct)],
+                [t.dashboard.fees, money(performance.fees_paid_usd)],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between">
                   <dt className="text-zinc-400">{label}</dt>
                   <dd className="font-mono">{value}</dd>
                 </div>
               ))}
-              <p className="pt-2 text-xs text-zinc-500">Al {time(performance.as_of_utc)}</p>
+              <p className="pt-2 text-xs text-zinc-500">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
             </dl>
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Signals */}
-        <Panel title="Señales" badge={<DemoBadge />}>
+        <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge />}>
           {signals ? (
             signals.signals.length === 0 ? (
-              <EmptyState text="Sin señales todavía" />
+              <EmptyState text={t.dashboard.noSignals} />
             ) : (
               <ul className="space-y-3">
                 {signals.signals.map((sig) => (
@@ -302,9 +297,9 @@ export default function DashboardPage() {
                       <span className={`font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
                     </div>
                     <div className="mt-1 grid grid-cols-3 gap-1 font-mono text-xs text-zinc-400">
-                      <span>Entrada {money(sig.entry_price)}</span>
-                      <span>Objetivo {money(sig.target_price)}</span>
-                      <span>Invalidación {money(sig.invalidation_price)}</span>
+                      <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
+                      <span>{t.dashboard.target} {money(sig.target_price)}</span>
+                      <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">{sig.reason}</p>
                     <p className="mt-1 text-[11px] text-zinc-600">
@@ -315,15 +310,15 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Strategies */}
-        <Panel title="Estrategias">
+        <Panel title={t.dashboard.strategiesTitle}>
           {strategies ? (
             strategies.length === 0 ? (
-              <EmptyState text="Sin estrategias registradas" />
+              <EmptyState text={t.dashboard.noStrategies} />
             ) : (
               <ul className="space-y-2 text-sm">
                 {strategies.map((s) => (
@@ -338,7 +333,7 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
           )}
         </Panel>
 
@@ -353,10 +348,10 @@ export default function DashboardPage() {
         )}
 
         {/* Scanner controls */}
-        <Panel title="Controles del escáner">
+        <Panel title={t.dashboard.scannerControlsTitle}>
           <div className="flex items-center gap-3">
             <StatusDot on={scanning} />
-            <span className="text-sm text-zinc-300">{scanning ? "En marcha" : "Detenido"}</span>
+            <span className="text-sm text-zinc-300">{scanning ? t.dashboard.running : t.dashboard.stopped}</span>
           </div>
           {isAdmin ? (
           <div className="mt-3 flex gap-2">
@@ -365,26 +360,26 @@ export default function DashboardPage() {
               disabled={scanning}
               className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
             >
-              Iniciar
+              {t.dashboard.start}
             </button>
             <button
               onClick={() => scanner("stop")}
               disabled={!scanning}
               className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
             >
-              Detener
+              {t.dashboard.stop}
             </button>
           </div>
           ) : (
-            <p className="mt-3 text-xs text-zinc-500">Controles solo del administrador.</p>
+            <p className="mt-3 text-xs text-zinc-500">{t.dashboard.controlsAdminOnly}</p>
           )}
         </Panel>
 
         {/* Simulation mode */}
-        <Panel title="Modo simulación">
+        <Panel title={t.dashboard.simulationMode}>
           {sim ? (
             <div>
-              <select aria-label="Modo de simulación"
+              <select aria-label={t.dashboard.simModeAria}
                 value={sim.current}
                 disabled={!isAdmin}
                 onChange={(e) => changeMode(e.target.value)}
@@ -395,28 +390,26 @@ export default function DashboardPage() {
                 ))}
               </select>
               <p className="mt-2 text-xs text-zinc-500">
-                Modo real {sim.real_enabled ? "ACTIVO en el servidor" : "apagado en el servidor"} —
-                lo enciende solo el dueño con las llaves de Kraken (sin permiso de retiros) y el
-                interruptor del servidor.
-                {!isAdmin && " Cambiar el modo es solo del administrador."}
+                {t.dashboard.realModePrefix} {sim.real_enabled ? t.dashboard.realModeOn : t.dashboard.realModeOff} {t.dashboard.realModeSuffix}
+                {!isAdmin && <> {t.dashboard.changeModeAdminOnly}</>}
               </p>
             </div>
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Risk limits + kill switch */}
-        <Panel title="Límites de riesgo" badge={<DemoBadge />} accent>
+        <Panel title={t.dashboard.riskTitle} badge={<DemoBadge />} accent>
           {risk ? (
             <div>
               <dl className="space-y-2 text-sm">
                 {[
-                  ["Riesgo máx. por operación", pct(risk.max_risk_per_trade_pct)],
-                  ["Pérdida diaria máx.", money(risk.max_daily_loss_usd)],
-                  ["Operaciones máx. por día", String(risk.max_trades_per_day)],
-                  ["Solo spot", risk.spot_only ? "sí" : "no"],
-                  ["Sin apalancamiento", risk.no_leverage ? "sí" : "no"],
+                  [t.dashboard.maxRisk, pct(risk.max_risk_per_trade_pct)],
+                  [t.dashboard.maxDailyLoss, money(risk.max_daily_loss_usd)],
+                  [t.dashboard.maxTrades, String(risk.max_trades_per_day)],
+                  [t.dashboard.spotOnly, risk.spot_only ? t.dashboard.yes : t.dashboard.no],
+                  [t.dashboard.noLeverage, risk.no_leverage ? t.dashboard.yes : t.dashboard.no],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between">
                     <dt className="text-zinc-400">{label}</dt>
@@ -430,47 +423,47 @@ export default function DashboardPage() {
                 disabled={risk.kill_switch}
                 className="mt-4 w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-600 disabled:opacity-40"
               >
-                {risk.kill_switch ? "Kill switch activado" : "Kill switch"}
+                {risk.kill_switch ? t.dashboard.killActivated : t.dashboard.killSwitch}
               </button>
               )}
               {confirmKill && (
                 <div className="mt-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm">
                   <p className="text-red-200">
-                    ¿Activar el kill switch? Esto detiene toda la actividad de trading.
+                    {t.dashboard.killConfirmQ}
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button
                       onClick={engageKillSwitch}
                       className="flex-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500"
                     >
-                      Confirmar
+                      {t.dashboard.confirm}
                     </button>
                     <button
                       onClick={() => setConfirmKill(false)}
                       className="flex-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
                     >
-                      Cancelar
+                      {t.dashboard.cancel}
                     </button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Operations */}
-        <Panel title="Operaciones">
+        <Panel title={t.dashboard.operationsTitle}>
           {operations ? (
             operations.orders.length === 0 && operations.trades.length === 0 ? (
-              <EmptyState text="Sin órdenes todavía — sin operaciones todavía" />
+              <EmptyState text={t.dashboard.noOrdersOrTrades} />
             ) : (
               <div className="space-y-3 text-sm">
                 <div>
-                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">Órdenes</h3>
+                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">{t.dashboard.ordersTitle}</h3>
                   {operations.orders.length === 0 ? (
-                    <p className="text-sm text-zinc-500">Sin órdenes todavía.</p>
+                    <p className="text-sm text-zinc-500">{t.dashboard.noOrders}</p>
                   ) : (
                     <ul className="space-y-2">
                       {operations.orders.map((o, i) => (
@@ -482,7 +475,7 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-zinc-400">
-                            Cantidad {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
+                            {t.dashboard.quantity} {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
                           </p>
                           <p className="mt-1 text-[11px] text-zinc-600">
                             {time(typeof o["created_utc"] === "string" ? o["created_utc"] : null)}
@@ -494,18 +487,18 @@ export default function DashboardPage() {
                 </div>
                 {operations.trades.length > 0 && (
                   <div>
-                    <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">Operaciones</h3>
+                    <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">{t.dashboard.operationsTitle}</h3>
                     <ul className="space-y-2">
-                      {operations.trades.map((t, i) => (
+                      {operations.trades.map((tr, i) => (
                         <li key={i} className="rounded-lg border border-zinc-800 p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono font-semibold">{String(t["symbol"] ?? "—")}</span>
-                            <span className={`font-bold uppercase ${t["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
-                              {String(t["side"] ?? "—")}
+                            <span className="font-mono font-semibold">{String(tr["symbol"] ?? "—")}</span>
+                            <span className={`font-bold uppercase ${tr["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
+                              {String(tr["side"] ?? "—")}
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-zinc-400">
-                            Cantidad {String(t["quantity"] ?? "—")} · {String(t["status"] ?? "—")}
+                            {t.dashboard.quantity} {String(tr["quantity"] ?? "—")} · {String(tr["status"] ?? "—")}
                           </p>
                         </li>
                       ))}
@@ -515,15 +508,15 @@ export default function DashboardPage() {
               </div>
             )
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
           )}
         </Panel>
 
         {/* Logs feed */}
-        <Panel title="Registro">
+        <Panel title={t.dashboard.logsTitle}>
           {logs ? (
             logs.length === 0 ? (
-              <EmptyState text="Sin registros" />
+              <EmptyState text={t.dashboard.noLogs} />
             ) : (
               <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
                 {logs.map((l) => (
@@ -542,7 +535,7 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
           )}
         </Panel>
 

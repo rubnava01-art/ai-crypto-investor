@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from "../lib/api";
+import { useLanguage } from "../lib/i18n";
 import { Panel } from "./Panel";
 
 const inputCls =
@@ -12,6 +13,8 @@ const inputCls =
  * administrador publica y edita posts; cualquier usuario autenticado
  * comenta, y borra solo sus propios comentarios (el admin, cualquiera). */
 export function InicioPanel() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [me, setMe] = useState<MeResponse | null>(null);
   const [posts, setPosts] = useState<HomePost[] | null>(null);
   const [comments, setComments] = useState<Record<number, HomeComment[]>>({});
@@ -75,28 +78,28 @@ export function InicioPanel() {
     try {
       if (editing) {
         await api.updateHomePost(editing.id, { title: title.trim(), body });
-        setMsg("Publicación actualizada.");
+        setMsg(t.inicio.updated);
       } else {
         await api.createHomePost({ title: title.trim(), body });
-        setMsg("Publicación guardada.");
+        setMsg(t.inicio.saved);
       }
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
+      setError(err instanceof ApiError ? err.message : t.inicio.saveError);
     } finally {
       setBusy(false);
     }
   };
 
   const removePost = async (p: HomePost) => {
-    if (!window.confirm(`¿Borrar la publicación "${p.title}" y sus comentarios?`)) return;
+    if (!window.confirm(t.inicio.deletePostConfirm.replace("{nombre}", p.title))) return;
     setError(null);
     try {
       await api.deleteHomePost(p.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : t.inicio.deleteError);
     }
   };
 
@@ -110,54 +113,53 @@ export function InicioPanel() {
       await loadComments(postId);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo comentar.");
+      setError(err instanceof ApiError ? err.message : t.inicio.commentError);
     }
   };
 
   const removeComment = async (postId: number, c: HomeComment) => {
-    if (!window.confirm("¿Borrar este comentario?")) return;
+    if (!window.confirm(t.inicio.deleteCommentConfirm)) return;
     setError(null);
     try {
       await api.deleteHomeComment(c.id);
       await loadComments(postId);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar el comentario.");
+      setError(err instanceof ApiError ? err.message : t.inicio.deleteCommentError);
     }
   };
 
   const fmtDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "";
+    iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "";
 
   return (
     <Panel
-      title="Inicio"
+      title={t.inicio.title}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-          {posts === null ? "Cargando…" : `${posts.length} publicaciones`}
+          {posts === null ? t.inicio.loading : t.inicio.postsCount.replace("{nombre}", String(posts.length))}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Noticias y actualizaciones de la plataforma. Solo el administrador las publica.
-        Cualquier usuario puede comentar.
+        {t.inicio.intro}
       </p>
 
       {isAdmin && (
         <form onSubmit={savePost} className="space-y-2">
-          <input aria-label="Título de la noticia" className={inputCls} placeholder="Título de la noticia *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label="Texto de la publicación" className={inputCls} placeholder="Texto de la publicación" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <input aria-label={t.inicio.titleAria} className={inputCls} placeholder={t.inicio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label={t.inicio.bodyAria} className={inputCls} placeholder={t.inicio.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy || !title.trim()}
               className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              {busy ? "Guardando…" : editing ? "Actualizar publicación" : "Publicar noticia"}
+              {busy ? t.inicio.saving : editing ? t.inicio.updatePost : t.inicio.publishNews}
             </button>
             {editing && (
               <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
-                Cancelar
+                {t.inicio.cancel}
               </button>
             )}
           </div>
@@ -168,11 +170,10 @@ export function InicioPanel() {
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {posts === null ? (
-          <p className="py-2 text-sm text-zinc-500">Cargando publicaciones…</p>
+          <p className="py-2 text-sm text-zinc-500">{t.inicio.loadingPosts}</p>
         ) : posts.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
-            Todavía no hay noticias publicadas. El administrador publica la primera
-            actualización desde esta misma pestaña.
+            {t.inicio.emptyPosts}
           </p>
         ) : (
           <ul className="space-y-4">
@@ -189,19 +190,19 @@ export function InicioPanel() {
                           onClick={() => { setEditing(p); setTitle(p.title); setBody(p.body); }}
                           className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
                         >
-                          Editar
+                          {t.inicio.edit}
                         </button>
                         <button
                           onClick={() => removePost(p)}
                           className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
                         >
-                          Borrar
+                          {t.inicio.delete}
                         </button>
                       </span>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Por {p.author_name}
+                    {t.inicio.by.replace("{nombre}", p.author_name)}
                     {p.author_username ? ` (@${p.author_username})` : ""} · {fmtDate(p.created_at)}
                   </p>
                   {p.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{p.body}</p>}
@@ -209,14 +210,14 @@ export function InicioPanel() {
                     onClick={() => toggleComments(p.id)}
                     className="mt-3 text-sm font-semibold text-emerald-400 hover:underline"
                   >
-                    {open ? "Ocultar comentarios" : `Comentarios (${p.comment_count})`}
+                    {open ? t.inicio.hideComments : t.inicio.commentsCount.replace("{nombre}", String(p.comment_count))}
                   </button>
                   {open && (
                     <div className="mt-3 space-y-2 border-t border-zinc-800 pt-3">
                       {rows === undefined ? (
-                        <p className="text-sm text-zinc-500">Cargando comentarios…</p>
+                        <p className="text-sm text-zinc-500">{t.inicio.loadingComments}</p>
                       ) : rows.length === 0 ? (
-                        <p className="text-sm text-zinc-500">Sé el primero en comentar.</p>
+                        <p className="text-sm text-zinc-500">{t.inicio.firstComment}</p>
                       ) : (
                         <ul className="space-y-2">
                           {rows.map((c) => (
@@ -232,7 +233,7 @@ export function InicioPanel() {
                                     onClick={() => removeComment(p.id, c)}
                                     className="ml-auto text-xs font-semibold text-red-400 hover:underline"
                                   >
-                                    Borrar
+                                    {t.inicio.delete}
                                   </button>
                                 )}
                               </div>
@@ -242,9 +243,9 @@ export function InicioPanel() {
                         </ul>
                       )}
                       <div className="flex gap-2">
-                        <input aria-label="Escribe un comentario"
+                        <input aria-label={t.inicio.commentAria}
                           className={inputCls}
-                          placeholder="Escribe un comentario…"
+                          placeholder={t.inicio.commentPlaceholder}
                           value={drafts[p.id] ?? ""}
                           onChange={(e) => setDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
                           maxLength={1000}
@@ -255,7 +256,7 @@ export function InicioPanel() {
                           disabled={!(drafts[p.id] ?? "").trim()}
                           className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
                         >
-                          Comentar
+                          {t.inicio.comment}
                         </button>
                       </div>
                     </div>

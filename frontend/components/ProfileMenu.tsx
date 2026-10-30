@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, type MeResponse, type UserProfile } from "../lib/api";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -19,6 +20,7 @@ export function ProfileEditor({
   onClose: () => void;
   onSaved: (p: UserProfile) => void;
 }) {
+  const { t } = useLanguage();
   const [displayName, setDisplayName] = useState(initial.display_name ?? "");
   const [email, setEmail] = useState(initial.email ?? "");
   const [address, setAddress] = useState(initial.address ?? "");
@@ -41,11 +43,11 @@ export function ProfileEditor({
     setError(null);
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("La foto debe ser una imagen (PNG, JPEG, GIF o WebP).");
+      setError(t.perfil.photoNotImage);
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      setError("La foto supera los 500 KB permitidos.");
+      setError(t.perfil.photoTooLarge);
       return;
     }
     const reader = new FileReader();
@@ -53,7 +55,7 @@ export function ProfileEditor({
       setAvatar(typeof reader.result === "string" ? reader.result : null);
       setAvatarRemoved(false);
     };
-    reader.onerror = () => setError("No se pudo leer la foto.");
+    reader.onerror = () => setError(t.perfil.photoReadFailed);
     reader.readAsDataURL(file);
   };
 
@@ -69,10 +71,10 @@ export function ProfileEditor({
         address,
         avatar_data_url: avatarRemoved ? "" : avatar ?? "",
       });
-      setMsg("Perfil guardado.");
+      setMsg(t.perfil.saved);
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar el perfil.");
+      setError(err instanceof ApiError ? err.message : t.perfil.saveFailed);
     } finally {
       setBusy(false);
     }
@@ -82,7 +84,7 @@ export function ProfileEditor({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Editar perfil"
+      aria-label={t.perfil.editProfile}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
       onClick={onClose}
     >
@@ -93,16 +95,15 @@ export function ProfileEditor({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-zinc-100">Mi perfil</h2>
+            <h2 className="text-lg font-bold text-zinc-100">{t.perfil.title}</h2>
             <p className="text-xs text-zinc-500">
-              Nombre, correo, dirección y foto. Todo opcional: lo que dejes
-              vacío queda vacío.
+              {t.perfil.editorSubtitle}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t.perfil.closeAria}
             className="rounded-lg border border-zinc-700 px-2.5 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
           >
             ✕
@@ -112,7 +113,7 @@ export function ProfileEditor({
         <div className="flex items-center gap-3">
           {avatar && !avatarRemoved ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt="Foto de perfil" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+            <img src={avatar} alt={t.perfil.photoAlt} className="h-14 w-14 shrink-0 rounded-full object-cover" />
           ) : (
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-bold text-white">
               {(displayName || initial.username).slice(0, 1).toUpperCase()}
@@ -120,7 +121,7 @@ export function ProfileEditor({
           )}
           <div className="min-w-0">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Foto (máx. 500 KB)</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.photoLabel}</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/gif,image/webp"
@@ -134,23 +135,23 @@ export function ProfileEditor({
                 onClick={() => { setAvatar(null); setAvatarRemoved(true); }}
                 className="mt-1 text-xs font-semibold text-red-400 hover:underline"
               >
-                Quitar foto
+                {t.perfil.removePhoto}
               </button>
             )}
           </div>
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-zinc-400">Nombre</span>
-          <input className={inputCls} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={100} placeholder="Tu nombre para mostrar" autoComplete="name" />
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.name}</span>
+          <input className={inputCls} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={100} placeholder={t.perfil.namePlaceholder} autoComplete="name" />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-zinc-400">Correo</span>
-          <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} placeholder="correo@ejemplo.com" autoComplete="email" />
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.email}</span>
+          <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} placeholder={t.perfil.emailPlaceholder} autoComplete="email" />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-zinc-400">Dirección</span>
-          <textarea className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} rows={2} placeholder="Dirección" autoComplete="street-address" />
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.address}</span>
+          <textarea className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} rows={2} placeholder={t.perfil.addressPlaceholder} autoComplete="street-address" />
         </label>
 
         {msg && <p className="text-sm text-emerald-400">{msg}</p>}
@@ -162,14 +163,14 @@ export function ProfileEditor({
             disabled={busy}
             className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {busy ? "Guardando…" : "Guardar perfil"}
+            {busy ? t.perfil.saving : t.perfil.saveProfile}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            Cerrar
+            {t.common.close}
           </button>
         </div>
       </form>
@@ -178,6 +179,7 @@ export function ProfileEditor({
 }
 
 export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -203,7 +205,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   // removed from the role line. Trading simulation labels (DemoBadge,
   // system mode, footer) and AI stub labels stay untouched — those
   // features genuinely run simulated/stub.
-  const roleText = me?.is_admin ? "Administrador · control total" : "Prueba · solo ver y probar";
+  const roleText = me?.is_admin ? t.perfil.menuRoleAdmin : t.perfil.rolePrueba;
 
   return (
     <div ref={ref} className="relative">
@@ -211,7 +213,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Menú de perfil"
+        aria-label={t.perfil.menuAria}
         className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-500"
       >
         {profile?.avatar_data_url ? (
@@ -233,14 +235,14 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
             onClick={() => { setOpen(false); setEditing(true); }}
             className="block w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            Mi perfil
+            {t.perfil.title}
           </button>
           <button
             role="menuitem"
             onClick={() => { setOpen(false); onLogout(); }}
             className="block w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            Cerrar sesión
+            {t.common.logout}
           </button>
         </div>
       )}
@@ -259,7 +261,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
           onClick={() => setEditing(false)}
         >
           <p className="rounded-2xl border border-zinc-700 bg-zinc-900 px-6 py-4 text-sm text-zinc-300">
-            No se pudo cargar el perfil. Cierra esto e inténtalo de nuevo.
+            {t.perfil.editorLoadFailed}
           </p>
         </div>
       )}

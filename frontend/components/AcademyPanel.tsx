@@ -6,15 +6,10 @@ import {
   type AcademyCourse, type AcademyEnrollment, type CrmContact, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
-
-const KIND_LABEL: Record<string, string> = {
-  ebook: "Ebook",
-  pack: "Pack",
-  academia: "Academia",
-};
 
 const kindBadge: Record<string, string> = {
   ebook: "bg-sky-500/15 text-sky-300",
@@ -22,10 +17,12 @@ const kindBadge: Record<string, string> = {
   academia: "bg-emerald-500/15 text-emerald-300",
 };
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : null;
+const fmtDate = (iso: string | null, locale: string) =>
+  iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
 function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse; isAdmin: boolean; contacts: CrmContact[] }) {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [students, setStudents] = useState<AcademyEnrollment[] | null>(null);
   const [contactId, setContactId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +35,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       setStudents(await api.listStudents(course.id));
     } catch {
       setStudents([]);
-      setLoadError("No se pudieron cargar los alumnos. Inténtalo de nuevo.");
+      setLoadError(t.academy.loadError);
     }
   }, [course.id]);
 
@@ -61,7 +58,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       setContactId("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo registrar la compra.");
+      setError(err instanceof ApiError ? err.message : t.academy.errRegister);
     } finally {
       setBusy(false);
     }
@@ -73,25 +70,25 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       await api.updateEnrollment(enr.id, { delivered: !enr.delivered });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo actualizar la entrega.");
+      setError(err instanceof ApiError ? err.message : t.academy.errUpdateDelivery);
     }
   };
 
   const remove = async (enr: AcademyEnrollment) => {
-    if (!window.confirm(`¿Quitar a "${enr.contact_name}" de ${course.title}?`)) return;
+    if (!window.confirm(t.academy.confirmRemove.replace("{nombre}", enr.contact_name).replace("{curso}", course.title))) return;
     setError(null);
     try {
       await api.deleteEnrollment(enr.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo quitar el registro.");
+      setError(err instanceof ApiError ? err.message : t.academy.errRemove);
     }
   };
 
   return (
     <div className="mt-3 border-t border-zinc-800 pt-3">
       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-        Alumnos ({students === null ? "…" : students.length})
+        {t.academy.students} ({students === null ? "…" : students.length})
       </p>
       {loadError && (
         <p role="alert" className="py-2 text-sm text-red-400">
@@ -99,9 +96,9 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
         </p>
       )}
       {students === null ? (
-        <p className="py-2 text-sm text-zinc-500">Cargando alumnos…</p>
+        <p className="py-2 text-sm text-zinc-500">{t.academy.loadingStudents}</p>
       ) : students.length === 0 && !loadError ? (
-        <p className="py-2 text-sm text-zinc-500">Todavía no hay compras registradas para este contenido.</p>
+        <p className="py-2 text-sm text-zinc-500">{t.academy.emptyStudents}</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {students.map((s) => (
@@ -109,10 +106,10 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
               <span className="font-semibold text-zinc-100">{s.contact_name}</span>
               {s.contact_email && <span className="text-xs text-zinc-500">{s.contact_email}</span>}
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.purchased ? "bg-sky-500/15 text-sky-300" : "bg-zinc-500/15 text-zinc-400"}`}>
-                {s.purchased ? `Comprado${fmtDate(s.purchased_at) ? ` · ${fmtDate(s.purchased_at)}` : ""}` : "Sin compra"}
+                {s.purchased ? `${t.academy.purchased}${fmtDate(s.purchased_at, locale) ? ` · ${fmtDate(s.purchased_at, locale)}` : ""}` : t.academy.noPurchase}
               </span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.delivered ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
-                {s.delivered ? `Entregado${fmtDate(s.delivered_at) ? ` · ${fmtDate(s.delivered_at)}` : ""}` : "Pendiente de entrega"}
+                {s.delivered ? `${t.academy.delivered}${fmtDate(s.delivered_at, locale) ? ` · ${fmtDate(s.delivered_at, locale)}` : ""}` : t.academy.pendingDelivery}
               </span>
               {isAdmin && (
                 <span className="ml-auto flex gap-1.5">
@@ -120,13 +117,13 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
                     onClick={() => toggleDelivered(s)}
                     className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
                   >
-                    {s.delivered ? "Marcar no entregado" : "Marcar entregado"}
+                    {s.delivered ? t.academy.markUndelivered : t.academy.markDelivered}
                   </button>
                   <button
                     onClick={() => remove(s)}
                     className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
                   >
-                    Quitar
+                    {t.academy.remove}
                   </button>
                 </span>
               )}
@@ -141,10 +138,10 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
             className={`${inputCls} max-w-xs flex-1`}
             value={contactId}
             onChange={(e) => setContactId(e.target.value)}
-            aria-label="Contacto del CRM"
+            aria-label={t.academy.contactAria}
             required
           >
-            <option value="">Registrar compra: elige un contacto del CRM…</option>
+            <option value="">{t.academy.selectContact}</option>
             {contacts.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}{c.email ? ` (${c.email})` : ""}
@@ -156,7 +153,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
             disabled={busy || !contactId}
             className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {busy ? "Registrando…" : "Registrar compra"}
+            {busy ? t.academy.registerBusy : t.academy.register}
           </button>
         </form>
       )}
@@ -166,6 +163,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
 }
 
 function DownloadButtons({ course }: { course: AcademyCourse }) {
+  const { t } = useLanguage();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!course.downloads || course.downloads.length === 0) return null;
@@ -176,7 +174,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
     try {
       await api.downloadCoursePdf(d.course_id, d.filename);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo descargar el PDF.");
+      setError(err instanceof ApiError ? err.message : t.academy.errDownload);
     } finally {
       setBusyId(null);
     }
@@ -192,10 +190,10 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
           className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
         >
           {busyId === d.course_id
-            ? "Descargando…"
+            ? t.academy.downloadBusy
             : course.downloads.length > 1
-              ? `PDF · ${d.title}`
-              : "Descargar PDF"}
+              ? t.academy.pdfTitle.replace("{titulo}", d.title)
+              : t.academy.downloadPdf}
         </button>
       ))}
       {error && <span role="alert" className="text-xs text-red-400">{error}</span>}
@@ -204,6 +202,8 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
 }
 
 export function AcademyPanel() {
+  const { t } = useLanguage();
+  const kindLabel = (k: string) => (k === "ebook" ? t.academy.kindEbook : k === "pack" ? t.academy.kindPack : k === "academia" ? t.academy.kindAcademia : k);
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
   const [courses, setCourses] = useState<AcademyCourse[] | null>(null);
@@ -219,29 +219,26 @@ export function AcademyPanel() {
   return (
     <div className="space-y-4">
       <Panel
-        title="Academia — Catálogo"
+        title={t.academy.panelTitle}
         badge={
           <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {courses === null ? "Cargando…" : `${courses.length} productos`}
+            {courses === null ? t.academy.badgeLoading : `${courses.length} ${t.academy.productsWord}`}
           </span>
         }
       >
         <p className="text-sm leading-relaxed text-zinc-400">
-          Tu catálogo real de contenido: los ebooks de Hotmart, el Pack Creador Completo
-          y la Academia de $400. Los PDFs reales viven aquí: descárgalos con el botón
-          de cada producto (el Pack trae los 6). Abre cada producto para ver sus
-          alumnos (desde el CRM) y registrar compras y entregas.
-          {!isAdmin && " Tu rol de prueba es de solo lectura."}
+          {t.academy.intro}
+          {!isAdmin && t.academy.readonly}
         </p>
       </Panel>
 
       {courses === null ? (
-        <Panel title="Cargando catálogo…">
-          <p className="py-2 text-sm text-zinc-500">Cargando…</p>
+        <Panel title={t.academy.loadingCatalogTitle}>
+          <p className="py-2 text-sm text-zinc-500">{t.academy.loading}</p>
         </Panel>
       ) : courses.length === 0 ? (
-        <Panel title="Sin contenido">
-          <p className="py-2 text-sm text-zinc-500">El catálogo está vacío.</p>
+        <Panel title={t.academy.emptyTitle}>
+          <p className="py-2 text-sm text-zinc-500">{t.academy.emptyText}</p>
         </Panel>
       ) : (
         courses.map((c) => (
@@ -251,7 +248,7 @@ export function AcademyPanel() {
             badge={
               <span className="flex items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${kindBadge[c.kind] ?? kindBadge.ebook}`}>
-                  {KIND_LABEL[c.kind] ?? c.kind}
+                  {kindLabel(c.kind)}
                 </span>
                 <span className="rounded-full bg-zinc-500/15 px-2.5 py-1 text-xs font-semibold text-zinc-300">
                   ${c.price_usd} USD
@@ -269,7 +266,7 @@ export function AcademyPanel() {
                   rel="noopener noreferrer"
                   className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
-                  Link de compra ↗
+                  {t.academy.buyLink}
                 </a>
               )}
               <DownloadButtons course={c} />
@@ -277,7 +274,7 @@ export function AcademyPanel() {
                 onClick={() => setOpenId(openId === c.id ? null : c.id)}
                 className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
               >
-                {openId === c.id ? "Ocultar alumnos" : `Alumnos (${c.students_count})`}
+                {openId === c.id ? t.academy.hideStudents : `${t.academy.students} (${c.students_count})`}
               </button>
             </div>
             {openId === c.id && (

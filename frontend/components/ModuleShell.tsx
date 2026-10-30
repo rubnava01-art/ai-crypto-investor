@@ -6,6 +6,7 @@ import { getToken, setToken } from "../lib/api";
 import { ModuleNav } from "./ModuleNav";
 import { ProfileMenu } from "./ProfileMenu";
 import { Footer } from "./Footer";
+import { LanguageToggle, useLanguage } from "../lib/i18n";
 
 /** Shared shell for the unified platform's module pages (Estudiar, Crear, CRM).
  * The Invertir module is the home dashboard (app/page.tsx), which renders the
@@ -23,6 +24,7 @@ export function ModuleShell({
   // No renderizar el contenido protegido hasta confirmar sesión: antes, los
   // paneles se montaban y disparaban llamadas sin token (flash de UI privada).
   const [checked, setChecked] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!getToken()) router.replace("/login");
@@ -32,7 +34,7 @@ export function ModuleShell({
   if (!checked) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6">
-        <p className="text-sm text-zinc-400">Cargando…</p>
+        <p className="text-sm text-zinc-400">{t.shell.loading}</p>
       </main>
     );
   }
@@ -48,12 +50,15 @@ export function ModuleShell({
         <div>
           <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            Plataforma unificada
+            {t.header.brand}
           </p>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{moduleTitle}</h1>
           <p className="text-sm text-zinc-400">{subtitle}</p>
         </div>
-        <ProfileMenu onLogout={logout} />
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <ProfileMenu onLogout={logout} />
+        </div>
       </header>
 
       <div className="mb-6">

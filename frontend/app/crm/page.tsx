@@ -1,11 +1,13 @@
 "use client";
 
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 import { CrmPanel } from "../../components/CrmPanel";
 
 export default function CrmPage() {
+  const { t } = useLanguage();
   return (
-    <ModuleShell moduleTitle="CRM" subtitle="Contactos y clientes de todos tus negocios">
+    <ModuleShell moduleTitle={t.crm.title} subtitle={t.crm.subtitle}>
       <CrmPanel />
     </ModuleShell>
   );

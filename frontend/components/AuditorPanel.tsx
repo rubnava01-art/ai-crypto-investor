@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type WebAudit } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -13,6 +14,8 @@ const inputCls =
  * ni PageSpeed, no hay rastreo, sitemap ni Core Web Vitals. El servidor
  * rechaza URLs privadas/reservadas antes de descargar nada. */
 export function AuditorPanel() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<WebAudit | null>(null);
   const [recent, setRecent] = useState<WebAudit[]>([]);
@@ -42,7 +45,7 @@ export function AuditorPanel() {
       setResult(data);
       await loadRecent();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo auditar la URL.");
+      setError(err instanceof ApiError ? err.message : t.auditor.errAudit);
     } finally {
       setBusy(false);
     }
@@ -59,16 +62,14 @@ export function AuditorPanel() {
 
   return (
     <div className="space-y-4">
-      <Panel title="Auditar una página" badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">1 página</span>}>
+      <Panel title={t.auditor.panelTitle} badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">{t.auditor.badge}</span>}>
         <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-          Pega el link de una página pública y mide su carga real más una revisión SEO básica.
-          Solo se descarga esa página (sin rastrear el sitio). Por seguridad, el servidor rechaza
-          direcciones privadas o internas.
+          {t.auditor.intro}
         </p>
         <form onSubmit={run} className="flex flex-col gap-2 sm:flex-row">
-          <input aria-label="URL a auditar"
+          <input aria-label={t.auditor.urlAria}
             className={inputCls}
-            placeholder="https://ejemplo.com/pagina"
+            placeholder={t.auditor.urlPlaceholder}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             maxLength={2048}
@@ -80,26 +81,26 @@ export function AuditorPanel() {
             disabled={busy || !url.trim()}
             className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {busy ? "Auditando…" : "Auditar"}
+            {busy ? t.auditor.auditBusy : t.auditor.audit}
           </button>
         </form>
         {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
       </Panel>
 
       {result && (
-        <Panel title="Resultado">
+        <Panel title={t.auditor.resultTitle}>
           <div className="mb-4 flex flex-wrap items-center gap-4">
             <div className="text-center">
               <p className={`text-5xl font-bold ${scoreColor}`}>
                 {result.score === null ? "—" : result.score}
               </p>
-              <p className="text-xs text-zinc-500">puntaje / 100</p>
+              <p className="text-xs text-zinc-500">{t.auditor.scoreLabel}</p>
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-zinc-100">{result.url}</p>
-              <p className="truncate text-xs text-zinc-500">Final: {result.final_url}</p>
+              <p className="truncate text-xs text-zinc-500">{t.auditor.finalLabel}{result.final_url}</p>
               <p className="mt-1 text-xs text-zinc-500">
-                Revisión básica de una sola página. NO es un puntaje Lighthouse ni PageSpeed.
+                {t.auditor.notScore}
               </p>
               {result.note && <p className="mt-1 text-xs text-amber-300">{result.note}</p>}
             </div>
@@ -107,12 +108,12 @@ export function AuditorPanel() {
 
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {[
-              ["Estado HTTP", String(result.status)],
-              ["Redirecciones", String(result.redirect_count)],
-              ["TTFB", `${result.ttfb_ms} ms`],
-              ["Tiempo total", `${result.total_ms} ms`],
-              ["Tamaño", `${result.size_kb} KB`],
-              ["HTTPS", result.is_https ? "Sí" : "No"],
+              [t.auditor.metricStatus, String(result.status)],
+              [t.auditor.metricRedirects, String(result.redirect_count)],
+              [t.auditor.metricTtfb, `${result.ttfb_ms} ms`],
+              [t.auditor.metricTotal, `${result.total_ms} ms`],
+              [t.auditor.metricSize, `${result.size_kb} KB`],
+              [t.auditor.metricHttps, result.is_https ? t.auditor.yes : t.auditor.no],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
                 <p className="text-xs text-zinc-500">{label}</p>
@@ -130,7 +131,7 @@ export function AuditorPanel() {
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{c.label}</span>
                   <span className="text-sm text-zinc-300">{c.value}</span>
-                  <span className="ml-auto text-xs text-zinc-500">ideal: {c.ideal}</span>
+                  <span className="ml-auto text-xs text-zinc-500">{t.auditor.ideal}{c.ideal}</span>
                 </li>
               ))}
             </ul>
@@ -138,9 +139,9 @@ export function AuditorPanel() {
         </Panel>
       )}
 
-      <Panel title="Auditorías recientes">
+      <Panel title={t.auditor.recentTitle}>
         {recent.length === 0 ? (
-          <p className="text-sm text-zinc-500">Todavía no hay auditorías guardadas.</p>
+          <p className="text-sm text-zinc-500">{t.auditor.emptyRecent}</p>
         ) : (
           <ul className="space-y-1">
             {recent.map((a) => (
@@ -152,10 +153,10 @@ export function AuditorPanel() {
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">{a.url}</span>
                   <span className="text-sm font-semibold text-zinc-100">
-                    {a.score === null ? "sin puntaje" : `${a.score}/100`}
+                    {a.score === null ? t.auditor.noScore : `${a.score}/100`}
                   </span>
                   <span className="text-xs text-zinc-500">
-                    {a.created_at ? new Date(a.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : ""}
+                    {a.created_at ? new Date(a.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" }) : ""}
                     {a.owner_username ? ` · ${a.owner_username}` : ""}
                   </span>
                 </button>

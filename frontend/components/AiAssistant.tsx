@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type AIAskResponse, type AILessonsResponse, type AIStatusResponse } from "../lib/api";
 import { Panel } from "./Panel";
 import { DemoBadge, EmptyState } from "./badges";
+import { useLanguage } from "../lib/i18n";
 
 /**
  * Asistente IA — panel técnico de solo lectura.
@@ -17,6 +18,7 @@ export function AiAssistant() {
   const [answer, setAnswer] = useState<AIAskResponse | null>(null);
   const [lessons, setLessons] = useState<AILessonsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +42,7 @@ export function AiAssistant() {
       const res = await api.aiAsk(q);
       setAnswer(res);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Error al preguntar");
+      setError(err instanceof ApiError ? err.message : t.ai.askFailed);
     } finally {
       setAsking(false);
     }
@@ -48,24 +50,23 @@ export function AiAssistant() {
 
   return (
     <Panel
-      title="Asistente IA"
+      title={t.ai.title}
       badge={status && status.demo ? <DemoBadge /> : undefined}
     >
       <p className="mb-3 text-xs text-zinc-500">
-        Asistente técnico de solo lectura: explica indicadores y señales.
-        No ejecuta órdenes ni modifica reglas.
+        {t.ai.intro}
         {status && status.demo && (
-          <> Modelo local (DEMO) — configura un proveedor para respuestas avanzadas.</>
+          <> {t.ai.demoNote}</>
         )}
       </p>
 
       <div className="flex gap-2">
-        <input aria-label="Pregunta al asistente"
+        <input aria-label={t.ai.questionAria}
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
-          placeholder="¿Qué significa el RSI actual de BTC? ¿Por qué se generó la señal #3?"
+          placeholder={t.ai.questionPlaceholder}
           maxLength={2000}
           className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none"
         />
@@ -74,7 +75,7 @@ export function AiAssistant() {
           disabled={asking || !question.trim()}
           className="shrink-0 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
         >
-          {asking ? "…" : "Preguntar"}
+          {asking ? t.ai.asking : t.ai.ask}
         </button>
       </div>
 
@@ -89,7 +90,7 @@ export function AiAssistant() {
           <p className="whitespace-pre-wrap">{answer.answer}</p>
           {answer.confidence != null && (
             <p className="mt-2 text-xs text-zinc-500">
-              Confianza expresada: {answer.confidence}% (calibrada contra resultados reales)
+              {t.ai.confidence.replace("{pct}", String(answer.confidence))}
             </p>
           )}
         </div>
@@ -97,7 +98,7 @@ export function AiAssistant() {
 
       <div className="mt-4">
         <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-          Lecciones aprendidas
+          {t.ai.lessonsTitle}
         </h3>
         {lessons ? (
           <>
@@ -110,11 +111,11 @@ export function AiAssistant() {
                   <li key={c.bucket} className="flex items-center gap-2 font-mono">
                     <span className="text-zinc-500">{c.bucket}</span>
                     <span className="text-zinc-400">
-                      dice {c.claimed_avg_pct}% · acierta {c.actual_win_pct}% · n={c.n}
+                      {t.ai.calibration.replace("{claimed}", String(c.claimed_avg_pct)).replace("{actual}", String(c.actual_win_pct)).replace("{n}", String(c.n))}
                     </span>
                     {c.miscalibrated && (
                       <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
-                        DESCALIBRADO
+                        {t.ai.miscalibrated}
                       </span>
                     )}
                   </li>
@@ -123,7 +124,7 @@ export function AiAssistant() {
             )}
           </>
         ) : (
-          <EmptyState text="Cargando lecciones…" />
+          <EmptyState text={t.ai.loadingLessons} />
         )}
       </div>
     </Panel>

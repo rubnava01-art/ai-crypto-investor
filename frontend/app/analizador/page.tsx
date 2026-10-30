@@ -2,10 +2,12 @@
 
 import { AnalizadorPanel } from "../../components/AnalizadorPanel";
 import { ModuleShell } from "../../components/ModuleShell";
+import { useLanguage } from "../../lib/i18n";
 
 export default function AnalizadorPage() {
+  const { t } = useLanguage();
   return (
-    <ModuleShell moduleTitle="Analizador IA" subtitle="Revisa con un link si un contenido parece creado con IA">
+    <ModuleShell moduleTitle={t.analizador.pageTitle} subtitle={t.analizador.pageSubtitle}>
       <AnalizadorPanel />
     </ModuleShell>
   );

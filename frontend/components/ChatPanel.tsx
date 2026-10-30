@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type ChatMessage, type MeResponse } from "../lib/api";
 import { Panel } from "./Panel";
+import { useLanguage } from "../lib/i18n";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
@@ -12,6 +13,8 @@ const inputCls =
  * consulta con la pestaña oculta. Empieza vacío; solo el admin borra
  * (moderación). Prueba puede leer y escribir. */
 export function ChatPanel() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<ChatMessage[] | null>(null);
   const [text, setText] = useState("");
@@ -56,50 +59,48 @@ export function ChatPanel() {
       setText("");
       await load(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo enviar el mensaje.");
+      setError(err instanceof ApiError ? err.message : t.chat.errSend);
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (m: ChatMessage) => {
-    if (!window.confirm(`¿Borrar el mensaje de ${m.author_label}?`)) return;
+    if (!window.confirm(t.chat.confirmDelete.replace("{autor}", m.author_label))) return;
     setError(null);
     try {
       await api.deleteChatMessage(m.id);
       await load(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : t.chat.errDelete);
     }
   };
 
   const isAdmin = !!me?.is_admin;
   const fmtTime = (iso: string | null) =>
     iso
-      ? new Date(iso).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      ? new Date(iso).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
       : "";
 
   return (
     <Panel
-      title="Chat en vivo"
+      title={t.chat.panelTitle}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-          {rows === null ? "Cargando…" : `${rows.length} mensajes`}
+          {rows === null ? t.chat.badgeLoading : `${rows.length} ${t.chat.messagesWord}`}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Conversación de la plataforma: se actualiza sola cada pocos segundos.
-        Todos los usuarios registrados pueden escribir; solo el administrador
-        puede borrar mensajes.
+        {t.chat.intro}
       </p>
 
       <div className="mb-3 max-h-[420px] space-y-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
         {rows === null ? (
-          <p className="py-2 text-sm text-zinc-500">Cargando mensajes…</p>
+          <p className="py-2 text-sm text-zinc-500">{t.chat.loadingMessages}</p>
         ) : rows.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
-            Todavía no hay mensajes. Sé el primero en escribir.
+            {t.chat.emptyChat}
           </p>
         ) : (
           rows.map((m) => {
@@ -121,7 +122,7 @@ export function ChatPanel() {
                       onClick={() => remove(m)}
                       className="mt-1 text-[11px] font-semibold text-red-300 hover:underline"
                     >
-                      Borrar
+                      {t.chat.deleteBtn}
                     </button>
                   )}
                 </div>
@@ -133,11 +134,11 @@ export function ChatPanel() {
       </div>
 
       <form onSubmit={send} className="flex gap-2">
-        <input aria-label="Escribe un mensaje"
+        <input aria-label={t.chat.inputAria}
           className={inputCls}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Escribe un mensaje…"
+          placeholder={t.chat.inputPlaceholder}
           maxLength={500}
           autoComplete="off"
         />
@@ -146,7 +147,7 @@ export function ChatPanel() {
           disabled={busy || !text.trim()}
           className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
         >
-          {busy ? "…" : "Enviar"}
+          {busy ? t.chat.sendBusy : t.chat.send}
         </button>
       </form>
       {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type InventoryItem, type InventoryUnit, type MeResponse } from "../lib/api";
+import { useLanguage } from "../lib/i18n";
 import { Panel } from "./Panel";
 
 const inputCls =
@@ -13,6 +14,8 @@ const UNITS: InventoryUnit[] = ["pieza", "kg", "litro", "metro", "caja", "otro"]
  * inventa. Solo el administrador crea, edita y borra; prueba solo lee.
  * `Stock bajo` se calcula solo (cantidad <= stock mínimo). */
 export function InventarioPanel() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [me, setMe] = useState<MeResponse | null>(null);
   const [items, setItems] = useState<InventoryItem[] | null>(null);
   const [filter, setFilter] = useState("");
@@ -29,6 +32,16 @@ export function InventarioPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = !!me?.is_admin;
+
+  // Etiqueta visible de cada unidad (el valor enviado al backend no
+  // cambia: sigue siendo el identificador en español).
+  const unitLabel = (u: InventoryUnit) =>
+    u === "pieza" ? t.inventario.unitPieza
+    : u === "kg" ? t.inventario.unitKg
+    : u === "litro" ? t.inventario.unitLitro
+    : u === "metro" ? t.inventario.unitMetro
+    : u === "caja" ? t.inventario.unitCaja
+    : t.inventario.unitOtro;
 
   const load = useCallback(async () => {
     try {
@@ -88,28 +101,28 @@ export function InventarioPanel() {
       };
       if (editing) {
         await api.updateInventoryItem(editing.id, body);
-        setMsg("Artículo actualizado.");
+        setMsg(t.inventario.updated);
       } else {
         await api.createInventoryItem(body);
-        setMsg("Artículo guardado.");
+        setMsg(t.inventario.saved);
       }
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo guardar.");
+      setError(err instanceof ApiError ? err.message : t.inventario.saveError);
     } finally {
       setBusy(false);
     }
   };
 
   const remove = async (it: InventoryItem) => {
-    if (!window.confirm(`¿Borrar "${it.name}" del inventario?`)) return;
+    if (!window.confirm(t.inventario.deleteConfirm.replace("{nombre}", it.name))) return;
     setError(null);
     try {
       await api.deleteInventoryItem(it.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo borrar.");
+      setError(err instanceof ApiError ? err.message : t.inventario.deleteError);
     }
   };
 
@@ -121,7 +134,7 @@ export function InventarioPanel() {
       await api.updateInventoryItem(it.id, { quantity: next });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudo ajustar la cantidad.");
+      setError(err instanceof ApiError ? err.message : t.inventario.adjustError);
     }
   };
 
@@ -137,49 +150,48 @@ export function InventarioPanel() {
   };
 
   const fmtMoney = (v: number) =>
-    v.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
+    v.toLocaleString(locale, { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
 
   return (
     <Panel
-      title="Inventario"
+      title={t.inventario.title}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
           {items === null
-            ? "Cargando…"
-            : `${totals.count} artículos · ${totals.low} con stock bajo · ${fmtMoney(totals.value)}`}
+            ? t.inventario.loading
+            : t.inventario.summary.replace("{nombre}", String(totals.count)).replace("{bajo}", String(totals.low)).replace("{valor}", fmtMoney(totals.value))}
         </span>
       }
     >
       <p className="mb-3 text-xs leading-relaxed text-zinc-500">
-        Control de stock: cantidad, unidad, precio y stock mínimo. Solo el
-        administrador crea, edita y borra.
-        {!isAdmin && " Tu rol de prueba es de solo lectura."}
+        {t.inventario.intro}
+        {!isAdmin && t.inventario.readOnly}
       </p>
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input aria-label="Nombre del artículo" className={inputCls} placeholder="Nombre del artículo *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label="Descripción" className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <input aria-label={t.inventario.nameAria} className={inputCls} placeholder={t.inventario.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label={t.inventario.descAria} className={inputCls} placeholder={t.inventario.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input aria-label="SKU (opcional)" className={inputCls} placeholder="SKU (opcional)" value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
+            <input aria-label={t.inventario.skuAria} className={inputCls} placeholder={t.inventario.skuPlaceholder} value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Unidad</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.unitLabel}</span>
               <select className={inputCls} value={unit} onChange={(e) => setUnit(e.target.value as InventoryUnit)}>
                 {UNITS.map((u) => (
-                  <option key={u} value={u}>{u}</option>
+                  <option key={u} value={u}>{unitLabel(u)}</option>
                 ))}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Cantidad</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.qtyLabel}</span>
               <input className={inputCls} type="number" min={0} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Precio unitario</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.priceLabel}</span>
               <input className={inputCls} type="number" min={0} step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">Stock mínimo</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.minLabel}</span>
               <input className={inputCls} type="number" min={0} step={1} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
             </label>
           </div>
@@ -189,11 +201,11 @@ export function InventarioPanel() {
               disabled={busy || !name.trim()}
               className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              {busy ? "Guardando…" : editing ? "Actualizar artículo" : "Guardar artículo"}
+              {busy ? t.inventario.saving : editing ? t.inventario.updateItem : t.inventario.saveItem}
             </button>
             {editing && (
               <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
-                Cancelar
+                {t.inventario.cancel}
               </button>
             )}
           </div>
@@ -203,20 +215,20 @@ export function InventarioPanel() {
       )}
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        <input aria-label="Buscar en inventario"
+        <input aria-label={t.inventario.searchAria}
           className={inputCls}
-          placeholder="Buscar por nombre, SKU o descripción…"
+          placeholder={t.inventario.searchPlaceholder}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           autoComplete="off"
         />
         {items === null ? (
-          <p className="py-2 text-sm text-zinc-500">Cargando inventario…</p>
+          <p className="py-2 text-sm text-zinc-500">{t.inventario.loadingItems}</p>
         ) : visible.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
             {items.length === 0
-              ? "Todavía no hay artículos en el inventario."
-              : "Ningún artículo coincide con la búsqueda."}
+              ? t.inventario.emptyItems
+              : t.inventario.noMatch}
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
@@ -231,30 +243,30 @@ export function InventarioPanel() {
                   )}
                   {it.low_stock && (
                     <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-300">
-                      Stock bajo
+                      {t.inventario.lowStock}
                     </span>
                   )}
                   {isAdmin && (
                     <span className="ml-auto flex items-center gap-2">
-                      <button onClick={() => adjust(it, -1)} aria-label="Quitar uno" className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => adjust(it, -1)} aria-label={t.inventario.removeOneAria} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
                         −
                       </button>
-                      <button onClick={() => adjust(it, 1)} aria-label="Agregar uno" className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => adjust(it, 1)} aria-label={t.inventario.addOneAria} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
                         +
                       </button>
                       <button onClick={() => startEdit(it)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
-                        Editar
+                        {t.inventario.edit}
                       </button>
                       <button onClick={() => remove(it)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
-                        Borrar
+                        {t.inventario.delete}
                       </button>
                     </span>
                   )}
                 </div>
                 {it.description && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{it.description}</p>}
                 <p className="mt-1.5 text-sm text-zinc-400">
-                  {it.quantity} {it.unit} · {fmtMoney(it.unit_price)} c/u · valor {fmtMoney(it.quantity * it.unit_price)}
-                  {it.min_stock > 0 && ` · mínimo ${it.min_stock}`}
+                  {it.quantity} {unitLabel(it.unit)} · {fmtMoney(it.unit_price)} {t.inventario.perUnit} · {t.inventario.valueWord} {fmtMoney(it.quantity * it.unit_price)}
+                  {it.min_stock > 0 && ` · ${t.inventario.minimum} ${it.min_stock}`}
                 </p>
               </li>
             ))}
