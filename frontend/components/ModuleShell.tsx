@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getToken, setToken } from "../lib/api";
 import { ModuleNav } from "./ModuleNav";
@@ -20,10 +20,22 @@ export function ModuleShell({
   children: ReactNode;
 }) {
   const router = useRouter();
+  // No renderizar el contenido protegido hasta confirmar sesión: antes, los
+  // paneles se montaban y disparaban llamadas sin token (flash de UI privada).
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!getToken()) router.replace("/login");
+    else setChecked(true);
   }, [router]);
+
+  if (!checked) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <p className="text-sm text-zinc-400">Cargando…</p>
+      </main>
+    );
+  }
 
   function logout() {
     setToken(null);

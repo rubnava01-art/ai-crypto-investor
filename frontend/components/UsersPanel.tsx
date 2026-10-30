@@ -19,16 +19,19 @@ export function UsersPanel() {
   const [meSuper, setMeSuper] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "prueba" | "super_admin">("prueba");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
       setUsers(await api.listUsers());
     } catch {
       setUsers([]);
+      setLoadError("No se pudieron cargar los usuarios. Inténtalo de nuevo.");
     }
     try {
       setMeSuper((await api.me()).is_super_admin);
@@ -119,8 +122,16 @@ export function UsersPanel() {
         ver el panel y correr pruebas (backtests y evaluación) — ningún control.
       </p>
 
+      {loadError && (
+        <p role="alert" className="mb-2 text-sm text-red-400">
+          {loadError}
+        </p>
+      )}
+
       {users === null ? (
         <p className="py-3 text-center text-sm text-zinc-500">Cargando usuarios…</p>
+      ) : users.length === 0 ? (
+        <p className="py-3 text-center text-sm text-zinc-500">Sin usuarios todavía.</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {users.map((u) => (
@@ -181,7 +192,7 @@ export function UsersPanel() {
       <form onSubmit={create} className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
         <p className="text-sm font-semibold text-zinc-200">Añadir usuario</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <input
+          <input aria-label="Usuario"
             className={inputCls}
             placeholder="Usuario"
             value={username}
@@ -190,7 +201,7 @@ export function UsersPanel() {
             minLength={3}
             autoComplete="off"
           />
-          <input
+          <input aria-label="Contraseña"
             className={inputCls}
             placeholder="Contraseña"
             type="password"
@@ -200,7 +211,7 @@ export function UsersPanel() {
             minLength={4}
             autoComplete="new-password"
           />
-          <select
+          <select aria-label="Rol"
             className={inputCls}
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "prueba" | "super_admin")}
@@ -218,7 +229,7 @@ export function UsersPanel() {
           {busy ? "Creando…" : "Crear usuario"}
         </button>
         {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       </form>
     </Panel>
   );

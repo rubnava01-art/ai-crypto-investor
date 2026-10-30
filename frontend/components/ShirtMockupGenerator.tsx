@@ -72,8 +72,8 @@ export function ShirtMockupGenerator() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <input className={inputCls} placeholder="Texto del diseño *" value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
-          <input className={inputCls} placeholder="Texto secundario (opcional)" value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
+          <input aria-label="Texto del diseño" className={inputCls} placeholder="Texto del diseño *" value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
+          <input aria-label="Texto secundario (opcional)" className={inputCls} placeholder="Texto secundario (opcional)" value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
           <div className="grid grid-cols-2 gap-2">
             <select className={inputCls} value={shirtIdx} onChange={(e) => setShirtIdx(Number(e.target.value))} aria-label="Color de camiseta">
               {SHIRT_COLORS.map((c, i) => (

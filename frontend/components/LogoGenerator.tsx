@@ -65,8 +65,8 @@ export function LogoGenerator() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <input className={inputCls} placeholder="Nombre de la marca *" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} autoComplete="off" />
-          <input className={inputCls} placeholder="Eslogan (opcional)" value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={40} autoComplete="off" />
+          <input aria-label="Nombre de la marca" className={inputCls} placeholder="Nombre de la marca *" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} autoComplete="off" />
+          <input aria-label="Eslogan (opcional)" className={inputCls} placeholder="Eslogan (opcional)" value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={40} autoComplete="off" />
           <div className="grid grid-cols-2 gap-2">
             <select className={inputCls} value={style} onChange={(e) => setStyle(e.target.value as Style)} aria-label="Estilo">
               <option value="simbolo">Símbolo + nombre</option>

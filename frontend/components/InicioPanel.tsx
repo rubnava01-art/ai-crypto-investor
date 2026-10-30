@@ -145,8 +145,8 @@ export function InicioPanel() {
 
       {isAdmin && (
         <form onSubmit={savePost} className="space-y-2">
-          <input className={inputCls} placeholder="Título de la noticia *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Texto de la publicación" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <input aria-label="Título de la noticia" className={inputCls} placeholder="Título de la noticia *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Texto de la publicación" className={inputCls} placeholder="Texto de la publicación" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
           <div className="flex gap-2">
             <button
               type="submit"
@@ -201,7 +201,8 @@ export function InicioPanel() {
                     )}
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Por {p.author_name} · {fmtDate(p.created_at)}
+                    Por {p.author_name}
+                    {p.author_username ? ` (@${p.author_username})` : ""} · {fmtDate(p.created_at)}
                   </p>
                   {p.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{p.body}</p>}
                   <button
@@ -222,6 +223,9 @@ export function InicioPanel() {
                             <li key={c.id} className="rounded-lg bg-zinc-900 p-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-zinc-200">{c.author_name}</span>
+                                {c.author_username && (
+                                  <span className="text-xs text-zinc-500">@{c.author_username}</span>
+                                )}
                                 <span className="text-xs text-zinc-500">{fmtDate(c.created_at)}</span>
                                 {c.can_delete && (
                                   <button
@@ -238,7 +242,7 @@ export function InicioPanel() {
                         </ul>
                       )}
                       <div className="flex gap-2">
-                        <input
+                        <input aria-label="Escribe un comentario"
                           className={inputCls}
                           placeholder="Escribe un comentario…"
                           value={drafts[p.id] ?? ""}

@@ -10,7 +10,7 @@ Two pieces:
 Permissions: any authenticated user reads; only admins write/delete
 (require_admin -> 403 for prueba), mirroring the other modules.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -45,9 +45,11 @@ def _rev_out(r: Revelation) -> RevelationOut:
 @router.get("/revelations", response_model=list[RevelationOut])
 def list_revelations(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(Revelation).order_by(Revelation.id.desc()).all()
+    rows = db.query(Revelation).order_by(Revelation.id.desc()).offset(offset).limit(limit).all()
     return [_rev_out(r) for r in rows]
 
 

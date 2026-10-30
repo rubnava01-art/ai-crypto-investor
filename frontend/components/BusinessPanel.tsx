@@ -126,7 +126,7 @@ export function BusinessPanel() {
       </div>
 
       {error && (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300">{error}</p>
+        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300">{error}</p>
       )}
 
       {loading ? (
@@ -142,8 +142,8 @@ export function BusinessPanel() {
                 <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
                   {editingNote?.id === n.id ? (
                     <div className="space-y-2">
-                      <input className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                      <textarea className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                      <input aria-label="Título de la nota" className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                      <textarea aria-label="Texto de la nota" className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                       <div className="flex gap-2">
                         <button onClick={saveEdit} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">Guardar</button>
                         <button onClick={() => setEditingNote(null)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">Cancelar</button>
@@ -163,7 +163,7 @@ export function BusinessPanel() {
                           </button>
                           <button
                             className="text-red-400 hover:underline"
-                            onClick={async () => { await api.deleteBusinessNote(n.id); refresh(); }}
+                            onClick={async () => { if (!window.confirm(`¿Eliminar la nota "${n.title}"?`)) return; await api.deleteBusinessNote(n.id); refresh(); }}
                           >
                             Eliminar
                           </button>
@@ -176,13 +176,13 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-                <input
+                <input aria-label="Título de la nota"
                   className={inputCls}
                   placeholder="Título de la nota"
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
                 />
-                <textarea
+                <textarea aria-label="Texto de la nota"
                   className={inputCls}
                   rows={3}
                   placeholder="Texto de la nota"
@@ -216,7 +216,7 @@ export function BusinessPanel() {
                   {isAdmin && (
                     <button
                       className="text-xs text-red-400 hover:underline"
-                      onClick={async () => { await api.deleteBusinessTask(t.id); refresh(); }}
+                      onClick={async () => { if (!window.confirm(`¿Eliminar la tarea "${t.title}"?`)) return; await api.deleteBusinessTask(t.id); refresh(); }}
                     >
                       Eliminar
                     </button>
@@ -226,7 +226,7 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-4 flex gap-2 border-t border-zinc-800 pt-4">
-                <input
+                <input aria-label="Nueva tarea"
                   className={inputCls}
                   placeholder="Nueva tarea"
                   value={taskTitle}

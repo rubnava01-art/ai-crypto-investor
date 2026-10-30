@@ -10,7 +10,7 @@ v1 tracks invoices only; it does not charge cards or move money.
 """
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -49,7 +49,7 @@ class InvoiceCreate(BaseModel):
     client_phone: str = Field(default="", max_length=64)
     items: list[InvoiceItem] = Field(min_length=1)
     tax_rate: float = Field(default=0, ge=0, le=100)
-    notes: str = ""
+    notes: str = Field(default="", max_length=5000)
 
 
 class InvoiceStatusUpdate(BaseModel):
@@ -74,9 +74,11 @@ def _inv_out(inv: Invoice) -> InvoiceOut:
 @router.get("/invoices", response_model=list[InvoiceOut])
 def list_invoices(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(Invoice).order_by(Invoice.id.desc()).all()
+    rows = db.query(Invoice).order_by(Invoice.id.desc()).offset(offset).limit(limit).all()
     return [_inv_out(r) for r in rows]
 
 

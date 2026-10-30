@@ -1,4 +1,6 @@
 """Application configuration. All secrets come from environment variables only."""
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,3 +61,27 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def assert_production_secrets(s: "Settings | None" = None) -> None:
+    """Fail closed en producción: negarse a arrancar sin secretos reales.
+
+    Solo se activa cuando environment == "production" o RENDER == "true"
+    (Render inyecta RENDER=true en sus servicios). En local y en tests no
+    hace nada. La comparación usa el valor por defecto del propio campo
+    (Settings.model_fields), sin escribirlo en ningún informe.
+    """
+    st = s or settings
+    if st.environment != "production" and os.environ.get("RENDER") != "true":
+        return
+    default_secret = Settings.model_fields["jwt_secret_key"].default
+    if (
+        st.jwt_secret_key == default_secret
+        or len(st.jwt_secret_key) < 32
+        or not st.admin_password_hash
+    ):
+        raise RuntimeError(
+            "Refusing to start in production without real secrets: set "
+            "JWT_SECRET_KEY (long, random) and ADMIN_PASSWORD_HASH (bcrypt) "
+            "in the API service environment."
+        )

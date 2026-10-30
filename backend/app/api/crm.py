@@ -43,7 +43,7 @@ class ContactCreate(BaseModel):
     source: str = "manual"
     tags: list[str] = Field(default_factory=list)
     status: str = "nuevo"
-    notes: str = ""
+    notes: str = Field(default="", max_length=5000)
 
 
 class ContactUpdate(BaseModel):
@@ -53,7 +53,7 @@ class ContactUpdate(BaseModel):
     source: str | None = None
     tags: list[str] | None = None
     status: str | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=5000)
 
 
 def _check_source(value: str) -> str:
@@ -94,6 +94,8 @@ def list_contacts(
     q: str | None = Query(default=None, description="Search by name or email"),
     status_filter: str | None = Query(default=None, alias="status"),
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     query = db.query(Contact)
@@ -102,7 +104,7 @@ def list_contacts(
         query = query.filter(or_(Contact.name.ilike(term), Contact.email.ilike(term)))
     if status_filter:
         query = query.filter(Contact.status == _check_status(status_filter))
-    return [_out(c) for c in query.order_by(Contact.id.desc()).all()]
+    return [_out(c) for c in query.order_by(Contact.id.desc()).offset(offset).limit(limit).all()]
 
 
 @router.post("", response_model=ContactOut, status_code=status.HTTP_201_CREATED)

@@ -112,7 +112,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       )}
       {isAdmin && (
         <form onSubmit={add} className="mt-2 flex gap-2">
-          <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nueva tarea…" maxLength={256} autoComplete="off" />
+          <input aria-label="Nueva tarea" className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nueva tarea…" maxLength={256} autoComplete="off" />
           <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50">
             Agregar
           </button>
@@ -215,7 +215,7 @@ export function DesarrolloPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input className={inputCls} placeholder="Nombre del proyecto *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <input aria-label="Nombre del proyecto" className={inputCls} placeholder="Nombre del proyecto *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-zinc-400">Empresa (contacto del CRM)</span>
             <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)}>
@@ -237,7 +237,7 @@ export function DesarrolloPanel() {
               ))}
             </select>
           </label>
-          <textarea className={inputCls} placeholder="Notas del proyecto (plan, acuerdos, pendientes)…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <textarea aria-label="Notas del proyecto" className={inputCls} placeholder="Notas del proyecto (plan, acuerdos, pendientes)…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           <button
             type="submit"
             disabled={busy || !title.trim()}

@@ -29,6 +29,10 @@ MARKET_COINS = (
 )
 _PRICES_CACHE: dict = {"at": 0.0, "payload": None}
 _PRICES_TTL_S = 60.0
+# Caché de ticker por (exchange, símbolo), mismo patrón stale que /prices
+# (corrida 3 agentes): antes cada llamada pegaba al exchange sin caché.
+_TICKER_CACHE: dict[tuple, dict] = {}
+_TICKER_TTL_S = 60.0
 
 
 class CandleOut(BaseModel):
@@ -53,6 +57,7 @@ class TickerResponse(BaseModel):
     last: str | None
     source: str
     updated_utc: str
+    stale: bool = False
 
 
 class IndicatorsResponse(BaseModel):
@@ -123,20 +128,31 @@ def get_ticker(
     exchange: str = Query(DEFAULT_EXCHANGE),
     user: User = Depends(get_current_user),
 ):
+    """Ticker con caché de 60 s (stale si el exchange falla), como /prices."""
+    key = (exchange, symbol)
+    now = time.monotonic()
+    cached = _TICKER_CACHE.get(key)
+    if cached is not None and now - cached["at"] < _TICKER_TTL_S:
+        return TickerResponse(**{**cached["payload"], "stale": False})
     try:
         t = exchanges.fetch_ticker(exchange, symbol)
     except Exception as e:  # noqa: BLE001 - surface as 503, never fake
+        if cached is not None:
+            return TickerResponse(**{**cached["payload"], "stale": True})
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Exchange unreachable ({exchange}): {type(e).__name__}",
         )
     last = t.get("last")
-    return TickerResponse(
-        symbol=symbol,
-        last=str(last) if last is not None else None,
-        source=exchange,
-        updated_utc=_utcnow(),
-    )
+    payload = {
+        "symbol": symbol,
+        "last": str(last) if last is not None else None,
+        "source": exchange,
+        "updated_utc": _utcnow(),
+        "stale": False,
+    }
+    _TICKER_CACHE[key] = {"at": now, "payload": payload}
+    return TickerResponse(**payload)
 
 
 @router.get("/indicators", response_model=IndicatorsResponse)

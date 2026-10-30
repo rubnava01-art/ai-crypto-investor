@@ -10,7 +10,7 @@ Permissions follow the platform RBAC (same as CRM / Referidos):
 - only admins can create, update or delete (require_admin -> 403
   for prueba).
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -43,12 +43,12 @@ class NoteOut(BaseModel):
 
 class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=256)
-    body: str = ""
+    body: str = Field(default="", max_length=5000)
 
 
 class NoteUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=256)
-    body: str | None = None
+    body: str | None = Field(default=None, max_length=5000)
 
 
 class TaskOut(BaseModel):
@@ -112,6 +112,8 @@ def _get_task_or_404(db: Session, task_id: int) -> BusinessTask:
 def list_notes(
     area: str,
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     area = _check_area(area)
@@ -120,7 +122,7 @@ def list_notes(
         for n in db.query(BusinessNote)
         .filter(BusinessNote.area == area)
         .order_by(BusinessNote.id.desc())
-        .all()
+        .offset(offset).limit(limit).all()
     ]
 
 
@@ -174,6 +176,8 @@ def delete_note(
 def list_tasks(
     area: str,
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     area = _check_area(area)
@@ -182,7 +186,7 @@ def list_tasks(
         for t in db.query(BusinessTask)
         .filter(BusinessTask.area == area)
         .order_by(BusinessTask.id.desc())
-        .all()
+        .offset(offset).limit(limit).all()
     ]
 
 

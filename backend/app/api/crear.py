@@ -17,7 +17,7 @@ a draft).
 """
 import datetime as dt
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Query, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -188,9 +188,11 @@ def generate_copy_endpoint(
 @router.get("/copies", response_model=list[CopyDraftOut])
 def list_copies(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(CopyDraft).order_by(CopyDraft.id.desc()).all()
+    rows = db.query(CopyDraft).order_by(CopyDraft.id.desc()).offset(offset).limit(limit).all()
     return [_copy_out(d) for d in rows]
 
 
@@ -213,12 +215,14 @@ def delete_copy(
 @router.get("/trends", response_model=list[TrendNoteOut])
 def list_trends(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     rows = (
         db.query(TrendNote)
         .order_by(TrendNote.published_on.desc(), TrendNote.id.desc())
-        .all()
+        .offset(offset).limit(limit).all()
     )
     return [_trend_out(t) for t in rows]
 

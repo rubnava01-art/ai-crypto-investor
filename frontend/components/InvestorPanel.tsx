@@ -41,7 +41,12 @@ export function InvestorPanel({
       }
     };
     loadPrice();
-    const t = setInterval(loadPrice, 15_000);
+    // Como el Chat y el Mercado: con la pestaña oculta el sondeo de
+    // precio no aporta nada (al volver se recarga) y solo gasta peticiones.
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      loadPrice();
+    }, 15_000);
     return () => {
       cancelled = true;
       clearInterval(t);
@@ -148,7 +153,7 @@ export function InvestorPanel({
               </dd>
             </div>
           </dl>
-          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
           <div className="mt-4 flex gap-2">
             <button
               onClick={confirm}
@@ -173,6 +178,7 @@ export function InvestorPanel({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setSide("buy")}
+              aria-pressed={side === "buy"}
               className={`rounded-lg px-3 py-2.5 text-sm font-bold ${
                 side === "buy"
                   ? "bg-emerald-600 text-white"
@@ -183,6 +189,7 @@ export function InvestorPanel({
             </button>
             <button
               onClick={() => setSide("sell")}
+              aria-pressed={side === "sell"}
               className={`rounded-lg px-3 py-2.5 text-sm font-bold ${
                 side === "sell"
                   ? "bg-red-600 text-white"
@@ -193,11 +200,11 @@ export function InvestorPanel({
             </button>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <select className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
+            <select aria-label="Símbolo" className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
               <option value="BTC/USD">Bitcoin (BTC/USD)</option>
               <option value="ETH/USD">Ethereum (ETH/USD)</option>
             </select>
-            <input
+            <input aria-label="Monto en USD (ej. 5)"
               className={inputCls}
               type="number"
               min="0"
@@ -214,7 +221,7 @@ export function InvestorPanel({
               : "cargando…"}{" "}
             · Capital: {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
           </p>
-          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
           <button
             onClick={() => {
               setError(null);

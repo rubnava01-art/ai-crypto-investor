@@ -46,6 +46,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import auditor_limiter
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.tables import User, WebAudit
@@ -386,6 +387,12 @@ def run_audit(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Fetch saliente desde el servidor: límite por usuario antes de salir.
+    if not auditor_limiter.allow(f"auditor:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas auditorías. Espera un minuto.",
+        )
     result = fetch_url_audit(payload.url)
     row = WebAudit(
         user_id=user.id,

@@ -19,7 +19,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -343,10 +343,12 @@ def _check_kind(value: str) -> str:
 @router.get("/courses", response_model=list[CourseOut])
 def list_courses(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     courses = (
-        db.query(Course).order_by(Course.sort_order.asc(), Course.id.asc()).all()
+        db.query(Course).order_by(Course.sort_order.asc(), Course.id.asc()).offset(offset).limit(limit).all()
     )
     return [_course_out(db, c) for c in courses]
 
@@ -412,6 +414,8 @@ def update_course(
 def list_students(
     course_id: int,
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     course = db.get(Course, course_id)
@@ -421,7 +425,7 @@ def list_students(
         db.query(CourseEnrollment)
         .filter(CourseEnrollment.course_id == course_id)
         .order_by(CourseEnrollment.id.desc())
-        .all()
+        .offset(offset).limit(limit).all()
     )
     return [_enrollment_out(db, e) for e in rows]
 

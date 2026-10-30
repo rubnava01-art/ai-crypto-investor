@@ -225,6 +225,7 @@ export interface HomePost {
   title: string;
   body: string;
   author_name: string;
+  author_username?: string;
   comment_count: number;
   created_at: string | null;
   updated_at: string | null;
@@ -239,6 +240,7 @@ export interface HomeComment {
   id: number;
   post_id: number;
   author_name: string;
+  author_username?: string;
   body: string;
   created_at: string | null;
   can_delete: boolean;

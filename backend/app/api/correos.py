@@ -13,7 +13,7 @@ Two pieces, both admin-written:
 Permissions: any authenticated user reads; only admins write/delete
 (require_admin -> 403 for prueba), mirroring the other modules.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ class EmailTemplateOut(BaseModel):
 class EmailTemplateCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     subject: str = Field(default="", max_length=300)
-    body: str = ""
+    body: str = Field(default="", max_length=20000)
 
 
 class EmailLogOut(BaseModel):
@@ -58,7 +58,7 @@ class EmailLogCreate(BaseModel):
     contact_email: str = Field(default="", max_length=200)
     template_name: str = Field(default="", max_length=200)
     subject: str = Field(default="", max_length=300)
-    body: str = ""
+    body: str = Field(default="", max_length=20000)
 
 
 class EmailLogStatusUpdate(BaseModel):
@@ -94,9 +94,11 @@ def _log_out(r: EmailLog) -> EmailLogOut:
 @router.get("/templates", response_model=list[EmailTemplateOut])
 def list_templates(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(EmailTemplate).order_by(EmailTemplate.id.desc()).all()
+    rows = db.query(EmailTemplate).order_by(EmailTemplate.id.desc()).offset(offset).limit(limit).all()
     return [_tpl_out(r) for r in rows]
 
 
@@ -134,9 +136,11 @@ def delete_template(
 @router.get("/logs", response_model=list[EmailLogOut])
 def list_logs(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(EmailLog).order_by(EmailLog.id.desc()).all()
+    rows = db.query(EmailLog).order_by(EmailLog.id.desc()).offset(offset).limit(limit).all()
     return [_log_out(r) for r in rows]
 
 

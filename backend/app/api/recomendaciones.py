@@ -6,7 +6,7 @@ EMPTY — the system never invents recommendations. Any authenticated
 user reads; only admins create/update/delete (require_admin -> 403
 for prueba), mirroring the other modules.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -76,9 +76,11 @@ def _validate_url(url: str) -> str:
 @router.get("", response_model=list[RecommendationOut])
 def list_recommendations(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(Recommendation).order_by(Recommendation.id).all()
+    rows = db.query(Recommendation).order_by(Recommendation.id).offset(offset).limit(limit).all()
     return [_out(r) for r in rows]
 
 

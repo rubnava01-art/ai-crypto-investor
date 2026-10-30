@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
@@ -145,21 +146,36 @@ def _business_name(db: Session, contact_id: int | None) -> str | None:
     return contact.name if contact else None
 
 
-def _out_campaign(db: Session, c: ReferralCampaign) -> CampaignOut:
-    referrals = db.query(Referral).filter(Referral.campaign_id == c.id).all()
+def _out_campaign(
+    db: Session,
+    c: ReferralCampaign,
+    contacts: dict[int, str] | None = None,
+    counts: dict[int, tuple[int, int, int]] | None = None,
+) -> CampaignOut:
+    if counts is None:
+        referrals = db.query(Referral).filter(Referral.campaign_id == c.id).all()
+        referrals_count = len(referrals)
+        confirmed_count = sum(1 for r in referrals if r.status in ("confirmed", "rewarded"))
+        rewarded_count = sum(1 for r in referrals if r.status == "rewarded")
+    else:
+        referrals_count, confirmed_count, rewarded_count = counts.get(c.id, (0, 0, 0))
+    if contacts is None:
+        business_name = _business_name(db, c.business_contact_id)
+    else:
+        business_name = contacts.get(c.business_contact_id) if c.business_contact_id else None
     return CampaignOut(
         id=c.id,
         name=c.name,
         business_contact_id=c.business_contact_id,
-        business_name=_business_name(db, c.business_contact_id),
+        business_name=business_name,
         share_code=c.share_code,
         reward_type=c.reward_type,
         reward_value=str(c.reward_value),
         reward_note=c.reward_note or "",
         status=c.status,
-        referrals_count=len(referrals),
-        confirmed_count=sum(1 for r in referrals if r.status in ("confirmed", "rewarded")),
-        rewarded_count=sum(1 for r in referrals if r.status == "rewarded"),
+        referrals_count=referrals_count,
+        confirmed_count=confirmed_count,
+        rewarded_count=rewarded_count,
         created_at=c.created_at.isoformat() if c.created_at else None,
         updated_at=c.updated_at.isoformat() if c.updated_at else None,
     )
@@ -191,13 +207,38 @@ def _get_campaign_or_404(db: Session, campaign_id: int) -> ReferralCampaign:
 @router.get("/campaigns", response_model=list[CampaignOut])
 def list_campaigns(
     status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = db.query(ReferralCampaign)
     if status_filter:
         query = query.filter(ReferralCampaign.status == _check_campaign_status(status_filter))
-    return [_out_campaign(db, c) for c in query.order_by(ReferralCampaign.id.desc()).all()]
+    rows = query.order_by(ReferralCampaign.id.desc()).offset(offset).limit(limit).all()
+    # Conteos con GROUP BY + contactos en un solo IN (antes: 2N consultas).
+    counts: dict[int, tuple[int, int, int]] = {}
+    if rows:
+        for cid, st, n in (
+            db.query(Referral.campaign_id, Referral.status, func.count())
+            .filter(Referral.campaign_id.in_([c.id for c in rows]))
+            .group_by(Referral.campaign_id, Referral.status)
+            .all()
+        ):
+            total, confirmed, rewarded = counts.get(cid, (0, 0, 0))
+            total += n
+            if st in ("confirmed", "rewarded"):
+                confirmed += n
+            if st == "rewarded":
+                rewarded += n
+            counts[cid] = (total, confirmed, rewarded)
+    contact_ids = {c.business_contact_id for c in rows if c.business_contact_id}
+    contacts = (
+        {ct.id: ct.name for ct in db.query(Contact).filter(Contact.id.in_(contact_ids)).all()}
+        if contact_ids
+        else {}
+    )
+    return [_out_campaign(db, c, contacts, counts) for c in rows]
 
 
 @router.post("/campaigns", response_model=CampaignOut, status_code=status.HTTP_201_CREATED)
@@ -270,6 +311,8 @@ def list_referrals(
     campaign_id: int,
     status_filter: str | None = Query(default=None, alias="status"),
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     _get_campaign_or_404(db, campaign_id)
@@ -282,7 +325,7 @@ def list_referrals(
                 detail=f"status must be one of: {', '.join(REFERRAL_STATUSES)}",
             )
         query = query.filter(Referral.status == v)
-    return [_out_referral(r) for r in query.order_by(Referral.id.desc()).all()]
+    return [_out_referral(r) for r in query.order_by(Referral.id.desc()).offset(offset).limit(limit).all()]
 
 
 @router.post(

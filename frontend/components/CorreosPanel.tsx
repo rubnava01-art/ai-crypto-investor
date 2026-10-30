@@ -91,14 +91,14 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-2">
-          <input className={inputCls} placeholder="Nombre de la plantilla *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
-          <input className={inputCls} placeholder="Asunto (puede usar {{nombre}})" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Cuerpo del correo… Hola {{nombre}}, …" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <input aria-label="Nombre de la plantilla" className={inputCls} placeholder="Nombre de la plantilla *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
+          <input aria-label="Asunto (puede usar {{nombre}})" className={inputCls} placeholder="Asunto (puede usar {{nombre}})" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
+          <textarea aria-label="Cuerpo del correo" className={inputCls} placeholder="Cuerpo del correo… Hola {{nombre}}, …" value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
           <button type="submit" disabled={busy || !name.trim()} className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50">
             {busy ? "Guardando…" : "Guardar plantilla"}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
 
@@ -253,8 +253,8 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
             </select>
           )}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input className={inputCls} placeholder="Nombre (si no es del CRM)" value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
-            <input className={inputCls} placeholder="Email del destinatario" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
+            <input aria-label="Nombre (si no es del CRM)" className={inputCls} placeholder="Nombre (si no es del CRM)" value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
+            <input aria-label="Email del destinatario" className={inputCls} placeholder="Email del destinatario" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
           </div>
 
           {contact && recovered && (
@@ -277,8 +277,8 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
           )}
 
           <form onSubmit={save} className="space-y-2">
-            <input className={inputCls} placeholder="Asunto *" value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
-            <textarea className={inputCls} placeholder="Cuerpo del correo *" value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
+            <input aria-label="Asunto" className={inputCls} placeholder="Asunto *" value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
+            <textarea aria-label="Cuerpo del correo" className={inputCls} placeholder="Cuerpo del correo *" value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
                 Copiar correo
@@ -299,7 +299,7 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
               )}
             </div>
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </form>
         </div>
       </Panel>
@@ -355,7 +355,7 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
         La línea de tiempo de correos por contacto, al estilo HubSpot: qué se
         preparó y qué ya enviaste tú desde tu Gmail.
       </p>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       {rows === null ? (
         <p className="py-2 text-sm text-zinc-500">Cargando registro…</p>
       ) : rows.length === 0 ? (

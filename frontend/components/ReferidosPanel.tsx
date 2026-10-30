@@ -269,7 +269,7 @@ export function ReferidosPanel() {
       </div>
 
       {msg && <div className="rounded-lg bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{msg}</div>}
-      {error && <div className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+      {error && <div role="alert" className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
 
       <Panel title="Campañas de referidos">
         {isAdmin && !showCampaignForm && (
@@ -282,7 +282,7 @@ export function ReferidosPanel() {
         )}
         {isAdmin && showCampaignForm && (
           <form onSubmit={submitCampaign} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
-            <input className={inputCls} placeholder="Nombre de la campaña *" value={campaignForm.name} onChange={setC("name")} required />
+            <input aria-label="Nombre de la campaña" className={inputCls} placeholder="Nombre de la campaña *" value={campaignForm.name} onChange={setC("name")} required />
             <label className="block text-sm text-zinc-400">
               Negocio (contacto del CRM, opcional)
               <select className={inputCls} value={campaignForm.business_contact_id} onChange={setC("business_contact_id")}>
@@ -305,7 +305,7 @@ export function ReferidosPanel() {
                 <input className={inputCls} type="number" min="0" max={campaignForm.reward_type === "percentage" ? 100 : undefined} step="any" value={campaignForm.reward_value} onChange={setC("reward_value")} />
               </label>
             </div>
-            <input className={inputCls} placeholder="Nota de la recompensa (ej. descuento en la próxima visita)" value={campaignForm.reward_note} onChange={setC("reward_note")} />
+            <input aria-label="Nota de la recompensa" className={inputCls} placeholder="Nota de la recompensa (ej. descuento en la próxima visita)" value={campaignForm.reward_note} onChange={setC("reward_note")} />
             <label className="block text-sm text-zinc-400">
               Estado
               <select className={inputCls} value={campaignForm.status} onChange={setC("status")}>
@@ -402,13 +402,13 @@ export function ReferidosPanel() {
           {isAdmin && showReferralForm && (
             <form onSubmit={submitReferral} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
               <div className="grid grid-cols-2 gap-3">
-                <input className={inputCls} placeholder="Quien refiere (nombre) *" value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
-                <input className={inputCls} placeholder="Contacto de quien refiere" value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
-                <input className={inputCls} placeholder="Persona referida (nombre) *" value={referralForm.referred_name} onChange={setR("referred_name")} required />
-                <input className={inputCls} placeholder="Contacto de la persona referida" value={referralForm.referred_contact} onChange={setR("referred_contact")} />
+                <input aria-label="Quien refiere (nombre)" className={inputCls} placeholder="Quien refiere (nombre) *" value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
+                <input aria-label="Contacto de quien refiere" className={inputCls} placeholder="Contacto de quien refiere" value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
+                <input aria-label="Persona referida (nombre)" className={inputCls} placeholder="Persona referida (nombre) *" value={referralForm.referred_name} onChange={setR("referred_name")} required />
+                <input aria-label="Contacto de la persona referida" className={inputCls} placeholder="Contacto de la persona referida" value={referralForm.referred_contact} onChange={setR("referred_contact")} />
               </div>
-              <input className={inputCls} placeholder={`Código usado (opcional; por defecto ${selected.share_code})`} value={referralForm.code} onChange={setR("code")} />
-              <input className={inputCls} placeholder="Notas" value={referralForm.notes} onChange={setR("notes")} />
+              <input aria-label="Código usado" className={inputCls} placeholder={`Código usado (opcional; por defecto ${selected.share_code})`} value={referralForm.code} onChange={setR("code")} />
+              <input aria-label="Notas" className={inputCls} placeholder="Notas" value={referralForm.notes} onChange={setR("notes")} />
               <div className="flex gap-2">
                 <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Registrar</button>
                 <button type="button" onClick={() => setShowReferralForm(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">Cancelar</button>

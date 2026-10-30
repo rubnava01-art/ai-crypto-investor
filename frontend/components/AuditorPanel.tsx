@@ -66,7 +66,7 @@ export function AuditorPanel() {
           direcciones privadas o internas.
         </p>
         <form onSubmit={run} className="flex flex-col gap-2 sm:flex-row">
-          <input
+          <input aria-label="URL a auditar"
             className={inputCls}
             placeholder="https://ejemplo.com/pagina"
             value={url}
@@ -83,7 +83,7 @@ export function AuditorPanel() {
             {busy ? "Auditando…" : "Auditar"}
           </button>
         </form>
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
       </Panel>
 
       {result && (

@@ -14,7 +14,7 @@ cookies) are tasks to draft and maintain those documents; their
 links/text live in `notes`, filled in by the admin.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -230,9 +230,11 @@ def _get_item_or_404(db: Session, item_id: int) -> ComplianceItem:
 @router.get("/items", response_model=list[ComplianceItemOut])
 def list_items(
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    return [_out(i) for i in db.query(ComplianceItem).order_by(ComplianceItem.id).all()]
+    return [_out(i) for i in db.query(ComplianceItem).order_by(ComplianceItem.id).offset(offset).limit(limit).all()]
 
 
 @router.post("/items", response_model=ComplianceItemOut, status_code=status.HTTP_201_CREATED)

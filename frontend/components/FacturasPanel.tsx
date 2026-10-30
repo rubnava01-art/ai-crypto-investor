@@ -104,8 +104,8 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
 
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-12 gap-2">
-            <input className={`${inputCls} col-span-6`} placeholder="Material (p. ej. Camiseta Bella+Canvas)" value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
+          <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+            <input aria-label="Material" className={`${inputCls} col-span-6`} placeholder="Material (p. ej. Camiseta Bella+Canvas)" value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
             <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" placeholder="Cant." value={r.qty} onChange={(e) => setRow(i, { qty: Number(e.target.value) })} aria-label="Cantidad" />
             <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" placeholder="Costo c/u" value={r.unitCost} onChange={(e) => setRow(i, { unitCost: Number(e.target.value) })} aria-label="Costo unitario" />
             <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label="Quitar material">×</button>
@@ -285,9 +285,9 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && (
           <form onSubmit={save} className="space-y-2">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input className={inputCls} placeholder="Tu nombre / negocio *" value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
-              <input className={inputCls} placeholder="Tu teléfono" value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
-              <input className={inputCls} placeholder="Tu email" value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
+              <input aria-label="Tu nombre / negocio" className={inputCls} placeholder="Tu nombre / negocio *" value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
+              <input aria-label="Tu teléfono" className={inputCls} placeholder="Tu teléfono" value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
+              <input aria-label="Tu email" className={inputCls} placeholder="Tu email" value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
             </div>
             {contacts.length > 0 && (
               <select className={inputCls} defaultValue="" onChange={(e) => pickContact(e.target.value)} aria-label="Cliente del CRM">
@@ -298,15 +298,15 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
               </select>
             )}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input className={inputCls} placeholder="Cliente *" value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
-              <input className={inputCls} placeholder="Email del cliente" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
-              <input className={inputCls} placeholder="Teléfono del cliente" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
+              <input aria-label="Cliente" className={inputCls} placeholder="Cliente *" value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
+              <input aria-label="Email del cliente" className={inputCls} placeholder="Email del cliente" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
+              <input aria-label="Teléfono del cliente" className={inputCls} placeholder="Teléfono del cliente" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
             </div>
 
             <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">Conceptos</p>
             {items.map((it, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2">
-                <input className={`${inputCls} col-span-6`} placeholder="Descripción" value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
+              <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+                <input aria-label="Descripción" className={`${inputCls} col-span-6`} placeholder="Descripción" value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
                 <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" value={it.qty} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} aria-label="Cantidad" />
                 <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" value={it.unit_price} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, unit_price: Number(e.target.value) } : x)))} aria-label="Precio unitario" />
                 <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label="Quitar concepto">×</button>
@@ -320,7 +320,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
               <label className="text-xs text-zinc-500">Impuesto (%)
                 <input className={`${inputCls} mt-1`} type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
               </label>
-              <input className={inputCls} placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
+              <input aria-label="Notas (opcional)" className={inputCls} placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
             </div>
 
             <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200">
@@ -338,7 +338,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
               </button>
             </div>
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </form>
         )}
 

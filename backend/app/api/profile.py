@@ -63,6 +63,19 @@ def _out(u: User, db: Session) -> ProfileOut:
     )
 
 
+def _magic_mime(raw: bytes) -> str | None:
+    """Detecta el formato real por magic bytes (no por la cabecera declarada)."""
+    if raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if raw.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if raw.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 def _validate_avatar(data_url: str) -> str:
     """Return the data URL unchanged if valid, else raise 422."""
     if not data_url.startswith("data:"):
@@ -88,6 +101,14 @@ def _validate_avatar(data_url: str) -> str:
         )
     if len(raw) == 0:
         raise HTTPException(status_code=422, detail="La foto está vacía.")
+    # El contenido debe corresponder al formato declarado: antes bastaba
+    # con poner image/png en la cabecera con cualquier contenido.
+    detected = _magic_mime(raw)
+    if detected is None or detected != mime:
+        raise HTTPException(
+            status_code=422,
+            detail="La foto no corresponde al formato de imagen declarado.",
+        )
     return data_url
 
 

@@ -30,12 +30,15 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
   const [contactId, setContactId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
       setStudents(await api.listStudents(course.id));
     } catch {
       setStudents([]);
+      setLoadError("No se pudieron cargar los alumnos. Inténtalo de nuevo.");
     }
   }, [course.id]);
 
@@ -90,9 +93,14 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
         Alumnos ({students === null ? "…" : students.length})
       </p>
+      {loadError && (
+        <p role="alert" className="py-2 text-sm text-red-400">
+          {loadError}
+        </p>
+      )}
       {students === null ? (
         <p className="py-2 text-sm text-zinc-500">Cargando alumnos…</p>
-      ) : students.length === 0 ? (
+      ) : students.length === 0 && !loadError ? (
         <p className="py-2 text-sm text-zinc-500">Todavía no hay compras registradas para este contenido.</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
@@ -152,7 +160,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
           </button>
         </form>
       )}
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </div>
   );
 }
@@ -190,7 +198,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
               : "Descargar PDF"}
         </button>
       ))}
-      {error && <span className="text-xs text-red-400">{error}</span>}
+      {error && <span role="alert" className="text-xs text-red-400">{error}</span>}
     </>
   );
 }

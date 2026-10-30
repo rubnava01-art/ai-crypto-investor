@@ -101,7 +101,7 @@ export function TendenciasPanel() {
           de Google en vivo — no son volúmenes de búsqueda ni puntajes de tendencia.
         </p>
         <form onSubmit={research} className="flex flex-col gap-2 sm:flex-row">
-          <input
+          <input aria-label="Tema a investigar"
             className={inputCls}
             placeholder="Ej. creatina, marketing digital, air fryer…"
             value={keyword}
@@ -117,7 +117,7 @@ export function TendenciasPanel() {
             {busy ? "Investigando…" : "Investigar"}
           </button>
         </form>
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
       </Panel>
 
       {result && (

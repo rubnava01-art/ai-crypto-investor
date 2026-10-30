@@ -147,6 +147,7 @@ function MeditationPanel() {
               <button
                 key={m}
                 type="button"
+                aria-pressed={timerMin === m}
                 onClick={() => { setTimerMin(m); setTimerLeft(null); setTimerDone(false); }}
                 className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${timerMin === m ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
               >
@@ -237,8 +238,8 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-2">
-          <input className={inputCls} placeholder="Título de la revelación *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Escríbela como te llegó…" value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+          <input aria-label="Título de la revelación" className={inputCls} placeholder="Título de la revelación *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Texto de la revelación" className={inputCls} placeholder="Escríbela como te llegó…" value={text} onChange={(e) => setText(e.target.value)} rows={3} />
           <button
             type="submit"
             disabled={busy || !title.trim()}
@@ -247,7 +248,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
             {busy ? "Guardando…" : "Guardar revelación"}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
 

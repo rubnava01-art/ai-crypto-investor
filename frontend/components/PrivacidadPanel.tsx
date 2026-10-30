@@ -165,9 +165,9 @@ export function PrivacidadPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input className={inputCls} placeholder="Título de la tarea *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <textarea className={inputCls} placeholder="Notas (enlaces o texto del documento, cuando exista)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <input aria-label="Título de la tarea" className={inputCls} placeholder="Título de la tarea *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Descripción" className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <textarea aria-label="Notas" className={inputCls} placeholder="Notas (enlaces o texto del documento, cuando exista)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-zinc-400">Grupo</span>

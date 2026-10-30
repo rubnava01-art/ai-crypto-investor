@@ -57,9 +57,9 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
       role="alert"
       className="mb-6 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
     >
-      <strong className="font-semibold">API offline.</strong> Could not reach{" "}
-      <code className="text-amber-200">{apiUrl}</code>. The dashboard is rendered with DEMO
-      placeholders — no live or real data is shown.
+      <strong className="font-semibold">API sin conexión.</strong> No se pudo contactar a{" "}
+      <code className="text-amber-200">{apiUrl}</code>. El panel se muestra con datos DEMO de ejemplo:
+      no se muestra ningún dato en vivo ni real.
     </div>
   );
 }
@@ -81,6 +81,9 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<LogEntry[] | null>(null);
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
+  // No renderizar el dashboard hasta confirmar sesión: antes, los paneles se
+  // montaban y disparaban llamadas sin token (flash de UI privada).
+  const [checked, setChecked] = useState(false);
 
   const load = useCallback(async () => {
     setActionError(null);
@@ -121,6 +124,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
+    setChecked(true);
     load();
   }, [load, router]);
 
@@ -129,7 +133,7 @@ export default function DashboardPage() {
       const state = action === "start" ? await api.scannerStart() : await api.scannerStop();
       setSystem((prev) => (prev ? { ...prev, scanner_running: state.running } : prev));
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Scanner ${action} failed: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? `Error al ${action === "start" ? "iniciar" : "detener"} el escáner: ${err.message}` : String(err));
     }
   }
 
@@ -138,7 +142,7 @@ export default function DashboardPage() {
       const res = await api.setSimulationMode(mode);
       setSim(res);
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Mode change failed: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? `Error al cambiar el modo: ${err.message}` : String(err));
     }
   }
 
@@ -148,7 +152,7 @@ export default function DashboardPage() {
       setRisk((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
       setSystem((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
     } catch (err) {
-      setActionError(err instanceof ApiError ? `Kill switch failed: ${err.message}` : String(err));
+      setActionError(err instanceof ApiError ? `Error al activar el kill switch: ${err.message}` : String(err));
     } finally {
       setConfirmKill(false);
     }
@@ -161,6 +165,14 @@ export default function DashboardPage() {
 
   const scanning = system?.scanner_running ?? false;
 
+  if (!checked) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <p className="text-sm text-zinc-400">Cargando…</p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -171,7 +183,7 @@ export default function DashboardPage() {
           </p>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Invertir</h1>
           <p className="text-sm text-zinc-400">
-            AI Crypto Investor — {system ? <>Mode: <span className="font-mono">{system.mode}</span></> : "Loading…"}
+            AI Crypto Investor — {system ? <>Modo: <span className="font-mono">{system.mode}</span></> : "Cargando…"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -180,7 +192,7 @@ export default function DashboardPage() {
             onClick={load}
             className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
           >
-            Refresh
+            Actualizar
           </button>
           <ProfileMenu onLogout={logout} />
         </div>
@@ -216,16 +228,16 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
-        <Panel title="System status" badge={<DemoBadge />}>
+        <Panel title="Estado del sistema" badge={<DemoBadge />}>
           {system ? (
             <dl className="space-y-2 text-sm">
               {[
-                ["Exchange connected", <StatusDot key="e" on={system.exchange_connected} />],
-                ["Scanner", <StatusDot key="s" on={system.scanner_running} />],
-                ["Simulation mode", <span key="m" className="font-mono">{system.simulation_mode}</span>],
-                ["Kill switch", <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? "ENGAGED" : "off"}</span>],
-                ["Data source", <span key="d" className="font-mono">{system.data_source}</span>],
-                ["Last update", <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
+                ["Exchange conectado", <StatusDot key="e" on={system.exchange_connected} />],
+                ["Escáner", <StatusDot key="s" on={system.scanner_running} />],
+                ["Modo simulación", <span key="m" className="font-mono">{system.simulation_mode}</span>],
+                ["Kill switch", <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? "ACTIVADO" : "apagado"}</span>],
+                ["Fuente de datos", <span key="d" className="font-mono">{system.data_source}</span>],
+                ["Última actualización", <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex items-center justify-between gap-2">
                   <dt className="text-zinc-400">{label}</dt>
@@ -234,53 +246,53 @@ export default function DashboardPage() {
               ))}
             </dl>
           ) : (
-            <EmptyState text={offline ? "No data — API offline (DEMO placeholder)" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Equity & balance */}
-        <Panel title="Equity & balance" badge={<DemoBadge />}>
+        <Panel title="Capital y saldo" badge={<DemoBadge />}>
           {balances ? (
             <div>
               <p className="text-3xl font-bold tracking-tight">{money(balances.equity_usd)}</p>
               <p className="mt-1 text-sm text-zinc-400">
-                Available: <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
+                Disponible: <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
                 <span className="font-mono text-xs">{balances.currency}</span>
               </p>
-              <p className="mt-3 text-xs text-zinc-500">As of {time(balances.as_of_utc)}</p>
+              <p className="mt-3 text-xs text-zinc-500">Al {time(balances.as_of_utc)}</p>
             </div>
           ) : (
-            <EmptyState text={offline ? "No data — API offline (DEMO placeholder)" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
           )}
         </Panel>
 
         {/* P&L + drawdown */}
-        <Panel title="P&L & drawdown" badge={<DemoBadge />}>
+        <Panel title="Ganancias y pérdidas" badge={<DemoBadge />}>
           {performance ? (
             <dl className="space-y-2 text-sm">
               {[
-                ["Realized P&L", money(performance.realized_pnl_usd)],
-                ["Unrealized P&L", money(performance.unrealized_pnl_usd)],
-                ["Max drawdown", pct(performance.max_drawdown_pct)],
-                ["Fees paid", money(performance.fees_paid_usd)],
+                ["Ganancias realizadas", money(performance.realized_pnl_usd)],
+                ["Ganancias no realizadas", money(performance.unrealized_pnl_usd)],
+                ["Drawdown máximo", pct(performance.max_drawdown_pct)],
+                ["Comisiones pagadas", money(performance.fees_paid_usd)],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between">
                   <dt className="text-zinc-400">{label}</dt>
                   <dd className="font-mono">{value}</dd>
                 </div>
               ))}
-              <p className="pt-2 text-xs text-zinc-500">As of {time(performance.as_of_utc)}</p>
+              <p className="pt-2 text-xs text-zinc-500">Al {time(performance.as_of_utc)}</p>
             </dl>
           ) : (
-            <EmptyState text={offline ? "No data — API offline (DEMO placeholder)" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Signals */}
-        <Panel title="Signals" badge={<DemoBadge />}>
+        <Panel title="Señales" badge={<DemoBadge />}>
           {signals ? (
             signals.signals.length === 0 ? (
-              <EmptyState text="No signals yet" />
+              <EmptyState text="Sin señales todavía" />
             ) : (
               <ul className="space-y-3">
                 {signals.signals.map((sig) => (
@@ -290,9 +302,9 @@ export default function DashboardPage() {
                       <span className={`font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
                     </div>
                     <div className="mt-1 grid grid-cols-3 gap-1 font-mono text-xs text-zinc-400">
-                      <span>Entry {money(sig.entry_price)}</span>
-                      <span>Target {money(sig.target_price)}</span>
-                      <span>Invalid {money(sig.invalidation_price)}</span>
+                      <span>Entrada {money(sig.entry_price)}</span>
+                      <span>Objetivo {money(sig.target_price)}</span>
+                      <span>Invalidación {money(sig.invalidation_price)}</span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">{sig.reason}</p>
                     <p className="mt-1 text-[11px] text-zinc-600">
@@ -303,15 +315,15 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "No data — API offline (DEMO placeholder)" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Strategies */}
-        <Panel title="Strategies">
+        <Panel title="Estrategias">
           {strategies ? (
             strategies.length === 0 ? (
-              <EmptyState text="No strategies registered" />
+              <EmptyState text="Sin estrategias registradas" />
             ) : (
               <ul className="space-y-2 text-sm">
                 {strategies.map((s) => (
@@ -326,7 +338,7 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "No data — API offline" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
           )}
         </Panel>
 
@@ -341,10 +353,10 @@ export default function DashboardPage() {
         )}
 
         {/* Scanner controls */}
-        <Panel title="Scanner controls">
+        <Panel title="Controles del escáner">
           <div className="flex items-center gap-3">
             <StatusDot on={scanning} />
-            <span className="text-sm text-zinc-300">{scanning ? "Running" : "Stopped"}</span>
+            <span className="text-sm text-zinc-300">{scanning ? "En marcha" : "Detenido"}</span>
           </div>
           {isAdmin ? (
           <div className="mt-3 flex gap-2">
@@ -353,14 +365,14 @@ export default function DashboardPage() {
               disabled={scanning}
               className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
             >
-              Start
+              Iniciar
             </button>
             <button
               onClick={() => scanner("stop")}
               disabled={!scanning}
               className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
             >
-              Stop
+              Detener
             </button>
           </div>
           ) : (
@@ -369,14 +381,14 @@ export default function DashboardPage() {
         </Panel>
 
         {/* Simulation mode */}
-        <Panel title="Simulation mode">
+        <Panel title="Modo simulación">
           {sim ? (
             <div>
-              <select
+              <select aria-label="Modo de simulación"
                 value={sim.current}
                 disabled={!isAdmin}
                 onChange={(e) => changeMode(e.target.value)}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sim.modes.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -390,21 +402,21 @@ export default function DashboardPage() {
               </p>
             </div>
           ) : (
-            <EmptyState text={offline ? "No data — API offline" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Risk limits + kill switch */}
-        <Panel title="Risk limits" badge={<DemoBadge />} accent>
+        <Panel title="Límites de riesgo" badge={<DemoBadge />} accent>
           {risk ? (
             <div>
               <dl className="space-y-2 text-sm">
                 {[
-                  ["Max risk per trade", pct(risk.max_risk_per_trade_pct)],
-                  ["Max daily loss", money(risk.max_daily_loss_usd)],
-                  ["Max trades per day", String(risk.max_trades_per_day)],
-                  ["Spot only", risk.spot_only ? "yes" : "no"],
-                  ["No leverage", risk.no_leverage ? "yes" : "no"],
+                  ["Riesgo máx. por operación", pct(risk.max_risk_per_trade_pct)],
+                  ["Pérdida diaria máx.", money(risk.max_daily_loss_usd)],
+                  ["Operaciones máx. por día", String(risk.max_trades_per_day)],
+                  ["Solo spot", risk.spot_only ? "sí" : "no"],
+                  ["Sin apalancamiento", risk.no_leverage ? "sí" : "no"],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between">
                     <dt className="text-zinc-400">{label}</dt>
@@ -418,67 +430,100 @@ export default function DashboardPage() {
                 disabled={risk.kill_switch}
                 className="mt-4 w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-600 disabled:opacity-40"
               >
-                {risk.kill_switch ? "Kill switch engaged" : "Kill switch"}
+                {risk.kill_switch ? "Kill switch activado" : "Kill switch"}
               </button>
               )}
               {confirmKill && (
                 <div className="mt-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm">
                   <p className="text-red-200">
-                    Engage the kill switch? This halts all trading activity.
+                    ¿Activar el kill switch? Esto detiene toda la actividad de trading.
                   </p>
                   <div className="mt-2 flex gap-2">
                     <button
                       onClick={engageKillSwitch}
                       className="flex-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500"
                     >
-                      Confirm
+                      Confirmar
                     </button>
                     <button
                       onClick={() => setConfirmKill(false)}
                       className="flex-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
                     >
-                      Cancel
+                      Cancelar
                     </button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <EmptyState text={offline ? "No data — API offline (DEMO placeholder)" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión (demo)" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Operations */}
-        <Panel title="Operations">
+        <Panel title="Operaciones">
           {operations ? (
             operations.orders.length === 0 && operations.trades.length === 0 ? (
-              <EmptyState text="No orders yet — no trades yet" />
+              <EmptyState text="Sin órdenes todavía — sin operaciones todavía" />
             ) : (
               <div className="space-y-3 text-sm">
                 <div>
-                  <h3 className="mb-1 text-xs font-semibold uppercase text-zinc-400">Orders</h3>
-                  <pre className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 font-mono text-xs text-zinc-400">
-                    {JSON.stringify(operations.orders, null, 2)}
-                  </pre>
+                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">Órdenes</h3>
+                  {operations.orders.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Sin órdenes todavía.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {operations.orders.map((o, i) => (
+                        <li key={String(o["id"] ?? i)} className="rounded-lg border border-zinc-800 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold">{String(o["symbol"] ?? "—")}</span>
+                            <span className={`font-bold uppercase ${o["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
+                              {String(o["side"] ?? "—")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            Cantidad {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
+                          </p>
+                          <p className="mt-1 text-[11px] text-zinc-600">
+                            {time(typeof o["created_utc"] === "string" ? o["created_utc"] : null)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div>
-                  <h3 className="mb-1 text-xs font-semibold uppercase text-zinc-400">Trades</h3>
-                  <pre className="max-h-40 overflow-auto rounded bg-zinc-950 p-2 font-mono text-xs text-zinc-400">
-                    {JSON.stringify(operations.trades, null, 2)}
-                  </pre>
-                </div>
+                {operations.trades.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">Operaciones</h3>
+                    <ul className="space-y-2">
+                      {operations.trades.map((t, i) => (
+                        <li key={i} className="rounded-lg border border-zinc-800 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold">{String(t["symbol"] ?? "—")}</span>
+                            <span className={`font-bold uppercase ${t["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
+                              {String(t["side"] ?? "—")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            Cantidad {String(t["quantity"] ?? "—")} · {String(t["status"] ?? "—")}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )
           ) : (
-            <EmptyState text={offline ? "No data — API offline" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
           )}
         </Panel>
 
         {/* Logs feed */}
-        <Panel title="Logs feed">
+        <Panel title="Registro">
           {logs ? (
             logs.length === 0 ? (
-              <EmptyState text="No log entries" />
+              <EmptyState text="Sin registros" />
             ) : (
               <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
                 {logs.map((l) => (
@@ -497,7 +542,7 @@ export default function DashboardPage() {
               </ul>
             )
           ) : (
-            <EmptyState text={offline ? "No data — API offline" : "Loading…"} />
+            <EmptyState text={offline ? "Sin datos — API sin conexión" : "Cargando…"} />
           )}
         </Panel>
 

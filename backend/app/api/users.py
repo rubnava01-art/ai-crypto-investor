@@ -9,7 +9,7 @@ Roles (Acceso, 2026-10-26):
 - prueba (is_admin=False): view everything and run tests (backtests,
   strategy evaluation, AI assistant) but cannot change any control.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -40,8 +40,9 @@ class UpdateUserRequest(BaseModel):
     password: str | None = Field(default=None, min_length=4, max_length=128)
 
 
-def _out(u: User, db: Session) -> UserOut:
-    super_flag = is_super_admin(u, db)
+def _out(u: User, db: Session, super_flag: bool | None = None) -> UserOut:
+    if super_flag is None:
+        super_flag = is_super_admin(u, db)
     return UserOut(
         id=u.id,
         username=u.username,
@@ -74,8 +75,25 @@ def _role_to_admin(role: str) -> bool:
 
 
 @router.get("", response_model=list[UserOut])
-def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return [_out(u, db) for u in db.query(User).order_by(User.id).all()]
+def list_users(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(User).order_by(User.id).offset(offset).limit(limit).all()
+    # Un solo SELECT de grants (antes: uno por usuario).
+    grant_ids = (
+        {
+            g.user_id
+            for g in db.query(SuperAdminGrant)
+            .filter(SuperAdminGrant.user_id.in_([u.id for u in rows]))
+            .all()
+        }
+        if rows
+        else set()
+    )
+    return [_out(u, db, super_flag=(u.id in grant_ids)) for u in rows]
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)

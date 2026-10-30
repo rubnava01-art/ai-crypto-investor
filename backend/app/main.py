@@ -1,13 +1,19 @@
 """AI Crypto Investor — Phase 1 API skeleton (+ Phase 2 market data)."""
 import asyncio
 import datetime as dt
+import logging
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
-from app.config import settings
+from app.config import assert_production_secrets, settings
+
+logger = logging.getLogger("ai-crypto-investor")
 from app.core.security import hash_password
 from app.core.state import state
 from app.data import ingest
@@ -120,6 +126,8 @@ def seed_demo_data() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail closed en producción antes de sembrar nada (corrida 3 agentes).
+    assert_production_secrets()
     seed_demo_data()
     task = asyncio.create_task(_scanner_loop())
     yield
@@ -190,6 +198,32 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         lifespan=lifespan,
     )
+
+    # Handlers globales (corrida 3 agentes): un IntegrityError ya no es un
+    # 500 crudo sino un 409 explicable, y cualquier otro fallo inesperado
+    # devuelve un 500 con ID de correlación sin filtrar trazas al cliente.
+    # Las HTTPException existentes no se ven afectadas (su handler propio
+    # tiene prioridad en Starlette).
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(request, exc):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "La operación viola una regla de integridad de datos "
+                "(registro relacionado o duplicado)."
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_error_handler(request, exc):
+        error_id = uuid.uuid4().hex[:12]
+        logger.exception(
+            "unhandled error [%s] %s %s", error_id, request.method, request.url.path
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Error interno del servidor.", "error_id": error_id},
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],

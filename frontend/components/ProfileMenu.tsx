@@ -28,6 +28,15 @@ export function ProfileEditor({
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Cerrar con Escape (antes solo se podía con clic fuera o el botón).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const onPhoto = (file: File | undefined) => {
     setError(null);
     if (!file) return;
@@ -79,7 +88,7 @@ export function ProfileEditor({
     >
       <form
         onSubmit={save}
-        className="w-full max-w-md space-y-3 rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
+        className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">

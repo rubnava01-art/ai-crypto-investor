@@ -103,9 +103,9 @@ export function RecomendacionesPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input className={inputCls} placeholder="Título *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input className={inputCls} placeholder="Enlace (https://…)" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
+          <input aria-label="Título" className={inputCls} placeholder="Título *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Descripción" className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <input aria-label="Enlace (https://…)" className={inputCls} placeholder="Enlace (https://…)" value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-zinc-400">Categoría</span>
             <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as RecommendationCategory)}>

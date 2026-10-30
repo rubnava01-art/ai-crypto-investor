@@ -12,7 +12,7 @@ import { api, setToken, ApiError } from "../../lib/api";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,7 @@ export default function LoginPage() {
   function switchMode(m: "login" | "register") {
     setMode(m);
     setError(null);
-    setUsername(m === "login" ? "admin" : "");
+    setUsername("");
     setPassword("");
     setAnswer("");
     if (m === "register") loadChallenge();
@@ -135,7 +135,7 @@ export default function LoginPage() {
               {challenge ? challenge.question : "Cargando verificación…"}
             </p>
             <div className="flex gap-2">
-              <input
+              <input aria-label="Tu respuesta"
                 className={inputCls}
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
@@ -188,10 +188,6 @@ export default function LoginPage() {
         </p>
       </form>
 
-      <p className="mt-6 text-center text-xs leading-relaxed text-zinc-600">
-        Cuentas de prueba: <code className="text-zinc-500">admin</code> / <code className="text-zinc-500">admin</code> (super admin) ·{" "}
-        <code className="text-zinc-500">prueba</code> / <code className="text-zinc-500">prueba</code> (solo ver y probar)
-      </p>
     </main>
   );
 }

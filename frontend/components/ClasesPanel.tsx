@@ -107,9 +107,9 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-2">
-          <input className={inputCls} placeholder="Título de la clase *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Descripción (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input className={inputCls} placeholder={isLive ? "Enlace de la sala (Zoom, Meet…) *" : "Enlace del video *"} value={url} onChange={(e) => setUrl(e.target.value)} maxLength={500} autoComplete="off" />
+          <input aria-label="Título de la clase" className={inputCls} placeholder="Título de la clase *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Descripción (opcional)" className={inputCls} placeholder="Descripción (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <input aria-label="Enlace de la sala o del video" className={inputCls} placeholder={isLive ? "Enlace de la sala (Zoom, Meet…) *" : "Enlace del video *"} value={url} onChange={(e) => setUrl(e.target.value)} maxLength={500} autoComplete="off" />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {isLive && (
               <label className="text-xs text-zinc-500">Fecha y hora
@@ -128,7 +128,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
             {busy ? "Guardando…" : isLive ? "Programar clase en vivo" : "Agregar clase grabada"}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
 

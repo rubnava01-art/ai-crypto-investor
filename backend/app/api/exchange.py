@@ -3,6 +3,7 @@
 No endpoint here accepts or stores API secrets — keys live in env only.
 """
 import datetime as dt
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -21,6 +22,14 @@ class ExchangeStatus(BaseModel):
     exchange: str | None = None
     read_only: bool = True
     detail: str = ""
+    stale: bool = False
+
+
+# Caché de estado 60 s (corrida 3 agentes): el estado no es dinero ni una
+# decisión de trading, así que cachearlo con flag stale es seguro. Los
+# balances NO se cachean jamás (dinero real para operar).
+_STATUS_CACHE: dict = {"at": 0.0, "payload": None}
+_STATUS_TTL_S = 60.0
 
 
 class BalancesResponse(BaseModel):
@@ -36,6 +45,10 @@ class RegisterConnectionRequest(BaseModel):
 
 @router.get("/status", response_model=ExchangeStatus)
 def exchange_status(user: User = Depends(get_current_user)):
+    now = time.monotonic()
+    cached = _STATUS_CACHE["payload"]
+    if cached is not None and now - _STATUS_CACHE["at"] < _STATUS_TTL_S:
+        return ExchangeStatus(**{**cached, "stale": False})
     if not adapter.is_configured():
         return ExchangeStatus(
             configured=False,
@@ -43,12 +56,18 @@ def exchange_status(user: User = Depends(get_current_user)):
         )
     try:
         info = adapter.ReadOnlyAdapter().fetch_status()
-        return ExchangeStatus(
-            configured=True,
-            exchange=info["exchange"],
-            detail=f"status={info['status']}",
-        )
+        payload = {
+            "configured": True,
+            "exchange": info["exchange"],
+            "detail": f"status={info['status']}",
+            "stale": False,
+        }
+        _STATUS_CACHE["at"] = now
+        _STATUS_CACHE["payload"] = payload
+        return ExchangeStatus(**payload)
     except Exception as e:  # noqa: BLE001
+        if cached is not None:
+            return ExchangeStatus(**{**cached, "stale": True})
         return ExchangeStatus(
             configured=True, detail=f"reachable but error: {type(e).__name__}"
         )

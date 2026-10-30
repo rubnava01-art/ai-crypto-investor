@@ -8,7 +8,7 @@ Any authenticated user reads; only admins create/update/delete
 """
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ class ItemOut(BaseModel):
 
 class ItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    description: str = ""
+    description: str = Field(default="", max_length=2000)
     sku: str = Field(default="", max_length=64)
     quantity: int = 0
     unit: str = "pieza"
@@ -47,7 +47,7 @@ class ItemCreate(BaseModel):
 
 class ItemUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
     sku: str | None = Field(default=None, max_length=64)
     quantity: int | None = None
     unit: str | None = None
@@ -65,7 +65,9 @@ def _out(r: InventoryItem) -> ItemOut:
         unit=r.unit,
         unit_price=float(r.unit_price),
         min_stock=r.min_stock,
-        low_stock=r.quantity <= r.min_stock,
+        # Sin mínimo definido (0) no hay alerta: antes un ítem con 0/0
+        # aparecía en "stock bajo" aunque el dueño no definió ningún mínimo.
+        low_stock=r.min_stock > 0 and r.quantity <= r.min_stock,
         created_at=r.created_at.isoformat() if r.created_at else None,
         updated_at=r.updated_at.isoformat() if r.updated_at else None,
     )
@@ -95,8 +97,13 @@ def _validate_price(value: float) -> Decimal:
 
 
 @router.get("/items", response_model=list[ItemOut])
-def list_items(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    rows = db.query(InventoryItem).order_by(InventoryItem.name.asc(), InventoryItem.id.asc()).all()
+def list_items(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(InventoryItem).order_by(InventoryItem.name.asc(), InventoryItem.id.asc()).offset(offset).limit(limit).all()
     return [_out(r) for r in rows]
 
 

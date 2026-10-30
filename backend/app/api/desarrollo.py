@@ -8,8 +8,9 @@ user reads; only admins create/update/delete (require_admin -> 403
 for prueba). Deleting a project deletes its tasks explicitly (SQLite
 may not enforce the FK cascade).
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
@@ -85,18 +86,32 @@ def _contact_or_404(db: Session, contact_id: int | None) -> Contact | None:
     return contact
 
 
-def _project_out(p: DigitalProject, db: Session) -> DigitalProjectOut:
-    contact = db.get(Contact, p.contact_id) if p.contact_id else None
-    tasks = db.query(DigitalTask).filter(DigitalTask.project_id == p.id).all()
+def _project_out(
+    p: DigitalProject,
+    db: Session,
+    contacts: dict[int, str] | None = None,
+    task_counts: dict[int, tuple[int, int]] | None = None,
+) -> DigitalProjectOut:
+    if contacts is None:
+        contact = db.get(Contact, p.contact_id) if p.contact_id else None
+        contact_name = contact.name if contact else None
+    else:
+        contact_name = contacts.get(p.contact_id) if p.contact_id else None
+    if task_counts is None:
+        tasks = db.query(DigitalTask).filter(DigitalTask.project_id == p.id).all()
+        tasks_count = len(tasks)
+        done_count = sum(1 for t in tasks if t.done)
+    else:
+        tasks_count, done_count = task_counts.get(p.id, (0, 0))
     return DigitalProjectOut(
         id=p.id,
         contact_id=p.contact_id,
-        contact_name=contact.name if contact else None,
+        contact_name=contact_name,
         title=p.title,
         stage=p.stage,
         notes=p.notes or "",
-        tasks_count=len(tasks),
-        done_count=sum(1 for t in tasks if t.done),
+        tasks_count=tasks_count,
+        done_count=done_count,
         created_at=p.created_at.isoformat() if p.created_at else None,
         updated_at=p.updated_at.isoformat() if p.updated_at else None,
     )
@@ -114,11 +129,33 @@ def _task_out(t: DigitalTask) -> DigitalTaskOut:
 
 @router.get("/projects", response_model=list[DigitalProjectOut])
 def list_projects(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    rows = db.query(DigitalProject).order_by(DigitalProject.id.desc()).all()
-    return [_project_out(p, db) for p in rows]
+    rows = db.query(DigitalProject).order_by(DigitalProject.id.desc()).offset(offset).limit(limit).all()
+    # Contactos en un solo IN + conteos de tareas con GROUP BY (antes: 2N consultas).
+    contact_ids = {p.contact_id for p in rows if p.contact_id}
+    contacts = (
+        {ct.id: ct.name for ct in db.query(Contact).filter(Contact.id.in_(contact_ids)).all()}
+        if contact_ids
+        else {}
+    )
+    task_counts: dict[int, tuple[int, int]] = {}
+    if rows:
+        for pid, done, n in (
+            db.query(DigitalTask.project_id, DigitalTask.done, func.count())
+            .filter(DigitalTask.project_id.in_([p.id for p in rows]))
+            .group_by(DigitalTask.project_id, DigitalTask.done)
+            .all()
+        ):
+            total, done_n = task_counts.get(pid, (0, 0))
+            total += n
+            if done:
+                done_n += n
+            task_counts[pid] = (total, done_n)
+    return [_project_out(p, db, contacts, task_counts) for p in rows]
 
 
 @router.post("/projects", response_model=DigitalProjectOut, status_code=status.HTTP_201_CREATED)
@@ -185,6 +222,8 @@ def delete_project(
 def list_tasks(
     project_id: int,
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     if db.get(DigitalProject, project_id) is None:
@@ -193,7 +232,7 @@ def list_tasks(
         db.query(DigitalTask)
         .filter(DigitalTask.project_id == project_id)
         .order_by(DigitalTask.id)
-        .all()
+        .offset(offset).limit(limit).all()
     )
     return [_task_out(t) for t in rows]
 

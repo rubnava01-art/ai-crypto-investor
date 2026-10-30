@@ -115,7 +115,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <form onSubmit={generate} className="space-y-2">
-          <input
+          <input aria-label="Tema o producto del copy"
             className={inputCls}
             placeholder="Tema o producto del copy (p. ej. Lanzamiento de la Academia)"
             value={topic}
@@ -144,7 +144,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
             {busy ? "Generando…" : "Generar copy"}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
 
@@ -285,9 +285,9 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <form onSubmit={add} className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
           <p className="text-sm font-semibold text-zinc-200">Nueva tendencia</p>
-          <input className={inputCls} placeholder="Título de la tendencia *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <input className={inputCls} placeholder="Fuente (p. ej. @tecnologia, investigación propia)" value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Resumen breve" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} />
+          <input aria-label="Título de la tendencia" className={inputCls} placeholder="Título de la tendencia *" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <input aria-label="Fuente" className={inputCls} placeholder="Fuente (p. ej. @tecnologia, investigación propia)" value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" />
+          <textarea aria-label="Resumen breve" className={inputCls} placeholder="Resumen breve" value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} />
           <button
             type="submit"
             disabled={busy || !title.trim()}
@@ -295,10 +295,10 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
           >
             {busy ? "Guardando…" : "Agregar tendencia"}
           </button>
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
-      {!isAdmin && error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {!isAdmin && error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </Panel>
   );
 }

@@ -274,10 +274,10 @@ export function CrmPanel() {
             {editingId !== null ? "Editar contacto" : "Nuevo contacto"}
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input className={inputCls} placeholder="Nombre *" value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" />
-            <input className={inputCls} placeholder="Correo" type="email" value={form.email} onChange={set("email")} autoComplete="off" />
-            <input className={inputCls} placeholder="Teléfono" value={form.phone} onChange={set("phone")} autoComplete="off" />
-            <input className={inputCls} placeholder="Etiquetas (separadas por comas)" value={form.tags} onChange={set("tags")} autoComplete="off" />
+            <input aria-label="Nombre" className={inputCls} placeholder="Nombre *" value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" />
+            <input aria-label="Correo" className={inputCls} placeholder="Correo" type="email" value={form.email} onChange={set("email")} autoComplete="off" />
+            <input aria-label="Teléfono" className={inputCls} placeholder="Teléfono" value={form.phone} onChange={set("phone")} autoComplete="off" />
+            <input aria-label="Etiquetas (separadas por comas)" className={inputCls} placeholder="Etiquetas (separadas por comas)" value={form.tags} onChange={set("tags")} autoComplete="off" />
             <select className={inputCls} value={form.source} onChange={set("source")} aria-label="Origen">
               {CRM_SOURCES.map((s) => (
                 <option key={s.value} value={s.value}>Origen: {s.label}</option>
@@ -289,7 +289,7 @@ export function CrmPanel() {
               ))}
             </select>
           </div>
-          <textarea
+          <textarea aria-label="Notas"
             className={inputCls}
             placeholder="Notas"
             value={form.notes}
@@ -315,13 +315,13 @@ export function CrmPanel() {
             )}
           </div>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
       )}
       {!isAdmin && (msg || error) && (
         <div className="mt-3">
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </div>
       )}
     </Panel>

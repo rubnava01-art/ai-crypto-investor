@@ -158,10 +158,10 @@ export function InventarioPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-2">
-          <input className={inputCls} placeholder="Nombre del artículo *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <div className="grid grid-cols-2 gap-2">
-            <input className={inputCls} placeholder="SKU (opcional)" value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
+          <input aria-label="Nombre del artículo" className={inputCls} placeholder="Nombre del artículo *" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
+          <textarea aria-label="Descripción" className={inputCls} placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <input aria-label="SKU (opcional)" className={inputCls} placeholder="SKU (opcional)" value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-zinc-400">Unidad</span>
               <select className={inputCls} value={unit} onChange={(e) => setUnit(e.target.value as InventoryUnit)}>
@@ -203,7 +203,7 @@ export function InventarioPanel() {
       )}
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        <input
+        <input aria-label="Buscar en inventario"
           className={inputCls}
           placeholder="Buscar por nombre, SKU o descripción…"
           value={filter}

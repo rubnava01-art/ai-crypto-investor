@@ -10,7 +10,7 @@ Permissions: any authenticated user reads; only admins write/delete
 """
 import datetime as dt
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -60,6 +60,8 @@ def _class_out(c: EduClass) -> EduClassOut:
 def list_classes(
     kind: str | None = None,
     user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     q = db.query(EduClass)
@@ -67,7 +69,7 @@ def list_classes(
         if kind not in KINDS:
             raise HTTPException(status_code=422, detail=f"kind must be one of: {', '.join(KINDS)}")
         q = q.filter(EduClass.kind == kind)
-    rows = q.order_by(EduClass.scheduled_at.desc(), EduClass.id.desc()).all()
+    rows = q.order_by(EduClass.scheduled_at.desc(), EduClass.id.desc()).offset(offset).limit(limit).all()
     return [_class_out(r) for r in rows]
 
 

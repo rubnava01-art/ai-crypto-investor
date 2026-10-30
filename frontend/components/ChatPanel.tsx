@@ -112,7 +112,7 @@ export function ChatPanel() {
                   }`}
                 >
                   <p className="text-[11px] font-semibold opacity-80">
-                    {m.author_label}
+                    {m.author_label} <span className="font-normal opacity-70">@{m.author_username}</span>
                     <span className="ml-2 font-normal opacity-70">{fmtTime(m.created_at)}</span>
                   </p>
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.text}</p>
@@ -133,7 +133,7 @@ export function ChatPanel() {
       </div>
 
       <form onSubmit={send} className="flex gap-2">
-        <input
+        <input aria-label="Escribe un mensaje"
           className={inputCls}
           value={text}
           onChange={(e) => setText(e.target.value)}

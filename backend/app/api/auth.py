@@ -79,11 +79,19 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/register-challenge")
-def register_challenge():
+def register_challenge(request: Request):
     """Issue a one-time human check for the registration form."""
+    # Antes sin límite: se podía pedir un challenge nuevo sin freno y el
+    # rango 2-9 solo tenía 64 respuestas posibles. Ahora 10-99 + límite.
+    client_ip = request.client.host if request.client else "unknown"
+    if not login_limiter.allow(f"challenge:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas verificaciones. Espera un minuto.",
+        )
     _prune_challenges()
-    a = random.randint(2, 9)
-    b = random.randint(2, 9)
+    a = random.randint(10, 99)
+    b = random.randint(10, 99)
     cid = secrets.token_urlsafe(16)
     _CHALLENGES[cid] = (a + b, time.monotonic() + _CHALLENGE_TTL_SECONDS)
     return {"challenge_id": cid, "question": f"¿Cuánto es {a} + {b}?"}

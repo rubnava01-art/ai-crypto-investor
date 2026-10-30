@@ -21,3 +21,10 @@ class RateLimiter:
 
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
+# Trabajo pesado por usuario (corrida 3 agentes): backtest y auditoría web
+# eran ilimitados y accesibles al rol prueba; un bucle bastaba para agotar
+# el pool de hilos del tier gratuito. Límites generosos para no romper el
+# uso normal; la suite los verifica.
+backtest_limiter = RateLimiter(max_requests=30, window_seconds=60)
+auditor_limiter = RateLimiter(max_requests=60, window_seconds=60)

@@ -60,7 +60,7 @@ export function AiAssistant() {
       </p>
 
       <div className="flex gap-2">
-        <input
+        <input aria-label="Pregunta al asistente"
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -79,7 +79,7 @@ export function AiAssistant() {
       </div>
 
       {error && (
-        <p className="mt-2 text-xs text-red-400">{error}</p>
+        <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>
       )}
 
       {answer && (

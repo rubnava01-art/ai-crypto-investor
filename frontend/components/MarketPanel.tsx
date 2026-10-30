@@ -134,7 +134,7 @@ export function MarketPanel() {
   const liveBadge = wsLive ? (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
       <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
       </span>
       EN VIVO
@@ -147,7 +147,7 @@ export function MarketPanel() {
 
   return (
     <Panel title="Mercado en vivo" badge={liveBadge}>
-      {error && <p className="py-4 text-center text-sm text-amber-400">{error}</p>}
+      {error && <p role="alert" className="py-4 text-center text-sm text-amber-400">{error}</p>}
       {!error && !prices && <p className="py-4 text-center text-sm text-zinc-500">Cargando precios…</p>}
       {prices && (
         <ul className="divide-y divide-zinc-800/70">
