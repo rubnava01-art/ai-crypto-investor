@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api } from "../lib/api";
 
 /** Small professional stroke icons (currentColor, 16px) — no emoji, no images. */
 function Icon({ d, children }: { d?: string; children?: React.ReactNode }) {
@@ -159,13 +161,34 @@ const MODULES = [
       </Icon>
     ),
   },
+  {
+    href: "/usuarios",
+    label: "Control de usuarios",
+    hint: "Aprobar cuentas · roles · claves",
+    adminOnly: true,
+    icon: (
+      <Icon>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M19 8v6M22 11h-6" />
+      </Icon>
+    ),
+  },
 ];
 
 export function ModuleNav() {
   const pathname = usePathname();
+  // La entrada de Control de usuarios solo se muestra a administradores.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    api
+      .me()
+      .then((m) => setIsAdmin(m.is_admin))
+      .catch(() => setIsAdmin(false));
+  }, []);
   return (
     <nav aria-label="Módulos de la plataforma" className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
-      {MODULES.map((m) => {
+      {MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin).map((m) => {
         const active = pathname === m.href;
         return (
           <Link

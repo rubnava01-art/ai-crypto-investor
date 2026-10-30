@@ -63,6 +63,32 @@ class SuperAdminGrant(Base):
     )
 
 
+class PendingActivation(Base):
+    """Cuentas nuevas por aprobar (Acceso, 2026-10-30, decisión del dueño).
+
+    El registro público crea la cuenta en estado pendiente: puede existir,
+    pero NO puede iniciar sesión ni ver nada hasta que un administrador la
+    apruebe (o la rechace, lo que la borra). Así nadie que se registre por
+    su cuenta accede al CRM, las facturas o los alumnos.
+
+    Igual que SuperAdminGrant, es una tabla aparte y no una columna en
+    users, así las bases existentes no necesitan migración: create_all la
+    crea al arrancar. Las cuentas creadas por un admin desde el panel de
+    usuarios nacen activas (el admin ya las aprobó al crearlas) y nunca
+    tienen fila aquí; las cuentas viejas tampoco, así que nada cambia
+    para ellas.
+    """
+
+    __tablename__ = "pending_activations"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class ExchangeConnection(Base):
     """Phase 1: stores metadata only. Real API secrets are NEVER stored in Phase 1.
 

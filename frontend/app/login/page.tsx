@@ -5,16 +5,18 @@ import { useRouter } from "next/navigation";
 import { api, setToken, ApiError } from "../../lib/api";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
- * claude.ai — one centered card, generous spacing, no clutter. ALL auth
- * logic is unchanged: username/password login, public registration with
- * the one-time server math challenge + per-IP rate limit, new accounts
- * always prueba, super_admin tier rules untouched. */
+ * claude.ai — one centered card, generous spacing, no clutter.
+ * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
+ * directo — la cuenta queda pendiente hasta que un administrador la
+ * active desde el módulo Control de usuarios; el login de una cuenta
+ * pendiente responde 403 con el aviso en español. */
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
@@ -30,6 +32,7 @@ export default function LoginPage() {
   function switchMode(m: "login" | "register") {
     setMode(m);
     setError(null);
+    setNotice(null);
     setUsername("");
     setPassword("");
     setAnswer("");
@@ -39,6 +42,7 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
       const res = await api.login(username, password);
@@ -54,6 +58,7 @@ export default function LoginPage() {
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
       if (!challenge) throw new Error("No se pudo cargar la verificación. Inténtalo de nuevo.");
@@ -63,10 +68,15 @@ export default function LoginPage() {
         challenge_id: challenge.challenge_id,
         answer: Number(answer),
       });
-      // La cuenta nueva entra como Prueba: inicia sesión con ella directamente.
-      const res = await api.login(username.trim(), password);
-      setToken(res.access_token);
-      router.replace("/");
+      // Cuenta pendiente: NO inicia sesión directa; un administrador la
+      // activa desde Control de usuarios y entonces podrá entrar.
+      setNotice(
+        "Cuenta creada. Quedó pendiente de activación por un administrador; podrás entrar cuando la aprueben."
+      );
+      setMode("login");
+      setUsername("");
+      setPassword("");
+      setAnswer("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo crear la cuenta.");
       loadChallenge();
@@ -93,7 +103,7 @@ export default function LoginPage() {
         <p className="mt-1 max-w-xs text-sm leading-relaxed text-zinc-400">
           {mode === "login"
             ? "Inicia sesión para entrar a tus módulos."
-            : "Las cuentas nuevas entran como Prueba (solo ver y probar); un administrador puede subirte de rol."}
+            : "Las cuentas nuevas quedan pendientes de activación por un administrador; al aprobarte entras como Prueba (solo ver y probar)."}
         </p>
       </div>
 
@@ -153,6 +163,12 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {notice && (
+          <p role="status" className="mb-5 rounded-xl bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300">
+            {notice}
+          </p>
         )}
 
         {error && (

@@ -414,6 +414,7 @@ export interface AdminUser {
   role: "admin" | "prueba" | "super_admin";
   is_admin: boolean;
   is_super_admin: boolean;
+  status: "active" | "pending";
   created_at: string | null;
 }
 
@@ -873,6 +874,10 @@ export const api = {
     request<AdminUser>("/api/auth/register", { method: "POST", body }),
   deleteUser: (id: number) =>
     request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),
+  approveUser: (id: number) =>
+    request<AdminUser>(`/api/users/${id}/approve`, { method: "POST", auth: true }),
+  rejectUser: (id: number) =>
+    request<void>(`/api/users/${id}/reject`, { method: "POST", auth: true }),
   dashboard: () => request<DashboardResponse>("/api/dashboard", { auth: true }),
   createOrder: (
     body: { symbol: string; side: "buy" | "sell"; quantity: string; mode: string },

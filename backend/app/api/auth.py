@@ -1,12 +1,15 @@
 """Authentication endpoints: login, public registration, access roles.
 
-Registration (Acceso, 2026-10-26): anyone can create an account from the
-login screen, but only after passing a one-time human check (a small
-math question issued by the server — the "no soy una máquina" check).
-New accounts are always role prueba (view + tests only, no controls);
-only an admin can promote them, and only a super admin can grant the
-super admin tier. No third-party CAPTCHA keys are involved: the check
-stops casual bots, it is not a proof against a determined human solver.
+Registration (Acceso, 2026-10-26; cuentas por aprobar, 2026-10-30): anyone
+can create an account from the login screen, but only after passing a
+one-time human check (a small math question issued by the server — the
+"no soy una máquina" check). New accounts are always role prueba AND
+stay pending: they cannot log in or see anything until an admin
+approves them from the users panel (approval removes the pending row;
+rejection deletes the account). Only an admin can promote an approved
+account, and only a super admin can grant the super admin tier.
+No third-party CAPTCHA keys are involved: the check stops casual bots,
+it is not a proof against a determined human solver.
 """
 import random
 import secrets
@@ -26,7 +29,7 @@ from app.core.security import (
     verify_password,
 )
 from app.database import get_db
-from app.models.tables import User
+from app.models.tables import PendingActivation, User
 from app.schemas.api import LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -65,6 +68,18 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
+    # Cuenta pendiente de activación: la contraseña es correcta pero aún
+    # ningún administrador la aprobó, así que no recibe token ni entra.
+    if (
+        db.query(PendingActivation)
+        .filter(PendingActivation.user_id == user.id)
+        .first()
+        is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu cuenta está pendiente de activación por un administrador.",
+        )
     return TokenResponse(access_token=create_access_token(user.username))
 
 
@@ -99,8 +114,10 @@ def register_challenge(request: Request):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
-    """Public registration. Always creates a prueba account (read-only);
-    promotion to admin/super_admin happens only through user management."""
+    """Public registration. Always creates a prueba account in pending
+    state: it cannot log in until an admin approves it from the users
+    panel. Promotion to admin/super_admin happens only through user
+    management, after approval."""
     client_ip = request.client.host if request.client else "unknown"
     if not login_limiter.allow(f"register:{client_ip}"):
         raise HTTPException(
@@ -125,11 +142,15 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     db.add(user)
     db.commit()
     db.refresh(user)
+    # Pendiente de activación: sin esta fila la cuenta entraría directa.
+    db.add(PendingActivation(user_id=user.id))
+    db.commit()
     return {
         "id": user.id,
         "username": user.username,
         "role": "prueba",
         "is_admin": False,
         "is_super_admin": False,
+        "status": "pending",
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }

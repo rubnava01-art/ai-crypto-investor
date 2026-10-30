@@ -1,4 +1,6 @@
-"""User management — administrators only.
+"""User management — administrators only. This is the master user control:
+approve/reject pending accounts, change roles, set or reset passwords,
+and delete users.
 
 Roles (Acceso, 2026-10-26):
 - super_admin: everything an admin can do, plus granting/revoking super
@@ -8,6 +10,13 @@ Roles (Acceso, 2026-10-26):
   kill switch, orders, exchange connections.
 - prueba (is_admin=False): view everything and run tests (backtests,
   strategy evaluation, AI assistant) but cannot change any control.
+
+Status (cuentas por aprobar, 2026-10-30, decisión del dueño):
+- pending: account created by public registration, not yet approved by
+  an admin. It cannot log in (login returns 403) and sees nothing.
+  Approving removes the pending row; rejecting deletes the account.
+- active: everyone else — admin-created accounts and approved accounts.
+  Old accounts have no pending row, so nothing changes for them.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -15,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, is_super_admin, require_admin
 from app.database import get_db
-from app.models.tables import SuperAdminGrant, User
+from app.models.tables import PendingActivation, SuperAdminGrant, User
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -26,6 +35,7 @@ class UserOut(BaseModel):
     role: str  # "super_admin" | "admin" | "prueba"
     is_admin: bool
     is_super_admin: bool
+    status: str = "active"  # "active" | "pending"
     created_at: str | None = None
 
 
@@ -40,15 +50,28 @@ class UpdateUserRequest(BaseModel):
     password: str | None = Field(default=None, min_length=4, max_length=128)
 
 
-def _out(u: User, db: Session, super_flag: bool | None = None) -> UserOut:
+def _out(
+    u: User,
+    db: Session,
+    super_flag: bool | None = None,
+    pending: bool | None = None,
+) -> UserOut:
     if super_flag is None:
         super_flag = is_super_admin(u, db)
+    if pending is None:
+        pending = (
+            db.query(PendingActivation)
+            .filter(PendingActivation.user_id == u.id)
+            .first()
+            is not None
+        )
     return UserOut(
         id=u.id,
         username=u.username,
         role="super_admin" if super_flag else ("admin" if u.is_admin else "prueba"),
         is_admin=u.is_admin,
         is_super_admin=super_flag,
+        status="pending" if pending else "active",
         created_at=u.created_at.isoformat() if u.created_at else None,
     )
 
@@ -82,7 +105,7 @@ def list_users(
     db: Session = Depends(get_db),
 ):
     rows = db.query(User).order_by(User.id).offset(offset).limit(limit).all()
-    # Un solo SELECT de grants (antes: uno por usuario).
+    # Un solo SELECT de grants y otro de pendientes (antes: uno por usuario).
     grant_ids = (
         {
             g.user_id
@@ -93,7 +116,20 @@ def list_users(
         if rows
         else set()
     )
-    return [_out(u, db, super_flag=(u.id in grant_ids)) for u in rows]
+    pending_ids = (
+        {
+            p.user_id
+            for p in db.query(PendingActivation)
+            .filter(PendingActivation.user_id.in_([u.id for u in rows]))
+            .all()
+        }
+        if rows
+        else set()
+    )
+    return [
+        _out(u, db, super_flag=(u.id in grant_ids), pending=(u.id in pending_ids))
+        for u in rows
+    ]
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -170,6 +206,66 @@ def update_user(
     return _out(user, db)
 
 
+@router.post("/{user_id}/approve", response_model=UserOut)
+def approve_user(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Approve a pending account: it can log in from now on. Any admin
+    can approve (user management is admin-level); super admin exclusivity
+    applies only to super admin accounts, and pending accounts are never
+    super admins when created."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    row = (
+        db.query(PendingActivation)
+        .filter(PendingActivation.user_id == user.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=409, detail="User is not pending activation"
+        )
+    db.delete(row)
+    db.commit()
+    db.refresh(user)
+    return _out(user, db)
+
+
+@router.post("/{user_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+def reject_user(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Reject a pending account: the account is deleted, it never entered.
+    Refused for admin/super accounts (a pending account should never be
+    one, but an admin could have promoted it before rejecting)."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    row = (
+        db.query(PendingActivation)
+        .filter(PendingActivation.user_id == user.id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=409, detail="User is not pending activation"
+        )
+    if user.is_admin or is_super_admin(user, db):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot reject an admin account; demote it first",
+        )
+    db.delete(row)
+    db.delete(user)
+    db.commit()
+    return None
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
@@ -193,6 +289,13 @@ def delete_user(
         if admins <= 1:
             raise HTTPException(status_code=400, detail="Cannot delete the last admin")
     _set_super(db, user, False)  # explicit: SQLite may not enforce the FK cascade
+    pending = (
+        db.query(PendingActivation)
+        .filter(PendingActivation.user_id == user.id)
+        .first()
+    )
+    if pending is not None:
+        db.delete(pending)
     db.delete(user)
     db.commit()
     return None
