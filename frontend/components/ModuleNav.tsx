@@ -47,6 +47,12 @@ const MODULES = [
     icon: <Icon d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />,
   },
   {
+    href: "/analizador",
+    label: "Analizador IA",
+    hint: "¿Contenido creado con IA?",
+    icon: <Icon d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />,
+  },
+  {
     href: "/crm",
     label: "CRM",
     hint: "Contactos y clientes",

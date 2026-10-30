@@ -246,6 +246,27 @@ export interface HomeComment {
   can_delete: boolean;
 }
 
+// ---------- Analizador IA ----------
+export interface AnalizadorIndicador {
+  nombre: string;
+  valor: string;
+  detalle: string;
+  punto: boolean;
+}
+
+export interface AnalizarResponse {
+  url: string;
+  final_url: string;
+  titulo: string;
+  palabras: number;
+  indicadores: AnalizadorIndicador[];
+  puntaje: number;
+  banda: "bajo" | "medio" | "alto";
+  etiqueta_banda: string;
+  regla: string;
+  descargo: string;
+}
+
 // ---------- Inventario ----------
 export type InventoryUnit = "pieza" | "kg" | "litro" | "metro" | "caja" | "otro";
 
@@ -1076,6 +1097,10 @@ export const api = {
   // ---------- Auditor web ----------
   runWebAudit: (url: string) =>
     request<WebAudit>("/api/auditor/audits", { method: "POST", auth: true, body: { url } }),
+
+  // ---------- Analizador IA ----------
+  analizarUrl: (url: string) =>
+    request<AnalizarResponse>("/api/analizador/analizar", { method: "POST", auth: true, body: { url } }),
   listWebAudits: () => request<WebAudit[]>("/api/auditor/audits", { auth: true }),
 
   // ---------- Privacidad y cumplimiento ----------
