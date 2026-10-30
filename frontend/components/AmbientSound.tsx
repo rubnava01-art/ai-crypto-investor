@@ -180,18 +180,49 @@ export function AmbientSound() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => (playing ? stop() : play(sound))}
-        className="mt-3 w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500"
+      {/* Play y Stop como dos botones separados y siempre visibles:
+          Reproducir solo activo cuando no suena, Detener solo activo
+          cuando suena. Así el estado queda claro sin depender del texto
+          de un solo botón que cambia. */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => play(sound)}
+          disabled={playing}
+          className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Reproducir
+        </button>
+        <button
+          type="button"
+          onClick={stop}
+          disabled={!playing}
+          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Detener
+        </button>
+      </div>
+      {/* Estado siempre visible para que se vea claro si opera o no:
+          por default (al entrar) está en Detenido; al sonar, punto
+          pulsante verde + "Sonando". */}
+      <p
+        role="status"
+        className="mt-2 flex items-center justify-center gap-2 text-center text-xs font-semibold"
       >
-        {playing ? "Detener sonido" : "Reproducir sonido"}
-      </button>
-      {playing && (
-        <p role="status" className="mt-2 text-center text-xs text-teal-300">
-          Sonando: {current.label} · volumen {volume}%
-        </p>
-      )}
+        <span
+          aria-hidden="true"
+          className={`inline-block h-2 w-2 rounded-full ${
+            playing ? "animate-pulse bg-teal-400" : "bg-zinc-600"
+          }`}
+        />
+        {playing ? (
+          <span className="text-teal-300">
+            Sonando: {current.label} · volumen {volume}%
+          </span>
+        ) : (
+          <span className="text-zinc-500">Detenido — toca Reproducir para empezar</span>
+        )}
+      </p>
       {error && (
         <p role="alert" className="mt-2 text-center text-xs text-red-400">
           {error}
