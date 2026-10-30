@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type MeResponse, type Revelation } from "../lib/api";
+import { AmbientSound } from "./AmbientSound";
 import { Panel } from "./Panel";
 
 const inputCls =
@@ -164,6 +165,9 @@ function MeditationPanel() {
           </button>
         </div>
       </div>
+
+      {/* Sonido ambiental: independiente de la respiración y del temporizador. */}
+      <AmbientSound />
     </Panel>
   );
 }
