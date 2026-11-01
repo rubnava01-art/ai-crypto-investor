@@ -6,7 +6,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "min-h-[44px] w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 type Step = "form" | "validate" | "done";
 
@@ -25,6 +25,7 @@ export function InvestorPanel({
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [price, setPrice] = useState<number | null>(null);
+  const [priceUpdatedAt, setPriceUpdatedAt] = useState<Date | null>(null);
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +38,10 @@ export function InvestorPanel({
       try {
         const res = await api.marketPrices();
         const coin = res.prices.find((p) => p.pair === symbol);
-        if (!cancelled && coin?.price_usd) setPrice(coin.price_usd);
+        if (!cancelled && coin?.price_usd) {
+          setPrice(coin.price_usd);
+          setPriceUpdatedAt(new Date());
+        }
       } catch {
         /* el precio se reintenta en el siguiente ciclo */
       }
@@ -112,10 +116,10 @@ export function InvestorPanel({
     >
       {step === "done" ? (
         <div className="py-2">
-          <p className="text-sm text-emerald-400">✓ {result}</p>
+          <p className="text-sm leading-relaxed text-emerald-400">✓ {result}</p>
           <button
             onClick={reset}
-            className="mt-3 w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+            className="mt-4 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.invertir.newOperation}
           </button>
@@ -123,47 +127,47 @@ export function InvestorPanel({
       ) : step === "validate" ? (
         <div className="py-1">
           {isReal && (
-            <div className="mb-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-200">
+            <div className="mb-4 rounded-lg border border-red-800 bg-red-950/50 p-3.5 text-sm leading-relaxed text-red-200">
               ⚠️ <strong>{t.invertir.realWarningTitle}</strong> {t.invertir.realWarningBody}
             </div>
           )}
-          <p className="text-sm font-semibold text-zinc-100">{t.invertir.validateTitle}</p>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
+          <p className="text-base font-semibold text-zinc-100">{t.invertir.validateTitle}</p>
+          <dl className="mt-3 space-y-2.5 text-sm">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.operation}</dt>
-              <dd className={`font-semibold ${side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
+              <dd className={`text-right font-semibold ${side === "buy" ? "text-emerald-400" : "text-red-400"}`}>
                 {side === "buy" ? t.invertir.enterBuy : t.invertir.exitSell} {symbol}
               </dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.amount}</dt>
-              <dd className="font-mono">${amountNum.toFixed(2)} USD</dd>
+              <dd className="text-right font-mono tabular-nums">${amountNum.toFixed(2)} USD</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.currentPrice}</dt>
-              <dd className="font-mono">${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}</dd>
+              <dd className="text-right font-mono tabular-nums">${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.estQty}</dt>
-              <dd className="font-mono">{qty.toFixed(8)}</dd>
+              <dd className="text-right font-mono tabular-nums">{qty.toFixed(8)}</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.pctCapital}</dt>
-              <dd className="font-mono">{pctCapital != null ? `${pctCapital.toFixed(1)}%` : "—"}</dd>
+              <dd className="text-right font-mono tabular-nums">{pctCapital != null ? `${pctCapital.toFixed(1)}%` : "—"}</dd>
             </div>
-            <div className="flex justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.mode}</dt>
-              <dd className="font-mono">
+              <dd className="text-right font-mono">
                 {isReal ? t.invertir.modeReal : orderMode} {t.invertir.riskGuardNote}
               </dd>
             </div>
           </dl>
           {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
-          <div className="mt-4 flex gap-2">
+          <div className="mt-5 flex gap-2">
             <button
               onClick={confirm}
               disabled={busy}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold text-white disabled:opacity-50 ${
+              className={`min-h-[44px] flex-1 rounded-lg px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
                 side === "buy" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
               }`}
             >
@@ -172,7 +176,7 @@ export function InvestorPanel({
             <button
               onClick={() => setStep("form")}
               disabled={busy}
-              className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+              className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t.invertir.back}
             </button>
@@ -180,11 +184,11 @@ export function InvestorPanel({
         </div>
       ) : (
         <div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={() => setSide("buy")}
               aria-pressed={side === "buy"}
-              className={`rounded-lg px-3 py-2.5 text-sm font-bold ${
+              className={`min-h-[44px] rounded-lg px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
                 side === "buy"
                   ? "bg-emerald-600 text-white"
                   : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
@@ -195,7 +199,7 @@ export function InvestorPanel({
             <button
               onClick={() => setSide("sell")}
               aria-pressed={side === "sell"}
-              className={`rounded-lg px-3 py-2.5 text-sm font-bold ${
+              className={`min-h-[44px] rounded-lg px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
                 side === "sell"
                   ? "bg-red-600 text-white"
                   : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
@@ -204,7 +208,7 @@ export function InvestorPanel({
               {t.invertir.exitBtn}
             </button>
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <select aria-label={t.invertir.symbolAria} className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
               <option value="BTC/USD">{t.invertir.bitcoin}</option>
               <option value="ETH/USD">{t.invertir.ethereum}</option>
@@ -219,21 +223,31 @@ export function InvestorPanel({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-3 text-xs leading-relaxed text-zinc-400">
             {t.invertir.price} {symbol}:{" "}
             {price
               ? `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
-              : t.invertir.loadingPrice}{" "}
+              : t.invertir.loadingPrice}
+            {priceUpdatedAt && (
+              <>
+                {" "}· {t.invertir.updatedAt}{" "}
+                {priceUpdatedAt.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </>
+            )}{" "}
             · {t.invertir.capital} {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
           </p>
-          {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-sm leading-relaxed text-red-400">{error}</p>}
           <button
             onClick={() => {
               setError(null);
               setStep("validate");
             }}
             disabled={!validAmount || !price}
-            className="mt-3 w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm font-bold text-zinc-900 hover:bg-white disabled:opacity-40"
+            className="mt-4 min-h-[44px] w-full rounded-lg bg-zinc-100 px-3 py-3 text-sm font-bold text-zinc-900 hover:bg-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.invertir.validateOrder}
           </button>

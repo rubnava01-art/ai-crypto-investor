@@ -86,18 +86,18 @@ export default function LoginPage() {
   }
 
   const inputCls =
-    "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2.5 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-emerald-500";
+    "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition-colors hover:border-zinc-600 focus:border-emerald-500";
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
       <div className="mb-8 flex flex-col items-center text-center">
-        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50">
+        <span aria-hidden="true" className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50">
           P
         </span>
         <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400">
           {t.header.brand}
         </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-100">
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
           {mode === "login" ? t.login.welcome : t.login.createAccount}
         </h1>
         <p className="mt-1 max-w-xs text-sm leading-relaxed text-zinc-400">
@@ -107,7 +107,7 @@ export default function LoginPage() {
 
       <form
         onSubmit={mode === "login" ? onSubmit : onRegister}
-        className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-xl sm:p-8"
+        className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl sm:p-8"
       >
         <label className="mb-4 block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.userLabel}</span>
@@ -164,13 +164,13 @@ export default function LoginPage() {
         )}
 
         {notice && (
-          <p role="status" className="mb-5 rounded-xl bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-300">
+          <p role="status" className="mb-5 rounded-xl bg-emerald-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-emerald-300">
             {notice}
           </p>
         )}
 
         {error && (
-          <p role="alert" className="mb-5 rounded-xl bg-red-500/10 px-3.5 py-2.5 text-sm text-red-400">
+          <p role="alert" className="mb-5 rounded-xl bg-red-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-red-400">
             {error}
           </p>
         )}
@@ -178,7 +178,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-[15px] font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:opacity-50"
         >
           {loading ? t.login.processing : mode === "login" ? t.login.loginSubmit : t.login.createSubmit}
         </button>
@@ -187,14 +187,14 @@ export default function LoginPage() {
           {mode === "login" ? (
             <>
               {t.login.noAccount}{" "}
-              <button type="button" onClick={() => switchMode("register")} className="font-semibold text-emerald-400 hover:underline">
+              <button type="button" onClick={() => switchMode("register")} className="inline-block py-1 font-semibold text-emerald-400 underline-offset-4 hover:underline">
                 {t.login.registerLink}
               </button>
             </>
           ) : (
             <>
               {t.login.hasAccount}{" "}
-              <button type="button" onClick={() => switchMode("login")} className="font-semibold text-emerald-400 hover:underline">
+              <button type="button" onClick={() => switchMode("login")} className="inline-block py-1 font-semibold text-emerald-400 underline-offset-4 hover:underline">
                 {t.login.loginSubmit}
               </button>
             </>

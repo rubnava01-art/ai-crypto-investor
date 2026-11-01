@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { downloadSvg, downloadSvgAsPng } from "../lib/svgDownload";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40";
 
 // Símbolos y paletas: valores/hex fijos; las etiquetas visibles salen del
 // diccionario dentro del componente (t.logo.*).
@@ -59,12 +59,12 @@ export function LogoGenerator() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.logo.intro}
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <input aria-label={t.logo.brandAria} className={inputCls} placeholder={t.logo.brandPlaceholder} value={name} onChange={(e) => setName(e.target.value)} maxLength={24} autoComplete="off" />
           <input aria-label={t.logo.taglineAria} className={inputCls} placeholder={t.logo.taglinePlaceholder} value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={40} autoComplete="off" />
           <div className="grid grid-cols-2 gap-2">
@@ -89,7 +89,7 @@ export function LogoGenerator() {
               type="button"
               onClick={() => download(false)}
               disabled={!name.trim()}
-              className="flex-1 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.logo.downloadSvg}
             </button>
@@ -97,7 +97,7 @@ export function LogoGenerator() {
               type="button"
               onClick={() => download(true)}
               disabled={!name.trim()}
-              className="flex-1 rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.logo.downloadPng}
             </button>
@@ -105,8 +105,8 @@ export function LogoGenerator() {
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         </div>
 
-        <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-          <svg ref={svgRef} viewBox="0 0 300 300" className="h-56 w-56" role="img" aria-label={t.logo.previewAria}>
+        <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <svg ref={svgRef} viewBox="0 0 300 300" className="h-auto w-full max-w-56" role="img" aria-label={t.logo.previewAria}>
             <rect width="300" height="300" fill={palette.bg} />
             {style === "monograma" ? (
               <>

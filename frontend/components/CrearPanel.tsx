@@ -11,7 +11,7 @@ import { LogoGenerator } from "./LogoGenerator";
 import { ShirtMockupGenerator } from "./ShirtMockupGenerator";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 const PLATFORMS: { value: CopyPlatform; label: string }[] = [
   { value: "instagram", label: "Instagram" },
@@ -107,13 +107,13 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
           {t.crear.demoPrefix}<strong>{t.crear.demoWord}</strong>{t.crear.demoSuffix}
         </p>
       )}
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.crear.copyIntro}
         {!isAdmin && t.crear.readonlyCopy}
       </p>
 
       {isAdmin && (
-        <form onSubmit={generate} className="space-y-2">
+        <form onSubmit={generate} className="space-y-3">
           <input aria-label={t.crear.topicAria}
             className={inputCls}
             placeholder={t.crear.topicPlaceholder}
@@ -138,7 +138,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
           <button
             type="submit"
             disabled={busy || !topic.trim()}
-            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.crear.generateBusy : t.crear.generate}
           </button>
@@ -148,30 +148,30 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
           {t.crear.saved} ({drafts === null ? "…" : drafts.length})
         </p>
         {drafts === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.crear.loadingCopies}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.crear.loadingCopies}</p>
         ) : drafts.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">{t.crear.emptyCopies}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.crear.emptyCopies}</p>
         ) : (
           <ul className="divide-y divide-zinc-800/70">
             {drafts.map((d) => (
               <li key={d.id} className="py-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{platformLabel(d.platform)}</span>
-                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{toneLabel(d.tone)}</span>
+                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300">{platformLabel(d.platform)}</span>
+                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300">{toneLabel(d.tone)}</span>
                   {d.demo && (
-                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">{t.crear.demoChip}</span>
+                    <span className="rounded bg-amber-500/15 px-1.5 py-1 text-[11px] font-semibold text-amber-300">{t.crear.demoChip}</span>
                   )}
-                  <span className="text-xs text-zinc-500">{d.topic}</span>
+                  <span className="text-xs text-zinc-400">{d.topic}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    <span className="text-xs text-zinc-600">{fmtDate(d.created_at, locale)}</span>
+                    <span className="text-xs text-zinc-400">{fmtDate(d.created_at, locale)}</span>
                     {isAdmin && (
                       <button
                         onClick={() => remove(d)}
-                        className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                        className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         {t.crear.deleteBtn}
                       </button>
@@ -247,15 +247,15 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.crear.trendsIntro}
         {!isAdmin && t.crear.readonlyTrends}
       </p>
 
       {trends === null ? (
-        <p className="py-2 text-sm text-zinc-500">{t.crear.loadingTrends}</p>
+        <p className="py-2 text-sm text-zinc-400">{t.crear.loadingTrends}</p>
       ) : trends.length === 0 ? (
-        <p className="py-2 text-sm text-zinc-500">
+        <p className="py-2 text-sm text-zinc-400">
           {t.crear.emptyTrends}
         </p>
       ) : (
@@ -264,17 +264,17 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
             <li key={tr.id} className="py-2.5">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{tr.title}</span>
-                {tr.published_on && <span className="text-xs text-zinc-500">{fmtDate(tr.published_on, locale)}</span>}
+                {tr.published_on && <span className="text-xs text-zinc-400">{fmtDate(tr.published_on, locale)}</span>}
                 {isAdmin && (
                   <button
                     onClick={() => remove(tr)}
-                    className="ml-auto rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                    className="ml-auto rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {t.crear.deleteBtn}
                   </button>
                 )}
               </div>
-              {tr.source && <p className="mt-0.5 text-xs text-zinc-500">{t.crear.sourceLabel}{tr.source}</p>}
+              {tr.source && <p className="mt-0.5 text-xs text-zinc-400">{t.crear.sourceLabel}{tr.source}</p>}
               {tr.summary && <p className="mt-0.5 text-sm text-zinc-400">{tr.summary}</p>}
             </li>
           ))}
@@ -282,7 +282,7 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {isAdmin && (
-        <form onSubmit={add} className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
+        <form onSubmit={add} className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
           <p className="text-sm font-semibold text-zinc-200">{t.crear.newTrend}</p>
           <input aria-label={t.crear.trendTitleAria} className={inputCls} placeholder={t.crear.trendTitlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <input aria-label={t.crear.sourceAria} className={inputCls} placeholder={t.crear.sourcePlaceholder} value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" />
@@ -290,7 +290,7 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.crear.addBusy : t.crear.addTrend}
           </button>

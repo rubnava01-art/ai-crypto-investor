@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { Panel } from "./Panel";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const UNITS: InventoryUnit[] = ["pieza", "kg", "litro", "metro", "caja", "otro"];
 
@@ -163,19 +163,19 @@ export function InventarioPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.inventario.intro}
         {!isAdmin && t.inventario.readOnly}
       </p>
 
       {isAdmin && (
-        <form onSubmit={save} className="space-y-2">
+        <form onSubmit={save} className="space-y-3">
           <input aria-label={t.inventario.nameAria} className={inputCls} placeholder={t.inventario.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
           <textarea aria-label={t.inventario.descAria} className={inputCls} placeholder={t.inventario.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input aria-label={t.inventario.skuAria} className={inputCls} placeholder={t.inventario.skuPlaceholder} value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.unitLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.unitLabel}</span>
               <select className={inputCls} value={unit} onChange={(e) => setUnit(e.target.value as InventoryUnit)}>
                 {UNITS.map((u) => (
                   <option key={u} value={u}>{unitLabel(u)}</option>
@@ -183,15 +183,15 @@ export function InventarioPanel() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.qtyLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.qtyLabel}</span>
               <input className={inputCls} type="number" min={0} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.priceLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.priceLabel}</span>
               <input className={inputCls} type="number" min={0} step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.inventario.minLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.minLabel}</span>
               <input className={inputCls} type="number" min={0} step={1} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
             </label>
           </div>
@@ -199,12 +199,12 @@ export function InventarioPanel() {
             <button
               type="submit"
               disabled={busy || !name.trim()}
-              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.inventario.saving : editing ? t.inventario.updateItem : t.inventario.saveItem}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+              <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                 {t.inventario.cancel}
               </button>
             )}
@@ -233,31 +233,31 @@ export function InventarioPanel() {
         ) : (
           <ul className="mt-3 space-y-3">
             {visible.map((it) => (
-              <li key={it.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
+              <li key={it.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-zinc-100">{it.name}</span>
                   {it.sku && (
-                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-400">
+                    <span className="rounded-full bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300">
                       {it.sku}
                     </span>
                   )}
                   {it.low_stock && (
-                    <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+                    <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-300">
                       {t.inventario.lowStock}
                     </span>
                   )}
                   {isAdmin && (
                     <span className="ml-auto flex items-center gap-2">
-                      <button onClick={() => adjust(it, -1)} aria-label={t.inventario.removeOneAria} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => adjust(it, -1)} aria-label={t.inventario.removeOneAria} className="min-h-[40px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         −
                       </button>
-                      <button onClick={() => adjust(it, 1)} aria-label={t.inventario.addOneAria} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => adjust(it, 1)} aria-label={t.inventario.addOneAria} className="min-h-[40px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         +
                       </button>
-                      <button onClick={() => startEdit(it)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => startEdit(it)} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.inventario.edit}
                       </button>
-                      <button onClick={() => remove(it)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                      <button onClick={() => remove(it)} className="min-h-[40px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.inventario.delete}
                       </button>
                     </span>

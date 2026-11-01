@@ -6,7 +6,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 /** Chat en vivo: mensajes cortos para usuarios autenticados. El panel
  * consulta cada ~5s (sin WebSocket en el tier gratuito) y se salta la
@@ -91,15 +91,15 @@ export function ChatPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.chat.intro}
       </p>
 
-      <div className="mb-3 max-h-[420px] space-y-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+      <div className="mb-3 max-h-[420px] space-y-3 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4">
         {rows === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.chat.loadingMessages}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.chat.loadingMessages}</p>
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">
+          <p className="py-2 text-sm text-zinc-400">
             {t.chat.emptyChat}
           </p>
         ) : (
@@ -108,7 +108,7 @@ export function ChatPanel() {
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 ${
+                  className={`max-w-[85%] sm:max-w-[75%] sm:max-w-[75%] rounded-2xl px-3.5 py-2 ${
                     mine ? "rounded-br-sm bg-emerald-600/90 text-white" : "rounded-bl-sm bg-zinc-800 text-zinc-100"
                   }`}
                 >
@@ -120,7 +120,7 @@ export function ChatPanel() {
                   {isAdmin && (
                     <button
                       onClick={() => remove(m)}
-                      className="mt-1 text-[11px] font-semibold text-red-300 hover:underline"
+                      className="mt-1 inline-block py-1 text-xs font-semibold text-red-300 hover:underline"
                     >
                       {t.chat.deleteBtn}
                     </button>
@@ -145,7 +145,7 @@ export function ChatPanel() {
         <button
           type="submit"
           disabled={busy || !text.trim()}
-          className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busy ? t.chat.sendBusy : t.chat.send}
         </button>

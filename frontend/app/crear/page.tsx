@@ -27,11 +27,11 @@ export default function CrearPage() {
             href={FORGE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            className="mt-3 inline-block rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           >
             {t.crear.forgeOpen}
           </a>
-          <p className="mt-2 font-mono text-xs text-zinc-500">{FORGE_URL}</p>
+          <p className="mt-2 font-mono text-xs text-zinc-400">{FORGE_URL}</p>
         </Panel>
 
         <CrearPanel />

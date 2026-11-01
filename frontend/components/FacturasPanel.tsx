@@ -9,7 +9,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -92,44 +92,44 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
     <Panel
       title={t.facturas.calcTitle}
       badge={
-        <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
           {t.facturas.costsBadge}
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.facturas.calcIntro}
       </p>
 
       <div className="space-y-2">
         {rows.map((r, i) => (
-          <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+          <div key={i} className="grid grid-cols-6 gap-3 sm:grid-cols-12">
             <input aria-label={t.facturas.materialAria} className={`${inputCls} col-span-6`} placeholder={t.facturas.materialPlaceholder} value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
             <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" placeholder={t.facturas.qtyPlaceholder} value={r.qty} onChange={(e) => setRow(i, { qty: Number(e.target.value) })} aria-label={t.facturas.qtyAria} />
             <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" placeholder={t.facturas.unitCostPlaceholder} value={r.unitCost} onChange={(e) => setRow(i, { unitCost: Number(e.target.value) })} aria-label={t.facturas.unitCostAria} />
-            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label={t.facturas.removeMaterialAria}>×</button>
+            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={t.facturas.removeMaterialAria}>×</button>
           </div>
         ))}
-        <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800">
+        <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
           {t.facturas.addMaterial}
         </button>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <label className="text-xs text-zinc-500">{t.facturas.laborLabel}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="text-sm text-zinc-400">{t.facturas.laborLabel}
             <input className={`${inputCls} mt-1`} type="number" min="0" step="0.01" value={labor} onChange={(e) => setLabor(Number(e.target.value))} />
           </label>
-          <label className="text-xs text-zinc-500">{t.facturas.otherLabel}
+          <label className="text-sm text-zinc-400">{t.facturas.otherLabel}
             <input className={`${inputCls} mt-1`} type="number" min="0" step="0.01" value={other} onChange={(e) => setOther(Number(e.target.value))} />
           </label>
-          <label className="text-xs text-zinc-500">{t.facturas.unitsLabel}
+          <label className="text-sm text-zinc-400">{t.facturas.unitsLabel}
             <input className={`${inputCls} mt-1`} type="number" min="1" step="1" value={units} onChange={(e) => setUnits(Number(e.target.value))} />
           </label>
         </div>
-        <label className="block text-xs text-zinc-500">{t.facturas.marginLabel}
+        <label className="block text-sm text-zinc-400">{t.facturas.marginLabel}
           <input className={`${inputCls} mt-1`} type="number" min="0" step="1" value={margin} onChange={(e) => setMargin(Number(e.target.value))} />
         </label>
       </div>
 
-      <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200">
+      <div className="mt-4 space-y-1 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-200">
         <p>{t.facturas.matCost}<b>{money(matCost)}</b></p>
         <p>{t.facturas.totalCost}<b>{money(totalCost)}</b></p>
         <p>{t.facturas.suggestedPrice.replace("{margen}", String(margin))}<b className="text-emerald-400">{money(suggested)}</b>
@@ -139,7 +139,7 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
           type="button"
           onClick={() => onUsePrice(t.facturas.calcLineDesc, Math.round(suggested * 100) / 100, 1)}
           disabled={suggested <= 0}
-          className="mt-3 w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+          className="mt-3 min-h-[44px] w-full rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
         >
           {t.facturas.usePrice}
         </button>
@@ -283,19 +283,19 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       <Panel
         title={tt.facturas.genTitle}
         badge={
-          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
             {saved === null ? tt.facturas.badgeLoading : tt.facturas.savedCount.replace("{n}", String(saved.length))}
           </span>
         }
       >
-        <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+        <p className="mb-4 text-sm leading-relaxed text-zinc-400">
           {tt.facturas.genIntro}
           {!isAdmin && tt.facturas.genIntroViewer}
         </p>
 
         {isAdmin && (
-          <form onSubmit={save} className="space-y-2">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <form onSubmit={save} className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <input aria-label={tt.facturas.sellerNameAria} className={inputCls} placeholder={tt.facturas.sellerNamePlaceholder} value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
               <input aria-label={tt.facturas.sellerPhoneAria} className={inputCls} placeholder={tt.facturas.sellerPhonePlaceholder} value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
               <input aria-label={tt.facturas.sellerEmailAria} className={inputCls} placeholder={tt.facturas.sellerEmailPlaceholder} value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
@@ -308,43 +308,43 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                 ))}
               </select>
             )}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <input aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
               <input aria-label={tt.facturas.clientEmailAria} className={inputCls} placeholder={tt.facturas.clientEmailPlaceholder} value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
               <input aria-label={tt.facturas.clientPhoneAria} className={inputCls} placeholder={tt.facturas.clientPhonePlaceholder} value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
             </div>
 
-            <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">{tt.facturas.conceptsHeading}</p>
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">{tt.facturas.conceptsHeading}</p>
             {items.map((it, i) => (
-              <div key={i} className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+              <div key={i} className="grid grid-cols-6 gap-3 sm:grid-cols-12">
                 <input aria-label={tt.facturas.descAria} className={`${inputCls} col-span-6`} placeholder={tt.facturas.descPlaceholder} value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
                 <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" value={it.qty} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} aria-label={tt.facturas.qtyAria} />
                 <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" value={it.unit_price} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, unit_price: Number(e.target.value) } : x)))} aria-label={tt.facturas.unitPriceAria} />
-                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 rounded-lg border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30" aria-label={tt.facturas.removeConceptAria}>×</button>
+                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={tt.facturas.removeConceptAria}>×</button>
               </div>
             ))}
-            <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800">
+            <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {tt.facturas.addConcept}
             </button>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="text-xs text-zinc-500">{tt.facturas.taxLabel}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-sm text-zinc-400">{tt.facturas.taxLabel}
                 <input className={`${inputCls} mt-1`} type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
               </label>
               <input aria-label={tt.facturas.notesAria} className={inputCls} placeholder={tt.facturas.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
             </div>
 
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200">
+            <div className="space-y-1 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-200">
               <p>{tt.facturas.subtotal}<b>{money(t.sub)}</b></p>
               <p>{tt.facturas.taxLine.replace("{tasa}", String(taxRate))}<b>{money(t.tax)}</b></p>
               <p>{tt.facturas.total}<b className="text-emerald-400">{money(t.total)}</b></p>
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" disabled={busy || !clientName.trim() || validItems.length === 0} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
+              <button type="submit" disabled={busy || !clientName.trim() || validItems.length === 0} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {busy ? tt.facturas.saving : tt.facturas.saveInvoice}
               </button>
-              <button type="button" onClick={printCurrent} disabled={validItems.length === 0 || !clientName.trim()} className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
+              <button type="button" onClick={printCurrent} disabled={validItems.length === 0 || !clientName.trim()} className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {tt.facturas.printPdf}
               </button>
             </div>
@@ -353,8 +353,8 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
           </form>
         )}
 
-        <div className="mt-4 border-t border-zinc-800 pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+        <div className="mt-5 border-t border-zinc-800 pt-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
             {tt.facturas.savedHeading} ({saved === null ? "…" : saved.length})
           </p>
           {saved === null ? (
@@ -370,17 +370,17 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100">{inv.number}</span>
                       <span className="text-sm text-zinc-400">{inv.client_name}</span>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{STATUS_LABEL[inv.status]}</span>
+                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{STATUS_LABEL[inv.status]}</span>
                       <span className="text-sm font-semibold text-emerald-400">{money(it.total)}</span>
                       <span className="ml-auto flex items-center gap-2">
-                        <span className="text-xs text-zinc-600">{fmtDate(inv.created_at, locale)}</span>
-                        <button onClick={() => printSaved(inv)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800">
+                        <span className="text-xs text-zinc-500">{fmtDate(inv.created_at, locale)}</span>
+                        <button onClick={() => printSaved(inv)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                           {tt.facturas.print}
                         </button>
                         {isAdmin && (
                           <>
                             <select
-                              className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+                              className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                               value={inv.status}
                               onChange={(e) => changeStatus(inv, e.target.value as InvoiceStatus)}
                               aria-label={tt.facturas.invoiceStatusAria}
@@ -389,7 +389,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                               ))}
                             </select>
-                            <button onClick={() => remove(inv)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                            <button onClick={() => remove(inv)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                               {tt.facturas.delete}
                             </button>
                           </>

@@ -6,7 +6,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 /** Auditor web: revisa UNA página (velocidad medida + SEO básico).
  * El puntaje es transparente: % de la lista de verificación aprobado,
@@ -63,7 +63,7 @@ export function AuditorPanel() {
   return (
     <div className="space-y-4">
       <Panel title={t.auditor.panelTitle} badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">{t.auditor.badge}</span>}>
-        <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+        <p className="mb-3 text-xs leading-relaxed text-zinc-400">
           {t.auditor.intro}
         </p>
         <form onSubmit={run} className="flex flex-col gap-2 sm:flex-row">
@@ -79,7 +79,7 @@ export function AuditorPanel() {
           <button
             type="submit"
             disabled={busy || !url.trim()}
-            className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.auditor.auditBusy : t.auditor.audit}
           </button>
@@ -90,16 +90,16 @@ export function AuditorPanel() {
       {result && (
         <Panel title={t.auditor.resultTitle}>
           <div className="mb-4 flex flex-wrap items-center gap-4">
-            <div className="text-center">
+            <div className="shrink-0 text-center">
               <p className={`text-5xl font-bold ${scoreColor}`}>
                 {result.score === null ? "—" : result.score}
               </p>
-              <p className="text-xs text-zinc-500">{t.auditor.scoreLabel}</p>
+              <p className="text-xs text-zinc-400">{t.auditor.scoreLabel}</p>
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-zinc-100">{result.url}</p>
-              <p className="truncate text-xs text-zinc-500">{t.auditor.finalLabel}{result.final_url}</p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="truncate text-xs text-zinc-400">{t.auditor.finalLabel}{result.final_url}</p>
+              <p className="mt-1 text-xs text-zinc-400">
                 {t.auditor.notScore}
               </p>
               {result.note && <p className="mt-1 text-xs text-amber-300">{result.note}</p>}
@@ -116,7 +116,7 @@ export function AuditorPanel() {
               [t.auditor.metricHttps, result.is_https ? t.auditor.yes : t.auditor.no],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
-                <p className="text-xs text-zinc-500">{label}</p>
+                <p className="text-xs text-zinc-400">{label}</p>
                 <p className="text-sm font-semibold text-zinc-100">{value}</p>
               </div>
             ))}
@@ -131,7 +131,7 @@ export function AuditorPanel() {
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{c.label}</span>
                   <span className="text-sm text-zinc-300">{c.value}</span>
-                  <span className="ml-auto text-xs text-zinc-500">{t.auditor.ideal}{c.ideal}</span>
+                  <span className="ml-auto text-xs text-zinc-400">{t.auditor.ideal}{c.ideal}</span>
                 </li>
               ))}
             </ul>
@@ -141,21 +141,21 @@ export function AuditorPanel() {
 
       <Panel title={t.auditor.recentTitle}>
         {recent.length === 0 ? (
-          <p className="text-sm text-zinc-500">{t.auditor.emptyRecent}</p>
+          <p className="text-sm text-zinc-400">{t.auditor.emptyRecent}</p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {recent.map((a) => (
               <li key={a.id}>
                 <button
                   type="button"
                   onClick={() => setResult(a)}
-                  className="flex w-full flex-wrap items-baseline gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-800"
+                  className="flex w-full flex-wrap items-baseline gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">{a.url}</span>
                   <span className="text-sm font-semibold text-zinc-100">
                     {a.score === null ? t.auditor.noScore : `${a.score}/100`}
                   </span>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-zinc-400">
                     {a.created_at ? new Date(a.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" }) : ""}
                     {a.owner_username ? ` · ${a.owner_username}` : ""}
                   </span>

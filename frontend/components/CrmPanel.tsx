@@ -9,7 +9,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 export const CRM_SOURCES: { value: CrmSource; label: string }[] = [
   { value: "manual", label: "Manual" },
@@ -178,18 +178,18 @@ export function CrmPanel() {
     <Panel
       title={t.crm.panelTitle}
       badge={
-        <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
           {contacts === null ? t.crm.badgeLoading : `${contacts.length} ${contacts.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.crm.intro1}<strong className="text-zinc-300">{t.crm.sourceAcademia}</strong>{t.crm.intro2}<strong className="text-zinc-300">Cohley</strong>{t.crm.intro3}<strong className="text-zinc-300">RIV Goods</strong>{t.crm.intro4}
         {isAdmin ? t.crm.introAdmin : t.crm.introViewer}
       </p>
 
       {/* Search + filter */}
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_220px]">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
         <input
           className={inputCls}
           placeholder={t.crm.searchPlaceholder}
@@ -212,62 +212,62 @@ export function CrmPanel() {
 
       {/* List */}
       {contacts === null ? (
-        <p className="py-3 text-center text-sm text-zinc-500">{t.crm.loadingContacts}</p>
+        <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>
       ) : contacts.length === 0 ? (
-        <p className="py-3 text-center text-sm text-zinc-500">
+        <p className="py-4 text-center text-sm text-zinc-400">
           {t.crm.emptyContacts}{query || statusFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-500">
-                <th className="py-2 pr-3 font-semibold">{t.crm.thName}</th>
-                <th className="py-2 pr-3 font-semibold">{t.crm.thContact}</th>
-                <th className="py-2 pr-3 font-semibold">{t.crm.thSource}</th>
-                <th className="py-2 pr-3 font-semibold">{t.crm.thStatus}</th>
-                <th className="py-2 pr-3 font-semibold">{t.crm.thTags}</th>
-                {isAdmin && <th className="py-2 font-semibold">{t.crm.thActions}</th>}
+              <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
+                <th className="py-3 pr-3 font-semibold">{t.crm.thName}</th>
+                <th className="py-3 pr-3 font-semibold">{t.crm.thContact}</th>
+                <th className="py-3 pr-3 font-semibold">{t.crm.thSource}</th>
+                <th className="py-3 pr-3 font-semibold">{t.crm.thStatus}</th>
+                <th className="py-3 pr-3 font-semibold">{t.crm.thTags}</th>
+                {isAdmin && <th className="py-3 font-semibold">{t.crm.thActions}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/70">
               {contacts.map((c) => (
-                <tr key={c.id} className="align-top">
-                  <td className="py-2.5 pr-3">
+                <tr key={c.id} className="align-top hover:bg-zinc-900/40">
+                  <td className="py-3 pr-3">
                     <span className="font-semibold text-zinc-100">{c.name}</span>
-                    {c.notes && <p className="mt-0.5 max-w-[260px] text-xs text-zinc-500">{c.notes}</p>}
+                    {c.notes && <p className="mt-0.5 max-w-[260px] text-xs text-zinc-400">{c.notes}</p>}
                   </td>
-                  <td className="py-2.5 pr-3 text-zinc-300">
+                  <td className="py-3 pr-3 text-zinc-300">
                     {c.email && <p className="break-all">{c.email}</p>}
-                    {c.phone && <p className="text-xs text-zinc-500">{c.phone}</p>}
-                    {!c.email && !c.phone && <span className="text-zinc-600">—</span>}
+                    {c.phone && <p className="text-xs text-zinc-400">{c.phone}</p>}
+                    {!c.email && !c.phone && <span className="text-zinc-500">—</span>}
                   </td>
-                  <td className="py-2.5 pr-3 text-zinc-300">{sourceLabel(c.source)}</td>
-                  <td className="py-2.5 pr-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[c.status] ?? statusBadge.inactivo}`}>
+                  <td className="py-3 pr-3 text-zinc-300">{sourceLabel(c.source)}</td>
+                  <td className="py-3 pr-3">
+                    <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[c.status] ?? statusBadge.inactivo}`}>
                       {statusLabel(c.status)}
                     </span>
                   </td>
-                  <td className="py-2.5 pr-3">
+                  <td className="py-3 pr-3">
                     <span className="flex flex-wrap gap-1">
                       {c.tags.map((t) => (
-                        <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{t}</span>
+                        <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{t}</span>
                       ))}
-                      {c.tags.length === 0 && <span className="text-zinc-600">—</span>}
+                      {c.tags.length === 0 && <span className="text-zinc-500">—</span>}
                     </span>
                   </td>
                   {isAdmin && (
-                    <td className="py-2.5">
+                    <td className="py-3">
                       <span className="flex gap-1.5">
                         <button
                           onClick={() => startEdit(c)}
-                          className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                         >
                           {t.crm.edit}
                         </button>
                         <button
                           onClick={() => remove(c)}
-                          className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                          className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                         >
                           {t.crm.delete}
                         </button>
@@ -283,11 +283,11 @@ export function CrmPanel() {
 
       {/* Create / edit form (admin only) */}
       {isAdmin && (
-        <form onSubmit={submit} className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
+        <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
           <p className="text-sm font-semibold text-zinc-200">
             {editingId !== null ? t.crm.editTitle : t.crm.newTitle}
           </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input aria-label={t.crm.nameAria} className={inputCls} placeholder={t.crm.namePlaceholder} value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" />
             <input aria-label={t.crm.emailAria} className={inputCls} placeholder={t.crm.emailPlaceholder} type="email" value={form.email} onChange={set("email")} autoComplete="off" />
             <input aria-label={t.crm.phoneAria} className={inputCls} placeholder={t.crm.phonePlaceholder} value={form.phone} onChange={set("phone")} autoComplete="off" />
@@ -314,7 +314,7 @@ export function CrmPanel() {
             <button
               type="submit"
               disabled={busy}
-              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {busy ? t.crm.saving : editingId !== null ? t.crm.saveChanges : t.crm.createContact}
             </button>
@@ -322,7 +322,7 @@ export function CrmPanel() {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
               >
                 {t.crm.cancel}
               </button>

@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { Panel } from "./Panel";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 /** Inicio: noticias y actualizaciones de la plataforma como posts, con
  * comentarios. La lista empieza VACÍA — aquí nada se inventa. Solo el
@@ -141,24 +141,24 @@ export function InicioPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.inicio.intro}
       </p>
 
       {isAdmin && (
-        <form onSubmit={savePost} className="space-y-2">
+        <form onSubmit={savePost} className="space-y-3">
           <input aria-label={t.inicio.titleAria} className={inputCls} placeholder={t.inicio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <textarea aria-label={t.inicio.bodyAria} className={inputCls} placeholder={t.inicio.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.inicio.saving : editing ? t.inicio.updatePost : t.inicio.publishNews}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+              <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                 {t.inicio.cancel}
               </button>
             )}
@@ -181,34 +181,34 @@ export function InicioPanel() {
               const open = expanded.has(p.id);
               const rows = comments[p.id];
               return (
-                <li key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <li key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-sm sm:p-5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold text-zinc-100">{p.title}</span>
+                    <span className="text-lg font-semibold leading-snug text-zinc-100">{p.title}</span>
                     {isAdmin && (
                       <span className="ml-auto flex gap-2">
                         <button
                           onClick={() => { setEditing(p); setTitle(p.title); setBody(p.body); }}
-                          className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                          className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.inicio.edit}
                         </button>
                         <button
                           onClick={() => removePost(p)}
-                          className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                          className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.inicio.delete}
                         </button>
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs text-zinc-500">
+                  <p className="mt-1 text-xs text-zinc-400">
                     {t.inicio.by.replace("{nombre}", p.author_name)}
                     {p.author_username ? ` (@${p.author_username})` : ""} · {fmtDate(p.created_at)}
                   </p>
                   {p.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{p.body}</p>}
                   <button
                     onClick={() => toggleComments(p.id)}
-                    className="mt-3 text-sm font-semibold text-emerald-400 hover:underline"
+                    className="mt-3 min-h-[44px] rounded-lg px-1 py-2 text-sm font-semibold text-emerald-400 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                   >
                     {open ? t.inicio.hideComments : t.inicio.commentsCount.replace("{nombre}", String(p.comment_count))}
                   </button>
@@ -221,7 +221,7 @@ export function InicioPanel() {
                       ) : (
                         <ul className="space-y-2">
                           {rows.map((c) => (
-                            <li key={c.id} className="rounded-lg bg-zinc-900 p-3">
+                            <li key={c.id} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-zinc-200">{c.author_name}</span>
                                 {c.author_username && (
@@ -231,7 +231,7 @@ export function InicioPanel() {
                                 {c.can_delete && (
                                   <button
                                     onClick={() => removeComment(p.id, c)}
-                                    className="ml-auto text-xs font-semibold text-red-400 hover:underline"
+                                    className="ml-auto min-h-[36px] rounded-lg px-2 py-1.5 text-xs font-semibold text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                                   >
                                     {t.inicio.delete}
                                   </button>
@@ -254,7 +254,7 @@ export function InicioPanel() {
                         <button
                           onClick={() => sendComment(p.id)}
                           disabled={!(drafts[p.id] ?? "").trim()}
-                          className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                          className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {t.inicio.comment}
                         </button>

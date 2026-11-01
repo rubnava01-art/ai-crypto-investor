@@ -9,7 +9,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 
 export function BusinessPanel() {
@@ -118,8 +118,8 @@ export function BusinessPanel() {
             onClick={() => setArea(a.value)}
             className={
               area === a.value
-                ? "rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                : "rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-zinc-800"
+                ? "min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             }
           >
             {a.label}
@@ -128,7 +128,7 @@ export function BusinessPanel() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300">{error}</p>
+        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{error}</p>
       )}
 
       {loading ? (
@@ -141,14 +141,14 @@ export function BusinessPanel() {
             )}
             <ul className="space-y-3">
               {notes.map((n) => (
-                <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
                   {editingNote?.id === n.id ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
                       <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                       <div className="flex gap-2">
-                        <button onClick={saveEdit} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">{tt.business.save}</button>
-                        <button onClick={() => setEditingNote(null)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">{tt.business.cancel}</button>
+                        <button onClick={saveEdit} className="min-h-[40px] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
+                        <button onClick={() => setEditingNote(null)} className="min-h-[40px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
                       </div>
                     </div>
                   ) : (
@@ -156,15 +156,15 @@ export function BusinessPanel() {
                       <p className="text-sm font-semibold text-zinc-100">{n.title}</p>
                       {n.body && <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{n.body}</p>}
                       {isAdmin && (
-                        <div className="mt-2 flex gap-3 text-xs">
+                        <div className="mt-3 flex gap-2 text-xs">
                           <button
-                            className="text-emerald-400 hover:underline"
+                            className="rounded px-1 py-1 text-emerald-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                             onClick={() => { setEditingNote(n); setEditTitle(n.title); setEditBody(n.body); }}
                           >
                             {tt.business.edit}
                           </button>
                           <button
-                            className="text-red-400 hover:underline"
+                            className="rounded px-1 py-1 text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                             onClick={async () => { if (!window.confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title))) return; await api.deleteBusinessNote(n.id); refresh(); }}
                           >
                             {tt.business.delete}
@@ -177,7 +177,7 @@ export function BusinessPanel() {
               ))}
             </ul>
             {isAdmin && (
-              <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
+              <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
                 <input aria-label={tt.business.noteTitleAria}
                   className={inputCls}
                   placeholder={tt.business.noteTitlePlaceholder}
@@ -191,7 +191,7 @@ export function BusinessPanel() {
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
                 />
-                <button onClick={createNote} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
+                <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.saveNote}
                 </button>
               </div>
@@ -204,9 +204,10 @@ export function BusinessPanel() {
             )}
             <ul className="space-y-2">
               {tasks.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+                <li key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
                   <input
                     type="checkbox"
+                    className="h-5 w-5 shrink-0 accent-emerald-500"
                     checked={t.done}
                     disabled={!isAdmin}
                     onChange={() => toggleTask(t)}
@@ -217,7 +218,7 @@ export function BusinessPanel() {
                   </span>
                   {isAdmin && (
                     <button
-                      className="text-xs text-red-400 hover:underline"
+                      className="rounded px-1 py-1 text-xs text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                       onClick={async () => { if (!window.confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title))) return; await api.deleteBusinessTask(t.id); refresh(); }}
                     >
                       {tt.business.delete}
@@ -227,7 +228,7 @@ export function BusinessPanel() {
               ))}
             </ul>
             {isAdmin && (
-              <div className="mt-4 flex gap-2 border-t border-zinc-800 pt-4">
+              <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
                 <input aria-label={tt.business.newTaskAria}
                   className={inputCls}
                   placeholder={tt.business.newTaskPlaceholder}
@@ -235,7 +236,7 @@ export function BusinessPanel() {
                   onChange={(e) => setTaskTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
                 />
-                <button onClick={createTask} className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
+                <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.add}
                 </button>
               </div>
@@ -244,7 +245,7 @@ export function BusinessPanel() {
         </div>
       )}
       {!isAdmin && me && (
-        <p className="text-xs text-zinc-500">{tt.business.viewerNote}</p>
+        <p className="text-xs text-zinc-400">{tt.business.viewerNote}</p>
       )}
     </div>
   );

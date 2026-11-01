@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { downloadSvg, downloadSvgAsPng } from "../lib/svgDownload";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
 
 // Colores: hex fijos; las etiquetas visibles salen del diccionario
 // dentro del componente (t.mockup.*).
@@ -66,12 +66,12 @@ export function ShirtMockupGenerator() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.mockup.intro}
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <input aria-label={t.mockup.designAria} className={inputCls} placeholder={t.mockup.designPlaceholder} value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
           <input aria-label={t.mockup.subAria} className={inputCls} placeholder={t.mockup.subPlaceholder} value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
           <div className="grid grid-cols-2 gap-2">
@@ -96,7 +96,7 @@ export function ShirtMockupGenerator() {
               type="button"
               onClick={() => download(false)}
               disabled={!designText.trim()}
-              className="flex-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.mockup.downloadSvg}
             </button>
@@ -104,7 +104,7 @@ export function ShirtMockupGenerator() {
               type="button"
               onClick={() => download(true)}
               disabled={!designText.trim()}
-              className="flex-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.mockup.downloadPng}
             </button>
@@ -112,8 +112,8 @@ export function ShirtMockupGenerator() {
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         </div>
 
-        <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-          <svg ref={svgRef} viewBox="0 0 400 400" className="h-64 w-64" role="img" aria-label={t.mockup.previewAria}>
+        <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+          <svg ref={svgRef} viewBox="0 0 400 400" className="h-auto w-full max-w-64" role="img" aria-label={t.mockup.previewAria}>
             <rect width="400" height="400" fill="#09090b" />
             <path d={TEE_PATH} fill={shirt.hex} stroke={shirt.seam} strokeWidth="2" />
             {/* Cuello */}

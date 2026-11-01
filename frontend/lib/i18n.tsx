@@ -324,6 +324,7 @@ const DICT: Record<Lang, Dictionary> = {
       amountPlaceholder: "Monto en USD (ej. 5)",
       price: "Precio",
       loadingPrice: "cargando…",
+      updatedAt: "Actualizado",
       capital: "Capital:",
       validateOrder: "VALIDAR ORDEN →",
     },
@@ -336,6 +337,7 @@ const DICT: Record<Lang, Dictionary> = {
       live: "EN VIVO",
       liveNote: "Precios en tiempo real (WebSocket público de Kraken) · cambio 24h cada minuto",
       publicNote: "Precios públicos de Kraken (solo lectura) · {time} UTC",
+      staleNote: "Precios en caché (exchange no disponible) · {time} UTC — pueden estar desactualizados",
     },
     ai: {
       title: "Asistente IA",
@@ -1134,6 +1136,7 @@ const DICT: Record<Lang, Dictionary> = {
       amountPlaceholder: "Amount in USD (e.g. 5)",
       price: "Price",
       loadingPrice: "loading…",
+      updatedAt: "Updated",
       capital: "Capital:",
       validateOrder: "VALIDATE ORDER →",
     },
@@ -1146,6 +1149,7 @@ const DICT: Record<Lang, Dictionary> = {
       live: "LIVE",
       liveNote: "Real-time prices (public Kraken WebSocket) · 24h change every minute",
       publicNote: "Public Kraken prices (read-only) · {time} UTC",
+      staleNote: "Cached prices (exchange unreachable) · {time} UTC — may be outdated",
     },
     ai: {
       title: "AI assistant",

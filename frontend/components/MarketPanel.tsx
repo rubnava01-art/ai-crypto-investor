@@ -149,8 +149,8 @@ export function MarketPanel() {
 
   return (
     <Panel title={t.market.title} badge={liveBadge}>
-      {error && <p role="alert" className="py-4 text-center text-sm text-amber-400">{error}</p>}
-      {!error && !prices && <p className="py-4 text-center text-sm text-zinc-500">{t.market.loadingPrices}</p>}
+      {error && <p role="alert" className="py-6 text-center text-sm leading-relaxed text-amber-400">{error}</p>}
+      {!error && !prices && <p className="py-6 text-center text-sm text-zinc-400">{t.market.loadingPrices}</p>}
       {prices && (
         <ul className="divide-y divide-zinc-800/70">
           {prices.map((c) => {
@@ -158,28 +158,28 @@ export function MarketPanel() {
             const up = (c.change_24h_pct ?? 0) >= 0;
             const price = live[c.symbol] ?? c.price_usd;
             return (
-              <li key={c.symbol} className="flex items-center gap-3 py-3">
+              <li key={c.symbol} className="flex items-center gap-3 py-3.5 sm:gap-4">
                 <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
                   style={{ backgroundColor: style.bg }}
                   aria-hidden
                 >
                   {style.glyph}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold text-zinc-100">{c.name}</p>
-                  <p className="text-xs uppercase tracking-wide text-zinc-500">{c.symbol}</p>
+                  <p className="truncate text-base font-semibold text-zinc-100">{c.name}</p>
+                  <p className="text-xs uppercase tracking-wide text-zinc-400">{c.symbol}</p>
                 </div>
                 <div className="hidden sm:block">
                   <Sparkline data={c.sparkline_24h} up={up} />
                 </div>
-                <div className="w-32 text-right sm:w-36">
-                  <p className="text-[15px] font-semibold tabular-nums text-zinc-100">
+                <div className="w-[7.5rem] shrink-0 text-right sm:w-36">
+                  <p className="text-base font-semibold tabular-nums text-zinc-100">
                     {price == null
                       ? "—"
                       : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: price < 10 ? 4 : 2 })}`}
                   </p>
-                  <p className={`text-sm font-medium tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
+                  <p className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
                     {c.change_24h_pct == null ? "—" : `${up ? "↗" : "↘"} ${Math.abs(c.change_24h_pct).toFixed(2)}%`}
                   </p>
                 </div>
@@ -189,10 +189,15 @@ export function MarketPanel() {
         </ul>
       )}
       {meta && (
-        <p className="mt-1 text-[11px] text-zinc-600">
+        <p
+          className={`mt-3 text-xs leading-relaxed ${meta.stale && !wsLive ? "text-amber-400" : "text-zinc-500"}`}
+          role={meta.stale && !wsLive ? "status" : undefined}
+        >
           {wsLive
             ? t.market.liveNote
-            : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))}
+            : meta.stale
+              ? t.market.staleNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))
+              : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))}
         </p>
       )}
     </Panel>

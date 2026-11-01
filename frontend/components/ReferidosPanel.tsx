@@ -11,7 +11,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 
 const campaignBadge: Record<string, string> = {
@@ -263,7 +263,7 @@ export function ReferidosPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-amber-700/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+      <div className="rounded-lg border border-amber-700/50 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-200">
         {t.referidos.banner1}<strong>{t.referidos.bannerStrong}</strong>{t.referidos.banner2}
       </div>
 
@@ -274,13 +274,13 @@ export function ReferidosPanel() {
         {isAdmin && !showCampaignForm && (
           <button
             onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaignForm); }}
-            className="mb-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            className="mb-4 min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.referidos.newCampaign}
           </button>
         )}
         {isAdmin && showCampaignForm && (
-          <form onSubmit={submitCampaign} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
+          <form onSubmit={submitCampaign} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4 sm:p-5">
             <input aria-label={t.referidos.campaignNameAria} className={inputCls} placeholder={t.referidos.campaignNamePlaceholder} value={campaignForm.name} onChange={setC("name")} required />
             <label className="block text-sm text-zinc-400">
               {t.referidos.businessLabel}
@@ -291,7 +291,7 @@ export function ReferidosPanel() {
                 ))}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm text-zinc-400">
                 {t.referidos.rewardTypeLabel}
                 <select className={inputCls} value={campaignForm.reward_type} onChange={setC("reward_type")}>
@@ -314,10 +314,10 @@ export function ReferidosPanel() {
               </select>
             </label>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {editingCampaignId !== null ? t.referidos.saveChanges : t.referidos.createCampaign}
               </button>
-              <button type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">
+              <button type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {t.referidos.cancel}
               </button>
             </div>
@@ -330,10 +330,10 @@ export function ReferidosPanel() {
         )}
         <ul className="space-y-3">
           {campaigns?.map((c) => (
-            <li key={c.id} className={`rounded-lg border p-4 ${selectedId === c.id ? "border-emerald-600 bg-zinc-900" : "border-zinc-800"}`}>
+            <li key={c.id} className={`rounded-lg border p-4 sm:p-5 ${selectedId === c.id ? "border-emerald-600 bg-zinc-900" : "border-zinc-800 hover:border-zinc-700"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <button onClick={() => setSelectedId(c.id)} className="text-left font-semibold text-zinc-100 hover:text-emerald-300">
+                  <button onClick={() => setSelectedId(c.id)} aria-pressed={selectedId === c.id} className="rounded text-left font-semibold text-zinc-100 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                     {c.name}
                   </button>
                   <p className="text-sm text-zinc-400">
@@ -347,18 +347,18 @@ export function ReferidosPanel() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ${campaignBadge[c.status]}`}>{campaignStatusLabel(c.status)}</span>
+                  <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${campaignBadge[c.status]}`}>{campaignStatusLabel(c.status)}</span>
                   {isAdmin && (
                     <>
-                      <button onClick={() => startEditCampaign(c)} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.edit}</button>
+                      <button onClick={() => startEditCampaign(c)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.edit}</button>
                       {c.status === "active" && (
-                        <button onClick={() => setCampaignStatus(c, "paused")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.pause}</button>
+                        <button onClick={() => setCampaignStatus(c, "paused")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.pause}</button>
                       )}
                       {c.status === "paused" && (
-                        <button onClick={() => setCampaignStatus(c, "active")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.resume}</button>
+                        <button onClick={() => setCampaignStatus(c, "active")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.resume}</button>
                       )}
                       {c.status !== "ended" && (
-                        <button onClick={() => setCampaignStatus(c, "ended")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.end}</button>
+                        <button onClick={() => setCampaignStatus(c, "ended")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.end}</button>
                       )}
                     </>
                   )}
@@ -376,7 +376,7 @@ export function ReferidosPanel() {
               {t.referidos.shareWithClients}
               <span className="font-mono text-lg font-bold text-emerald-300">{selected.share_code}</span>
             </p>
-            <button onClick={copyShareCode} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">
+            <button onClick={copyShareCode} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {copied ? t.referidos.copied : t.referidos.copyCode}
             </button>
             <label className="ml-auto flex items-center gap-2 text-sm text-zinc-400">
@@ -391,7 +391,7 @@ export function ReferidosPanel() {
           </div>
 
           {isAdmin && selected.status === "active" && !showReferralForm && (
-            <button onClick={() => setShowReferralForm(true)} className="mb-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
+            <button onClick={() => setShowReferralForm(true)} className="mb-4 min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {t.referidos.registerReferral}
             </button>
           )}
@@ -399,8 +399,8 @@ export function ReferidosPanel() {
             <p className="mb-4 text-sm text-amber-300">{t.referidos.campaignInactive.replace("{estado}", campaignStatusLabel(selected.status).toLowerCase())}</p>
           )}
           {isAdmin && showReferralForm && (
-            <form onSubmit={submitReferral} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={submitReferral} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4 sm:p-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <input aria-label={t.referidos.referrerNameAria} className={inputCls} placeholder={t.referidos.referrerNamePlaceholder} value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
                 <input aria-label={t.referidos.referrerContactAria} className={inputCls} placeholder={t.referidos.referrerContactPlaceholder} value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
                 <input aria-label={t.referidos.referredNameAria} className={inputCls} placeholder={t.referidos.referredNamePlaceholder} value={referralForm.referred_name} onChange={setR("referred_name")} required />
@@ -409,8 +409,8 @@ export function ReferidosPanel() {
               <input aria-label={t.referidos.codeAria} className={inputCls} placeholder={t.referidos.codePlaceholder.replace("{codigo}", selected.share_code)} value={referralForm.code} onChange={setR("code")} />
               <input aria-label={t.referidos.notesAria} className={inputCls} placeholder={t.referidos.notesPlaceholder} value={referralForm.notes} onChange={setR("notes")} />
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{t.referidos.register}</button>
-                <button type="button" onClick={() => setShowReferralForm(false)} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300">{t.referidos.cancel}</button>
+                <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.register}</button>
+                <button type="button" onClick={() => setShowReferralForm(false)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.cancel}</button>
               </div>
             </form>
           )}
@@ -421,7 +421,7 @@ export function ReferidosPanel() {
           )}
           <ul className="space-y-3">
             {referrals?.map((r) => (
-              <li key={r.id} className="rounded-lg border border-zinc-800 p-4">
+              <li key={r.id} className="rounded-lg border border-zinc-800 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold text-zinc-100">
@@ -435,12 +435,12 @@ export function ReferidosPanel() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${referralBadge[r.status]}`}>{referralStatusLabel(r.status)}</span>
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${referralBadge[r.status]}`}>{referralStatusLabel(r.status)}</span>
                     {isAdmin && r.status === "pending" && (
-                      <button onClick={() => advanceReferral(r, "confirmed")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.confirmClient}</button>
+                      <button onClick={() => advanceReferral(r, "confirmed")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.confirmClient}</button>
                     )}
                     {isAdmin && r.status === "confirmed" && (
-                      <button onClick={() => advanceReferral(r, "rewarded")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{t.referidos.markReward}</button>
+                      <button onClick={() => advanceReferral(r, "rewarded")} disabled={busy} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.markReward}</button>
                     )}
                   </div>
                 </div>

@@ -57,7 +57,7 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
   return (
     <div
       role="alert"
-      className="mb-6 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-300"
+      className="mb-6 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3.5 text-sm leading-relaxed text-amber-300"
     >
       <strong className="font-semibold">{t.dashboard.offlineTitle}</strong> {t.dashboard.offlineBefore}{" "}
       <code className="text-amber-200">{apiUrl}</code>{t.dashboard.offlineAfter}
@@ -169,15 +169,15 @@ export default function DashboardPage() {
 
   if (!checked) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <p className="text-sm text-zinc-400">{t.dashboard.loading}</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div>
           <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
@@ -193,7 +193,7 @@ export default function DashboardPage() {
           <DemoBadge />
           <button
             onClick={load}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
+            className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.dashboard.refresh}
           </button>
@@ -201,31 +201,31 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="mb-6">
+      <div className="mb-6 sm:mb-8">
         <ModuleNav />
       </div>
 
       {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}      {actionError && (
-        <p role="alert" className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        <p role="alert" className="mb-5 rounded-lg bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-400">
           {actionError}
         </p>
       )}
 
-      <div className="mb-4">
+      <div className="mb-5">
         <MarketPanel />
       </div>
 
       {me && !isAdmin && (
-        <div className="mb-4 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3 text-sm text-sky-300">
+        <div className="mb-5 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3.5 text-sm leading-relaxed text-sky-300">
           <strong className="font-semibold">{t.dashboard.testModeTitle}</strong> {t.dashboard.testModeBody}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
         <Panel title={t.dashboard.systemTitle} badge={<DemoBadge />}>
           {system ? (
-            <dl className="space-y-2 text-sm">
+            <dl className="space-y-2.5 text-sm">
               {[
                 [t.dashboard.exchangeConnected, <StatusDot key="e" on={system.exchange_connected} />],
                 [t.dashboard.scanner, <StatusDot key="s" on={system.scanner_running} />],
@@ -249,12 +249,12 @@ export default function DashboardPage() {
         <Panel title={t.dashboard.capitalTitle} badge={<DemoBadge />}>
           {balances ? (
             <div>
-              <p className="text-3xl font-bold tracking-tight">{money(balances.equity_usd)}</p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums sm:text-4xl">{money(balances.equity_usd)}</p>
               <p className="mt-1 text-sm text-zinc-400">
                 {t.dashboard.available} <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
                 <span className="font-mono text-xs">{balances.currency}</span>
               </p>
-              <p className="mt-3 text-xs text-zinc-500">{t.dashboard.asOf} {time(balances.as_of_utc)}</p>
+              <p className="mt-3 text-xs text-zinc-400">{t.dashboard.asOf} {time(balances.as_of_utc)}</p>
             </div>
           ) : (
             <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
@@ -276,7 +276,7 @@ export default function DashboardPage() {
                   <dd className="font-mono">{value}</dd>
                 </div>
               ))}
-              <p className="pt-2 text-xs text-zinc-500">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
+              <p className="pt-2 text-xs text-zinc-400">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
             </dl>
           ) : (
             <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
@@ -291,18 +291,18 @@ export default function DashboardPage() {
             ) : (
               <ul className="space-y-3">
                 {signals.signals.map((sig) => (
-                  <li key={sig.id} className="rounded-lg border border-zinc-800 p-3 text-sm">
-                    <div className="flex items-center justify-between">
+                  <li key={sig.id} className="rounded-lg border border-zinc-800 p-3.5 text-sm">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-mono font-semibold">{sig.symbol}</span>
-                      <span className={`font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
+                      <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
                     </div>
-                    <div className="mt-1 grid grid-cols-3 gap-1 font-mono text-xs text-zinc-400">
+                    <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-xs text-zinc-400 sm:grid-cols-3">
                       <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
                       <span>{t.dashboard.target} {money(sig.target_price)}</span>
                       <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-500">{sig.reason}</p>
-                    <p className="mt-1 text-[11px] text-zinc-600">
+                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
                       {sig.status} · {time(sig.created_utc)}
                     </p>
                   </li>
@@ -323,11 +323,11 @@ export default function DashboardPage() {
               <ul className="space-y-2 text-sm">
                 {strategies.map((s) => (
                   <li key={s.id} className="rounded-lg border border-zinc-800 p-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold">{s.name}</span>
-                      <span className="text-xs text-zinc-400">v{s.version} · {s.status}</span>
+                      <span className="shrink-0 text-xs text-zinc-400">v{s.version} · {s.status}</span>
                     </div>
-                    {s.notes && <p className="mt-1 text-xs text-zinc-500">{s.notes}</p>}
+                    {s.notes && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{s.notes}</p>}
                   </li>
                 ))}
               </ul>
@@ -354,18 +354,18 @@ export default function DashboardPage() {
             <span className="text-sm text-zinc-300">{scanning ? t.dashboard.running : t.dashboard.stopped}</span>
           </div>
           {isAdmin ? (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex gap-2.5">
             <button
               onClick={() => scanner("start")}
               disabled={scanning}
-              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t.dashboard.start}
             </button>
             <button
               onClick={() => scanner("stop")}
               disabled={!scanning}
-              className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+              className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t.dashboard.stop}
             </button>
@@ -383,13 +383,13 @@ export default function DashboardPage() {
                 value={sim.current}
                 disabled={!isAdmin}
                 onChange={(e) => changeMode(e.target.value)}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-[44px] w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sim.modes.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-3 text-xs leading-relaxed text-zinc-400">
                 {t.dashboard.realModePrefix} {sim.real_enabled ? t.dashboard.realModeOn : t.dashboard.realModeOff} {t.dashboard.realModeSuffix}
                 {!isAdmin && <> {t.dashboard.changeModeAdminOnly}</>}
               </p>
@@ -421,26 +421,26 @@ export default function DashboardPage() {
               <button
                 onClick={() => setConfirmKill(true)}
                 disabled={risk.kill_switch}
-                className="mt-4 w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-600 disabled:opacity-40"
+                className="mt-5 min-h-[44px] w-full rounded-lg bg-red-700 px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
               >
                 {risk.kill_switch ? t.dashboard.killActivated : t.dashboard.killSwitch}
               </button>
               )}
               {confirmKill && (
-                <div className="mt-3 rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm">
+                <div className="mt-4 rounded-lg border border-red-800 bg-red-950/50 p-3.5 text-sm leading-relaxed">
                   <p className="text-red-200">
                     {t.dashboard.killConfirmQ}
                   </p>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-3 flex gap-2.5">
                     <button
                       onClick={engageKillSwitch}
-                      className="flex-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500"
+                      className="min-h-[44px] flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                     >
                       {t.dashboard.confirm}
                     </button>
                     <button
                       onClick={() => setConfirmKill(false)}
-                      className="flex-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800"
+                      className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                     >
                       {t.dashboard.cancel}
                     </button>
@@ -477,7 +477,7 @@ export default function DashboardPage() {
                           <p className="mt-1 text-xs text-zinc-400">
                             {t.dashboard.quantity} {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
                           </p>
-                          <p className="mt-1 text-[11px] text-zinc-600">
+                          <p className="mt-1 text-xs text-zinc-500">
                             {time(typeof o["created_utc"] === "string" ? o["created_utc"] : null)}
                           </p>
                         </li>
@@ -521,7 +521,7 @@ export default function DashboardPage() {
               <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
                 {logs.map((l) => (
                   <li key={l.id} className="flex gap-2 font-mono">
-                    <span className="shrink-0 text-zinc-600">{time(l.created_utc)}</span>
+                    <span className="shrink-0 text-zinc-500">{time(l.created_utc)}</span>
                     <span className={`shrink-0 font-semibold ${
                       l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-500"
                     }`}>

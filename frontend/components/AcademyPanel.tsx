@@ -9,7 +9,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 const kindBadge: Record<string, string> = {
   ebook: "bg-sky-500/15 text-sky-300",
@@ -87,7 +87,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
 
   return (
     <div className="mt-3 border-t border-zinc-800 pt-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
         {t.academy.students} ({students === null ? "…" : students.length})
       </p>
       {loadError && (
@@ -96,32 +96,32 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
         </p>
       )}
       {students === null ? (
-        <p className="py-2 text-sm text-zinc-500">{t.academy.loadingStudents}</p>
+        <p className="py-2 text-sm text-zinc-400">{t.academy.loadingStudents}</p>
       ) : students.length === 0 && !loadError ? (
-        <p className="py-2 text-sm text-zinc-500">{t.academy.emptyStudents}</p>
+        <p className="py-2 text-sm text-zinc-400">{t.academy.emptyStudents}</p>
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {students.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
               <span className="font-semibold text-zinc-100">{s.contact_name}</span>
-              {s.contact_email && <span className="text-xs text-zinc-500">{s.contact_email}</span>}
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.purchased ? "bg-sky-500/15 text-sky-300" : "bg-zinc-500/15 text-zinc-400"}`}>
+              {s.contact_email && <span className="text-xs text-zinc-400">{s.contact_email}</span>}
+              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${s.purchased ? "bg-sky-500/15 text-sky-300" : "bg-zinc-500/15 text-zinc-400"}`}>
                 {s.purchased ? `${t.academy.purchased}${fmtDate(s.purchased_at, locale) ? ` · ${fmtDate(s.purchased_at, locale)}` : ""}` : t.academy.noPurchase}
               </span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.delivered ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${s.delivered ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
                 {s.delivered ? `${t.academy.delivered}${fmtDate(s.delivered_at, locale) ? ` · ${fmtDate(s.delivered_at, locale)}` : ""}` : t.academy.pendingDelivery}
               </span>
               {isAdmin && (
                 <span className="ml-auto flex gap-1.5">
                   <button
                     onClick={() => toggleDelivered(s)}
-                    className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                    className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {s.delivered ? t.academy.markUndelivered : t.academy.markDelivered}
                   </button>
                   <button
                     onClick={() => remove(s)}
-                    className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                    className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {t.academy.remove}
                   </button>
@@ -151,7 +151,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
           <button
             type="submit"
             disabled={busy || !contactId}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.academy.registerBusy : t.academy.register}
           </button>
@@ -187,7 +187,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
           key={`${d.course_id}-${d.filename}`}
           onClick={() => download(d)}
           disabled={busyId === d.course_id}
-          className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+          className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busyId === d.course_id
             ? t.academy.downloadBusy
@@ -234,11 +234,11 @@ export function AcademyPanel() {
 
       {courses === null ? (
         <Panel title={t.academy.loadingCatalogTitle}>
-          <p className="py-2 text-sm text-zinc-500">{t.academy.loading}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.academy.loading}</p>
         </Panel>
       ) : courses.length === 0 ? (
         <Panel title={t.academy.emptyTitle}>
-          <p className="py-2 text-sm text-zinc-500">{t.academy.emptyText}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.academy.emptyText}</p>
         </Panel>
       ) : (
         courses.map((c) => (
@@ -257,14 +257,14 @@ export function AcademyPanel() {
             }
           >
             {c.description && <p className="text-sm leading-relaxed text-zinc-300">{c.description}</p>}
-            <p className="mt-2 text-xs leading-relaxed text-zinc-500">{c.delivery_note}</p>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">{c.delivery_note}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {c.buy_url && (
                 <a
                   href={c.buy_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
                 >
                   {t.academy.buyLink}
                 </a>
@@ -272,7 +272,7 @@ export function AcademyPanel() {
               <DownloadButtons course={c} />
               <button
                 onClick={() => setOpenId(openId === c.id ? null : c.id)}
-                className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800"
+                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               >
                 {openId === c.id ? t.academy.hideStudents : `${t.academy.students} (${c.students_count})`}
               </button>

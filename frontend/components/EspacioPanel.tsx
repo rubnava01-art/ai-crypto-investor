@@ -7,7 +7,7 @@ import { AmbientSound } from "./AmbientSound";
 import { Panel } from "./Panel";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const fmtDate = (iso: string | null, locale: string) =>
   iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
@@ -106,21 +106,21 @@ function MeditationPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.espacio.meditationIntro}
       </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-center">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-center shadow-sm">
           <div
-            className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-teal-500/20 transition-transform duration-1000"
+            className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-teal-500/20 ring-1 ring-teal-500/30 transition-transform duration-1000"
             style={{ transform: `scale(${breathing ? circleScale : 1})` }}
           >
             <span className="text-lg font-semibold text-teal-200">
               {breathing ? phaseLabel : t.espacio.breatheIdle}
             </span>
           </div>
-          <p className="mt-3 text-sm text-zinc-400">
+          <p className="mt-3 text-sm leading-relaxed text-zinc-400">
             {breathing ? (
               <>
                 {phaseLeft}s · {t.espacio.cycle.replace("{nombre}", String(cycles + 1))}
@@ -132,17 +132,17 @@ function MeditationPanel() {
           <button
             type="button"
             onClick={breathing ? stopBreath : startBreath}
-            className="mt-3 w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500"
+            className="mt-4 min-h-[44px] w-full rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
           >
             {breathing ? t.espacio.stopBreath : t.espacio.startBreath}
           </button>
         </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-center">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-center shadow-sm">
           <p className="text-4xl font-bold tracking-wider text-zinc-100">
             {mm ?? `${timerMin}:00`}
           </p>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm leading-relaxed text-zinc-400">
             {timerDone ? t.espacio.timerDone : timerLeft !== null ? t.espacio.timerRunning : t.espacio.timerIdle}
           </p>
           <div className="mt-3 flex justify-center gap-2">
@@ -152,7 +152,7 @@ function MeditationPanel() {
                 type="button"
                 aria-pressed={timerMin === m}
                 onClick={() => { setTimerMin(m); setTimerLeft(null); setTimerDone(false); }}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${timerMin === m ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+                className={`min-h-[40px] rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${timerMin === m ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
               >
                 {m} {t.espacio.min}
               </button>
@@ -161,7 +161,7 @@ function MeditationPanel() {
           <button
             type="button"
             onClick={timerLeft !== null && !timerDone ? stopTimer : startTimer}
-            className="mt-3 w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500"
+            className="mt-4 min-h-[44px] w-full rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
           >
             {timerLeft !== null && !timerDone ? t.espacio.stopTimer : t.espacio.startMeditation}
           </button>
@@ -238,19 +238,19 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.espacio.revelationsIntro}
         {!isAdmin && t.espacio.readOnly}
       </p>
 
       {isAdmin && (
-        <form onSubmit={add} className="space-y-2">
+        <form onSubmit={add} className="space-y-3">
           <input aria-label={t.espacio.titleAria} className={inputCls} placeholder={t.espacio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <textarea aria-label={t.espacio.textAria} className={inputCls} placeholder={t.espacio.textPlaceholder} value={text} onChange={(e) => setText(e.target.value)} rows={3} />
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+            className="min-h-[44px] w-full rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t.espacio.saving : t.espacio.saveRevelation}
           </button>
@@ -271,11 +271,11 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="text-sm font-semibold text-zinc-100">{r.title}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    <span className="text-xs text-zinc-600">{fmtDate(r.created_at, locale)}</span>
+                    <span className="text-xs text-zinc-500">{fmtDate(r.created_at, locale)}</span>
                     {isAdmin && (
                       <button
                         onClick={() => remove(r)}
-                        className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50"
+                        className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                       >
                         {t.espacio.delete}
                       </button>

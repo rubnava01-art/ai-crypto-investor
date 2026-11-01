@@ -6,7 +6,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
 
 /** Recomendaciones: el admin recomienda cursos de Estudiar y herramientas
  * de Crear. La lista empieza VACÍA — aquí nada se inventa. Prueba solo
@@ -97,13 +97,13 @@ export function RecomendacionesPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.recomendaciones.intro}
         {!isAdmin && t.recomendaciones.readonly}
       </p>
 
       {isAdmin && (
-        <form onSubmit={save} className="space-y-2">
+        <form onSubmit={save} className="space-y-3">
           <input aria-label={t.recomendaciones.titleAria} className={inputCls} placeholder={t.recomendaciones.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <textarea aria-label={t.recomendaciones.descAria} className={inputCls} placeholder={t.recomendaciones.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           <input aria-label={t.recomendaciones.urlAria} className={inputCls} placeholder={t.recomendaciones.urlPlaceholder} value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
@@ -118,12 +118,12 @@ export function RecomendacionesPanel() {
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="flex-1 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-amber-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {busy ? t.recomendaciones.saveBusy : editing ? t.recomendaciones.update : t.recomendaciones.publish}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                 {t.recomendaciones.cancelBtn}
               </button>
             )}
@@ -135,26 +135,26 @@ export function RecomendacionesPanel() {
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {rows === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.recomendaciones.loadingRecs}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.recomendaciones.loadingRecs}</p>
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">
+          <p className="py-2 text-sm text-zinc-400">
             {t.recomendaciones.emptyRecs}
           </p>
         ) : (
           <ul className="space-y-3">
             {rows.map((r) => (
-              <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
+              <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
+                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
                     {r.category === "curso" ? t.recomendaciones.catCourse : t.recomendaciones.catTool}
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{r.title}</span>
                   {isAdmin && (
                     <span className="ml-auto flex gap-2">
-                      <button onClick={() => startEdit(r)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => startEdit(r)} className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                         {t.recomendaciones.editBtn}
                       </button>
-                      <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                      <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                         {t.recomendaciones.deleteBtn}
                       </button>
                     </span>

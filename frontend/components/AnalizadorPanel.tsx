@@ -7,7 +7,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 function bandaCls(banda: AnalizarResponse["banda"]) {
   if (banda === "alto") return "bg-red-500/15 text-red-300 ring-red-500/40";
@@ -51,11 +51,11 @@ export function AnalizadorPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.analizador.intro}
       </p>
 
-      <form onSubmit={analizar} className="space-y-2">
+      <form onSubmit={analizar} className="space-y-3">
         <input
           aria-label={t.analizador.urlAria}
           className={inputCls}
@@ -70,7 +70,7 @@ export function AnalizadorPanel() {
         <button
           type="submit"
           disabled={busy || !url.trim()}
-          className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busy ? t.analizador.analyzeBusy : t.analizador.analyze}
         </button>
@@ -79,14 +79,14 @@ export function AnalizadorPanel() {
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {busy ? (
-          <p className="py-2 text-sm text-zinc-500">{t.analizador.analyzing}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.analizador.analyzing}</p>
         ) : resultado === null ? (
           <EmptyState text={t.analizador.empty} />
         ) : (
           <div className="space-y-4">
             <div>
-              <p className="text-base font-semibold text-zinc-100">{resultado.titulo}</p>
-              <p className="mt-1 break-all text-xs text-zinc-500">{resultado.final_url}</p>
+              <p className="text-lg font-semibold text-zinc-100">{resultado.titulo}</p>
+              <p className="mt-1 break-all text-xs text-zinc-400">{resultado.final_url}</p>
               <p className="mt-2 flex flex-wrap items-center gap-2">
                 <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${bandaCls(resultado.banda)}`}>
                   {resultado.etiqueta_banda}
@@ -97,24 +97,24 @@ export function AnalizadorPanel() {
               </p>
             </div>
 
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {resultado.indicadores.map((ind) => (
-                <li key={ind.nombre} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <li key={ind.nombre} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-zinc-200">{ind.nombre}</span>
                     <span className="text-sm text-zinc-100">{ind.valor}</span>
                     {ind.punto && (
-                      <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                      <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-300">
                         {t.analizador.pointBadge}
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-500">{ind.detalle}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">{ind.detalle}</p>
                 </li>
               ))}
             </ul>
 
-            <p className="text-xs leading-relaxed text-zinc-500">
+            <p className="text-xs leading-relaxed text-zinc-400">
               <span className="font-semibold text-zinc-300">{t.analizador.ruleLabel}</span>
               {resultado.regla}
             </p>

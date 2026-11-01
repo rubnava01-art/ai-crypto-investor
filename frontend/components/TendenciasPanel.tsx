@@ -6,10 +6,10 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 const linkBtnCls =
-  "flex items-center justify-between gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-800";
+  "flex items-center justify-between gap-2 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50";
 
 /** Tendencias: investiga palabras clave para tendencias y campañas.
  * Las preguntas son sugerencias REALES de autocompletado de Google
@@ -79,12 +79,12 @@ export function TendenciasPanel() {
   const renderGroup = (title: string, items: string[]) => (
     <div>
       <p className="mb-2 text-sm font-semibold text-zinc-100">
-        {title} <span className="font-normal text-zinc-500">({items.length})</span>
+        {title} <span className="font-normal text-zinc-400">({items.length})</span>
       </p>
       {items.length === 0 ? (
-        <p className="text-sm text-zinc-500">{t.tendencias.emptyGroup}</p>
+        <p className="text-sm text-zinc-400">{t.tendencias.emptyGroup}</p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {items.map((q) => (
             <li key={q} className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200">
               {q}
@@ -98,7 +98,7 @@ export function TendenciasPanel() {
   return (
     <div className="space-y-4">
       <Panel title={t.tendencias.panelTitle} badge={<span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">{t.tendencias.badge}</span>}>
-        <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+        <p className="mb-3 text-xs leading-relaxed text-zinc-400">
           {t.tendencias.intro}
         </p>
         <form onSubmit={research} className="flex flex-col gap-2 sm:flex-row">
@@ -113,7 +113,7 @@ export function TendenciasPanel() {
           <button
             type="submit"
             disabled={busy || !keyword.trim()}
-            className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.tendencias.researchBusy : t.tendencias.research}
           </button>
@@ -129,7 +129,7 @@ export function TendenciasPanel() {
             </p>
           )}
           <Panel title={t.tendencias.resultsTitle.replace("{palabra}", result.keyword)}>
-            <p className="mb-3 text-xs leading-relaxed text-zinc-500">{result.source_note}</p>
+            <p className="mb-3 text-xs leading-relaxed text-zinc-400">{result.source_note}</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {renderGroup(t.tendencias.groupEs, result.es)}
               {renderGroup(t.tendencias.groupEn, result.en)}
@@ -137,15 +137,15 @@ export function TendenciasPanel() {
           </Panel>
 
           <Panel title={t.tendencias.toolsTitle}>
-            <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+            <p className="mb-3 text-xs leading-relaxed text-zinc-400">
               {t.tendencias.toolsIntro}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {deepLinks.map((l) => (
                 <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className={linkBtnCls}>
                   <span>
                     {l.label}
-                    <span className="block text-xs font-normal text-zinc-500">{l.hint}</span>
+                    <span className="block text-xs font-normal text-zinc-400">{l.hint}</span>
                   </span>
                   <span aria-hidden="true">↗</span>
                 </a>
@@ -157,18 +157,18 @@ export function TendenciasPanel() {
 
       <Panel title={t.tendencias.recentTitle}>
         {recent.length === 0 ? (
-          <p className="text-sm text-zinc-500">{t.tendencias.emptyRecent}</p>
+          <p className="text-sm text-zinc-400">{t.tendencias.emptyRecent}</p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {recent.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
                   onClick={() => setKeyword(r.keyword)}
-                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                 >
                   {r.keyword}
-                  <span className="ml-2 text-xs text-zinc-500">
+                  <span className="ml-2 text-xs text-zinc-400">
                     {r.created_at ? new Date(r.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" }) : ""}
                   </span>
                 </button>

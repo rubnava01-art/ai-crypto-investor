@@ -8,12 +8,12 @@ export function Panel({ title, badge, children, accent }: {
 }) {
   return (
     <section
-      className={`rounded-xl border bg-zinc-900/70 p-4 sm:p-5 ${
+      className={`rounded-2xl border bg-zinc-900/70 p-5 shadow-sm sm:p-6 ${
         accent ? "border-red-800/60" : "border-zinc-800"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">{title}</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="min-w-0 flex-1 text-sm font-semibold uppercase leading-6 tracking-wider text-zinc-200">{title}</h2>
         {badge}
       </div>
       {children}

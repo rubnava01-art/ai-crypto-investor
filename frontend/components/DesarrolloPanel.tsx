@@ -14,7 +14,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
 
 
 /** Desarrollo digital: seguimiento de la adaptación digital de empresas.
@@ -79,9 +79,9 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
     <div className="mt-3 border-t border-zinc-800 pt-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.desarrollo.tasksHeading}</p>
       {tasks === null ? (
-        <p className="text-sm text-zinc-500">{t.desarrollo.loadingTasks}</p>
+        <p className="text-sm text-zinc-400">{t.desarrollo.loadingTasks}</p>
       ) : tasks.length === 0 ? (
-        <p className="text-sm text-zinc-500">{t.desarrollo.emptyTasks}</p>
+        <p className="text-sm text-zinc-400">{t.desarrollo.emptyTasks}</p>
       ) : (
         <ul className="space-y-1.5">
           {tasks.map((tk) => (
@@ -92,11 +92,11 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
                 disabled={!isAdmin}
                 onChange={() => toggle(tk)}
                 aria-label={t.desarrollo.markTask.replace("{titulo}", tk.title)}
-                className="h-4 w-4 accent-emerald-600"
+                className="h-5 w-5 shrink-0 accent-emerald-600"
               />
-              <span className={`flex-1 ${tk.done ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{tk.title}</span>
+              <span className={`flex-1 ${tk.done ? "text-zinc-400 line-through" : "text-zinc-200"}`}>{tk.title}</span>
               {isAdmin && (
-                <button onClick={() => remove(tk)} className="rounded border border-red-900/60 px-2 py-0.5 text-xs text-red-400 hover:bg-red-950/50">
+                <button onClick={() => remove(tk)} className="rounded border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                   {t.desarrollo.deleteBtn}
                 </button>
               )}
@@ -107,7 +107,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       {isAdmin && (
         <form onSubmit={add} className="mt-2 flex gap-2">
           <input aria-label={t.desarrollo.newTaskAria} className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.desarrollo.newTaskPlaceholder} maxLength={256} autoComplete="off" />
-          <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50">
+          <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50">
             {t.desarrollo.addTask}
           </button>
         </form>
@@ -208,13 +208,13 @@ export function DesarrolloPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-3 text-xs leading-relaxed text-zinc-400">
         {t.desarrollo.intro}
         {!isAdmin && t.desarrollo.readonly}
       </p>
 
       {isAdmin && (
-        <form onSubmit={save} className="space-y-2">
+        <form onSubmit={save} className="space-y-3">
           <input aria-label={t.desarrollo.projectAria} className={inputCls} placeholder={t.desarrollo.projectPlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-zinc-400">{t.desarrollo.companyLabel}</span>
@@ -241,7 +241,7 @@ export function DesarrolloPanel() {
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+            className="w-full rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.desarrollo.createBusy : t.desarrollo.create}
           </button>
@@ -252,28 +252,28 @@ export function DesarrolloPanel() {
 
       <div className="mt-4 space-y-3 border-t border-zinc-800 pt-3">
         {projects === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.desarrollo.loadingProjects}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.desarrollo.loadingProjects}</p>
         ) : projects.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">{t.desarrollo.emptyProjects}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.desarrollo.emptyProjects}</p>
         ) : (
           projects.map((p) => (
-            <article key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
+            <article key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{p.title}</span>
-                <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300">
+                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">
                   {stageLabel(p.stage)}
                 </span>
                 {p.contact_name && (
                   <span className="text-xs text-zinc-400">· {p.contact_name}</span>
                 )}
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-zinc-400">
                   {p.done_count}/{p.tasks_count} {t.desarrollo.tasksWord}
                 </span>
                 {isAdmin && (
                   <span className="ml-auto flex items-center gap-2">
                     <select
                       aria-label={t.desarrollo.stageOf.replace("{titulo}", p.title)}
-                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300"
+                      className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
                       value={p.stage}
                       onChange={(e) => changeStage(p, e.target.value as DigitalStage)}
                     >
@@ -283,7 +283,7 @@ export function DesarrolloPanel() {
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => remove(p)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                    <button onClick={() => remove(p)} className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                       {t.desarrollo.deleteBtn}
                     </button>
                   </span>

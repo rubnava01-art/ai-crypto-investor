@@ -10,7 +10,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-cyan-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60";
 
 const fmtDate = (iso: string | null, locale: string) =>
   iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
@@ -79,12 +79,12 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
     <Panel
       title={tt.correos.templatesTitle}
       badge={
-        <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
           {rows === null ? tt.correos.badgeLoading : tt.correos.templatesCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {tt.correos.templatesIntro1}
         {tt.correos.templatesTokens}
         {tt.correos.templatesIntro2}
@@ -92,11 +92,11 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
       </p>
 
       {isAdmin && (
-        <form onSubmit={add} className="space-y-2">
+        <form onSubmit={add} className="space-y-3">
           <input aria-label={tt.correos.templateNameAria} className={inputCls} placeholder={tt.correos.templateNamePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
           <input aria-label={tt.correos.subjectAria} className={inputCls} placeholder={tt.correos.subjectPlaceholder} value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
           <textarea aria-label={tt.correos.bodyAria} className={inputCls} placeholder={tt.correos.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
-          <button type="submit" disabled={busy || !name.trim()} className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50">
+          <button type="submit" disabled={busy || !name.trim()} className="min-h-[44px] w-full rounded-lg bg-cyan-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
             {busy ? tt.correos.saving : tt.correos.saveTemplate}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
@@ -104,7 +104,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
         </form>
       )}
 
-      <div className="mt-4 border-t border-zinc-800 pt-3">
+      <div className="mt-5 border-t border-zinc-800 pt-4">
         {rows === null ? (
           <p className="py-2 text-sm text-zinc-500">{tt.correos.loadingTemplates}</p>
         ) : rows.length === 0 ? (
@@ -119,10 +119,10 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
                   <span className="ml-auto flex items-center gap-2">
                     {isAdmin && (
                       <>
-                        <button onClick={() => onUse(t)} className="rounded-lg bg-cyan-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-cyan-500">
+                        <button onClick={() => onUse(t)} className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                           {tt.correos.use}
                         </button>
-                        <button onClick={() => remove(t)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                        <button onClick={() => remove(t)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                           {tt.correos.delete}
                         </button>
                       </>
@@ -232,17 +232,17 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
       <Panel
         title={t.correos.composerTitle}
         badge={
-          <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
             {t.correos.crmBadge}
           </span>
         }
       >
-        <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+        <p className="mb-4 text-sm leading-relaxed text-zinc-400">
           {t.correos.composerIntro}
           {!isAdmin && t.correos.composerIntroViewer}
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {contacts.length > 0 && (
             <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} aria-label={t.correos.crmContactAria}>
               <option value="">{t.correos.crmContactOption}</option>
@@ -251,13 +251,13 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
               ))}
             </select>
           )}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input aria-label={t.correos.manualNameAria} className={inputCls} placeholder={t.correos.manualNamePlaceholder} value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
             <input aria-label={t.correos.manualEmailAria} className={inputCls} placeholder={t.correos.manualEmailPlaceholder} value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
           </div>
 
           {contact && recovered && (
-            <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm leading-relaxed text-zinc-200">
+            <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm leading-relaxed text-zinc-200">
               <p className="font-semibold text-cyan-200">{t.correos.recoveredTitle.replace("{nombre}", contact.name)}</p>
               <p className="text-zinc-300">
                 {contact.phone && <>{t.correos.telLabel}{contact.phone} · </>}
@@ -275,24 +275,24 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
             </div>
           )}
 
-          <form onSubmit={save} className="space-y-2">
+          <form onSubmit={save} className="space-y-3">
             <input aria-label={t.correos.subjectAria2} className={inputCls} placeholder={t.correos.subjectPlaceholder2} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
             <textarea aria-label={t.correos.bodyAria2} className={inputCls} placeholder={t.correos.bodyPlaceholder2} value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50">
+              <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                 {t.correos.copyMail}
               </button>
               {gmailUrl ? (
-                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg bg-cyan-600 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-cyan-500">
+                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-cyan-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                   {t.correos.openGmail}
                 </a>
               ) : (
-                <button type="button" disabled className="flex-1 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-500 disabled:opacity-50">
+                <button type="button" disabled className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-400 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                   {t.correos.missingEmail}
                 </button>
               )}
               {isAdmin && (
-                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
+                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {busy ? t.correos.saving : t.correos.saveToLog}
                 </button>
               )}
@@ -347,12 +347,12 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
     <Panel
       title={t.correos.logsTitle}
       badge={
-        <span className="rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
           {rows === null ? t.correos.badgeLoading : t.correos.logsCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.correos.logsIntro}
       </p>
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
@@ -370,16 +370,16 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
                 <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${r.status === "enviado" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
                   {r.status === "enviado" ? t.correos.sentLabel : t.correos.preparedLabel}
                 </span>
-                {r.template_name && <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-300">{r.template_name}</span>}
+                {r.template_name && <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{r.template_name}</span>}
                 <span className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-zinc-600">{fmtDate(r.created_at, locale)}</span>
+                  <span className="text-xs text-zinc-500">{fmtDate(r.created_at, locale)}</span>
                   {isAdmin && r.status === "preparado" && (
-                    <button onClick={() => changeStatus(r, "enviado")} className="rounded-lg border border-emerald-900/60 px-2.5 py-1 text-xs text-emerald-400 hover:bg-emerald-950/50">
+                    <button onClick={() => changeStatus(r, "enviado")} className="rounded-lg border border-emerald-900/60 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                       {t.correos.markSent}
                     </button>
                   )}
                   {isAdmin && (
-                    <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                    <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                       {t.correos.delete}
                     </button>
                   )}

@@ -5,7 +5,7 @@ import { api, ApiError, type MeResponse, type UserProfile } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 transition-colors hover:border-zinc-600 focus:border-emerald-500 focus:outline-none";
 
 const MAX_AVATAR_BYTES = 500 * 1024;
 
@@ -104,7 +104,7 @@ export function ProfileEditor({
             type="button"
             onClick={onClose}
             aria-label={t.perfil.closeAria}
-            className="rounded-lg border border-zinc-700 px-2.5 py-1 text-sm text-zinc-300 hover:bg-zinc-800"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
           >
             ✕
           </button>
@@ -113,9 +113,9 @@ export function ProfileEditor({
         <div className="flex items-center gap-3">
           {avatar && !avatarRemoved ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt={t.perfil.photoAlt} className="h-14 w-14 shrink-0 rounded-full object-cover" />
+            <img src={avatar} alt={t.perfil.photoAlt} className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-zinc-700" />
           ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-bold text-white">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-bold text-white ring-1 ring-emerald-500/50">
               {(displayName || initial.username).slice(0, 1).toUpperCase()}
             </span>
           )}
@@ -126,14 +126,14 @@ export function ProfileEditor({
                 type="file"
                 accept="image/png,image/jpeg,image/gif,image/webp"
                 onChange={(e) => onPhoto(e.target.files?.[0])}
-                className="w-full text-xs text-zinc-400"
+                className="w-full text-xs leading-relaxed text-zinc-400"
               />
             </label>
             {(avatar || avatarRemoved) && (
               <button
                 type="button"
                 onClick={() => { setAvatar(null); setAvatarRemoved(true); }}
-                className="mt-1 text-xs font-semibold text-red-400 hover:underline"
+                className="mt-1 inline-block py-1 text-xs font-semibold text-red-400 hover:text-red-300 hover:underline"
               >
                 {t.perfil.removePhoto}
               </button>
@@ -154,21 +154,21 @@ export function ProfileEditor({
           <textarea className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} rows={2} placeholder={t.perfil.addressPlaceholder} autoComplete="street-address" />
         </label>
 
-        {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        {msg && <p role="status" className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm leading-relaxed text-emerald-400">{msg}</p>}
+        {error && <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-400">{error}</p>}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 pt-1">
           <button
             type="submit"
             disabled={busy}
-            className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:opacity-50"
           >
             {busy ? t.perfil.saving : t.perfil.saveProfile}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+            className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
           >
             {t.common.close}
           </button>
@@ -214,7 +214,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t.perfil.menuAria}
-        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-500"
+        className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-600 text-base font-bold text-white shadow-sm ring-1 ring-emerald-500/50 transition-colors hover:bg-emerald-500"
       >
         {profile?.avatar_data_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -224,23 +224,23 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         )}
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl">
+        <div role="menu" aria-label={t.perfil.menuAria} className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
           <div className="border-b border-zinc-800 px-4 py-3">
             <p className="truncate text-sm font-semibold text-zinc-100">{displayName}</p>
             <p className="truncate text-xs text-zinc-500">{me?.username}</p>
-            <p className="text-xs text-zinc-500">{roleText}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{roleText}</p>
           </div>
           <button
             role="menuitem"
             onClick={() => { setOpen(false); setEditing(true); }}
-            className="block w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+            className="block w-full px-4 py-3 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
           >
             {t.perfil.title}
           </button>
           <button
             role="menuitem"
             onClick={() => { setOpen(false); onLogout(); }}
-            className="block w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+            className="block w-full px-4 py-3 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
           >
             {t.common.logout}
           </button>
@@ -260,7 +260,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
           onClick={() => setEditing(false)}
         >
-          <p className="rounded-2xl border border-zinc-700 bg-zinc-900 px-6 py-4 text-sm text-zinc-300">
+          <p className="rounded-2xl border border-zinc-700 bg-zinc-900 px-6 py-4 text-sm leading-relaxed text-zinc-300 shadow-xl">
             {t.perfil.editorLoadFailed}
           </p>
         </div>

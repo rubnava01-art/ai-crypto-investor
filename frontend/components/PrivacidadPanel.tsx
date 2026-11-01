@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { Panel } from "./Panel";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const CATEGORY_ORDER: ComplianceCategory[] = [
   "documentos",
@@ -157,19 +157,19 @@ export function PrivacidadPanel() {
         </span>
       }
     >
-      <p className="mb-3 text-xs leading-relaxed text-zinc-500">
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.privacidad.intro}
         {!isAdmin && t.privacidad.readOnly}
       </p>
 
       {isAdmin && (
-        <form onSubmit={save} className="space-y-2">
+        <form onSubmit={save} className="space-y-3">
           <input aria-label={t.privacidad.titleAria} className={inputCls} placeholder={t.privacidad.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
           <textarea aria-label={t.privacidad.descAria} className={inputCls} placeholder={t.privacidad.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           <textarea aria-label={t.privacidad.notesAria} className={inputCls} placeholder={t.privacidad.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.privacidad.groupLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.privacidad.groupLabel}</span>
               <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as ComplianceCategory)}>
                 {CATEGORY_ORDER.map((c) => (
                   <option key={c} value={c}>{categoryLabel(c)}</option>
@@ -177,7 +177,7 @@ export function PrivacidadPanel() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.privacidad.statusLabel}</span>
+              <span className="mb-1 block text-xs font-medium text-zinc-300">{t.privacidad.statusLabel}</span>
               <select className={inputCls} value={statusValue} onChange={(e) => setStatusValue(e.target.value as ComplianceStatus)}>
                 <option value="pendiente">{t.privacidad.statusPendiente}</option>
                 <option value="en_proceso">{t.privacidad.statusEnProceso}</option>
@@ -189,12 +189,12 @@ export function PrivacidadPanel() {
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="flex-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.privacidad.saving : editing ? t.privacidad.updateTask : t.privacidad.saveTask}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+              <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                 {t.privacidad.cancel}
               </button>
             )}
@@ -207,7 +207,7 @@ export function PrivacidadPanel() {
       <div className="mt-4 flex flex-wrap gap-1.5">
         <button
           onClick={() => setFilter("todas")}
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === "todas" ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+          className={`min-h-[36px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === "todas" ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
         >
           {t.privacidad.allFilter}
         </button>
@@ -215,7 +215,7 @@ export function PrivacidadPanel() {
           <button
             key={c}
             onClick={() => setFilter(c)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === c ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+            className={`min-h-[36px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === c ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
           >
             {categoryLabel(c)}
           </button>
@@ -230,12 +230,12 @@ export function PrivacidadPanel() {
         ) : (
           <ul className="space-y-3">
             {visible.map((item) => (
-              <li key={item.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5">
+              <li key={item.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-zinc-500/15 px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
+                  <span className="rounded-full bg-zinc-500/15 px-2.5 py-1 text-xs font-semibold text-zinc-200">
                     {categoryLabel(item.category)}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusCls(item.status)}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusCls(item.status)}`}>
                     {statusLabel(item.status)}
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{item.title}</span>
@@ -243,7 +243,7 @@ export function PrivacidadPanel() {
                     <span className="ml-auto flex flex-wrap gap-2">
                       <select
                         aria-label={t.privacidad.changeStatusAria}
-                        className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+                        className="min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         value={item.status}
                         onChange={(e) => quickStatus(item, e.target.value as ComplianceStatus)}
                       >
@@ -251,10 +251,10 @@ export function PrivacidadPanel() {
                         <option value="en_proceso">{t.privacidad.statusEnProceso}</option>
                         <option value="completado">{t.privacidad.statusCompletado}</option>
                       </select>
-                      <button onClick={() => startEdit(item)} className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                      <button onClick={() => startEdit(item)} className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.privacidad.edit}
                       </button>
-                      <button onClick={() => remove(item)} className="rounded-lg border border-red-900/60 px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50">
+                      <button onClick={() => remove(item)} className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.privacidad.delete}
                       </button>
                     </span>

@@ -31,7 +31,7 @@ import { useLanguage } from "../lib/i18n";
 type SoundId = "blanco" | "lluvia" | "tonos";
 
 const selectCls =
-  "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-teal-500 focus:outline-none";
+  "mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 focus:border-teal-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 export function AmbientSound() {
   const { t } = useLanguage();
@@ -128,9 +128,9 @@ export function AmbientSound() {
   const current = SOUNDS.find((s) => s.id === sound) ?? SOUNDS[0];
 
   return (
-    <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <p className="text-sm font-semibold text-zinc-100">{t.ambient.title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+    <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-5 shadow-sm">
+      <p className="text-base font-semibold leading-snug text-zinc-100">{t.ambient.title}</p>
+      <p className="mt-1 text-sm leading-relaxed text-zinc-400">
         {t.ambient.intro}
       </p>
 
@@ -146,7 +146,7 @@ export function AmbientSound() {
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="sonido-ambiental" className="text-xs font-semibold text-zinc-400">
+          <label htmlFor="sonido-ambiental" className="text-xs font-semibold text-zinc-300">
             {t.ambient.soundLabel}
           </label>
           <select
@@ -162,17 +162,17 @@ export function AmbientSound() {
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-zinc-500">{current.hint}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{current.hint}</p>
         </div>
 
         <div>
-          <label htmlFor="volumen-ambiental" className="text-xs font-semibold text-zinc-400">
+          <label htmlFor="volumen-ambiental" className="text-xs font-semibold text-zinc-300">
             {t.ambient.volume.replace("{nombre}", String(volume))}
           </label>
           <input
             id="volumen-ambiental"
             aria-label={t.ambient.volumeAria}
-            className="mt-2 w-full accent-teal-500"
+            className="mt-2 w-full cursor-pointer py-2 accent-teal-500"
             type="range"
             min={0}
             max={100}
@@ -186,12 +186,12 @@ export function AmbientSound() {
           Reproducir solo activo cuando no suena, Detener solo activo
           cuando suena. Así el estado queda claro sin depender del texto
           de un solo botón que cambia. */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => play(sound)}
           disabled={playing}
-          className="rounded-lg bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[44px] rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {t.ambient.play}
         </button>
@@ -199,7 +199,7 @@ export function AmbientSound() {
           type="button"
           onClick={stop}
           disabled={!playing}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {t.ambient.stop}
         </button>
@@ -222,7 +222,7 @@ export function AmbientSound() {
             {t.ambient.playing.replace("{nombre}", current.label)} · {t.ambient.volumeWord} {volume}%
           </span>
         ) : (
-          <span className="text-zinc-500">{t.ambient.stopped}</span>
+          <span className="text-zinc-400">{t.ambient.stopped}</span>
         )}
       </p>
       {error && (

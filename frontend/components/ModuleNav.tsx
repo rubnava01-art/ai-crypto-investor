@@ -215,7 +215,7 @@ export function ModuleNav() {
       .catch(() => setIsAdmin(false));
   }, []);
   return (
-    <nav aria-label={t.header.navAria} className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
+    <nav aria-label={t.header.navAria} className="flex gap-2 overflow-x-auto pb-2 sm:flex-wrap sm:pb-1">
       {MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin).map((m) => {
         const navText = t.nav[KEY_BY_HREF[m.href]];
         const label = navText?.label ?? m.label;
@@ -228,13 +228,13 @@ export function ModuleNav() {
             aria-current={active ? "page" : undefined}
             className={
               active
-                ? "flex items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
-                : "flex items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800"
+                ? "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-emerald-500/50 transition-colors"
+                : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
             }
           >
             {m.icon}
             {label}
-            <span className={`hidden text-xs font-normal sm:inline ${active ? "text-emerald-100/80" : "text-zinc-500"}`}>
+            <span className={`hidden text-xs font-normal sm:inline ${active ? "text-emerald-100/90" : "text-zinc-400"}`}>
               {hint}
             </span>
           </Link>

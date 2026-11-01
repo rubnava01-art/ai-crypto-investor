@@ -33,8 +33,8 @@ export function ModuleShell({
 
   if (!checked) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        <p className="text-sm text-zinc-400">{t.shell.loading}</p>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <p role="status" className="text-sm text-zinc-400">{t.shell.loading}</p>
       </main>
     );
   }
@@ -45,15 +45,15 @@ export function ModuleShell({
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
+        <div className="min-w-0">
+          <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+            <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
             {t.header.brand}
           </p>
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{moduleTitle}</h1>
-          <p className="text-sm text-zinc-400">{subtitle}</p>
+          <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">{moduleTitle}</h1>
+          <p className="mt-0.5 text-sm leading-relaxed text-zinc-400">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />
@@ -61,7 +61,7 @@ export function ModuleShell({
         </div>
       </header>
 
-      <div className="mb-6">
+      <div className="mb-6 sm:mb-8">
         <ModuleNav />
       </div>
 
