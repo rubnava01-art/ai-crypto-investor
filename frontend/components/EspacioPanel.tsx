@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, type MeResponse, type Revelation } from "../lib/api";
+import { api, ApiError, type EmotionEntry, type MeResponse, type Revelation } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { AmbientSound } from "./AmbientSound";
 import { Panel } from "./Panel";
@@ -292,6 +292,210 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Manejo de emociones: registro diario manual (patrón Monitor de      */
+/* Emociones). Misma persistencia que las revelaciones: backend,      */
+/* lectura para cualquier autenticado, escritura solo admin. Nada se   */
+/* genera solo: cada registro lo escribe el usuario.                  */
+/* ------------------------------------------------------------------ */
+
+const EMOTION_OPTIONS = [
+  { id: "tranquilo", key: "emotionCalm" },
+  { id: "contento", key: "emotionHappy" },
+  { id: "estresado", key: "emotionStressed" },
+  { id: "cansado", key: "emotionTired" },
+  { id: "motivado", key: "emotionMotivated" },
+  { id: "triste", key: "emotionSad" },
+  { id: "ansioso", key: "emotionAnxious" },
+  { id: "agradecido", key: "emotionGrateful" },
+] as const;
+
+function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const emotionLabel = (id: string) => {
+    const opt = EMOTION_OPTIONS.find((o) => o.id === id);
+    return opt ? (t.espacio[opt.key] as string) : id;
+  };
+  const [rows, setRows] = useState<EmotionEntry[] | null>(null);
+  const [emotion, setEmotion] = useState<string>(EMOTION_OPTIONS[0].id);
+  const [intensity, setIntensity] = useState(3);
+  const [note, setNote] = useState("");
+  const [editing, setEditing] = useState<EmotionEntry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await api.listEmotions());
+    } catch {
+      setRows([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resetForm = () => {
+    setEmotion(EMOTION_OPTIONS[0].id);
+    setIntensity(3);
+    setNote("");
+    setEditing(null);
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      if (editing) {
+        await api.updateEmotion(editing.id, { emotion, intensity, note });
+      } else {
+        await api.createEmotion({ emotion, intensity, note });
+      }
+      setMsg(t.espacio.savedEmotion);
+      resetForm();
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.espacio.saveError);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (r: EmotionEntry) => {
+    if (!window.confirm(t.espacio.deleteEmotionConfirm.replace("{nombre}", emotionLabel(r.emotion)))) return;
+    setError(null);
+    try {
+      await api.deleteEmotion(r.id);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t.espacio.deleteError);
+    }
+  };
+
+  return (
+    <Panel
+      title={t.espacio.emotionsTitle}
+      badge={
+        <span className="rounded-full bg-teal-500/15 px-2.5 py-1 text-xs font-semibold text-teal-300">
+          {rows === null ? t.espacio.loading : t.espacio.emotionsCount.replace("{nombre}", String(rows.length))}
+        </span>
+      }
+    >
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
+        {t.espacio.emotionsIntro}
+        {!isAdmin && t.espacio.readOnly}
+      </p>
+
+      {isAdmin && (
+        <form onSubmit={save} className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="emocion-registro" className="text-xs font-semibold text-zinc-300">
+                {t.espacio.emotionAria}
+              </label>
+              <select
+                id="emocion-registro"
+                aria-label={t.espacio.emotionAria}
+                className={`${inputCls} mt-1`}
+                value={emotion}
+                onChange={(e) => setEmotion(e.target.value)}
+              >
+                {EMOTION_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {t.espacio[o.key] as string}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <p id="intensidad-etiqueta" className="text-xs font-semibold text-zinc-300">
+                {t.espacio.intensityLabel.replace("{nombre}", String(intensity))}
+              </p>
+              <div className="mt-1 flex gap-1.5" role="group" aria-labelledby="intensidad-etiqueta">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-pressed={intensity === n}
+                    aria-label={`${t.espacio.intensityAria}: ${n}`}
+                    onClick={() => setIntensity(n)}
+                    className={`min-h-[44px] min-w-[44px] rounded-lg px-2 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${intensity === n ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <textarea aria-label={t.espacio.noteAria} className={inputCls} placeholder={t.espacio.notePlaceholder} value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="min-h-[44px] flex-1 rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? t.espacio.saving : editing ? t.espacio.updateEmotion : t.espacio.saveEmotion}
+            </button>
+            {editing && (
+              <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                {t.espacio.cancelEdit}
+              </button>
+            )}
+          </div>
+          {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        </form>
+      )}
+
+      <div className="mt-4 border-t border-zinc-800 pt-3">
+        {rows === null ? (
+          <p className="py-2 text-sm text-zinc-500">{t.espacio.loadingEmotions}</p>
+        ) : rows.length === 0 ? (
+          <p className="py-2 text-sm text-zinc-500">{t.espacio.emptyEmotions}</p>
+        ) : (
+          <ul className="divide-y divide-zinc-800/70">
+            {rows.map((r) => (
+              <li key={r.id} className="py-3">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-sm font-semibold text-zinc-100">{emotionLabel(r.emotion)}</span>
+                  <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[11px] font-semibold text-teal-300">
+                    {t.espacio.intensityLabel.replace("{nombre}", String(r.intensity))}
+                  </span>
+                  <span className="ml-auto flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">{fmtDate(r.created_at, locale)}</span>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => { setEditing(r); setEmotion(r.emotion); setIntensity(r.intensity); setNote(r.note); }}
+                          className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                        >
+                          {t.espacio.editEmotion}
+                        </button>
+                        <button
+                          onClick={() => remove(r)}
+                          className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                        >
+                          {t.espacio.delete}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {r.note && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-200">{r.note}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 export function EspacioPanel() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
@@ -303,6 +507,7 @@ export function EspacioPanel() {
   return (
     <div className="space-y-4">
       <MeditationPanel />
+      <EmotionsPanel isAdmin={isAdmin} />
       <RevelationsPanel isAdmin={isAdmin} />
     </div>
   );

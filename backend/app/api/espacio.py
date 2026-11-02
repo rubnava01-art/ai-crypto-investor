@@ -1,13 +1,16 @@
-"""Espacio — meditation and revelation journal.
+"""Espacio — meditation, revelation journal, and emotion check-ins.
 
-Two pieces:
+Three pieces:
 1. Meditación: breathing exercise + timer, fully client-side in the
    frontend — no backend state, no data stored.
 2. Revelaciones: a personal journal. Entries are written by Rubén
    himself (reflections, ideas, lessons from meditation) — the system
    never generates or invents them.
+3. Emociones: manual emotion check-ins (how he feels, intensity 1-5,
+   optional note), following the Monitor de Emociones pattern — also
+   written only by him, never generated.
 
-Permissions: any authenticated user reads; only admins write/delete
+Permissions: any authenticated user reads; only admins write/edit/delete
 (require_admin -> 403 for prueba), mirroring the other modules.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
@@ -16,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
-from app.models.tables import Revelation, User
+from app.models.tables import EmotionEntry, Revelation, User
 
 router = APIRouter(prefix="/api/espacio", tags=["espacio"])
 
@@ -75,6 +78,92 @@ def delete_revelation(
     row = db.get(Revelation, rev_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Revelation not found")
+    db.delete(row)
+    db.commit()
+    return None
+
+
+class EmotionOut(BaseModel):
+    id: int
+    emotion: str
+    intensity: int
+    note: str
+    created_at: str | None = None
+
+
+class EmotionCreate(BaseModel):
+    emotion: str = Field(min_length=1, max_length=40)
+    intensity: int = Field(ge=1, le=5)
+    note: str = ""
+
+
+class EmotionUpdate(BaseModel):
+    emotion: str = Field(min_length=1, max_length=40)
+    intensity: int = Field(ge=1, le=5)
+    note: str = ""
+
+
+def _emo_out(r: EmotionEntry) -> EmotionOut:
+    return EmotionOut(
+        id=r.id,
+        emotion=r.emotion,
+        intensity=r.intensity,
+        note=r.note or "",
+        created_at=r.created_at.isoformat() if r.created_at else None,
+    )
+
+
+@router.get("/emotions", response_model=list[EmotionOut])
+def list_emotions(
+    user: User = Depends(get_current_user),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    rows = db.query(EmotionEntry).order_by(EmotionEntry.id.desc()).offset(offset).limit(limit).all()
+    return [_emo_out(r) for r in rows]
+
+
+@router.post("/emotions", response_model=EmotionOut, status_code=status.HTTP_201_CREATED)
+def create_emotion(
+    payload: EmotionCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = EmotionEntry(emotion=payload.emotion.strip(), intensity=payload.intensity, note=payload.note)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _emo_out(row)
+
+
+@router.put("/emotions/{emo_id}", response_model=EmotionOut)
+def update_emotion(
+    emo_id: int,
+    payload: EmotionUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(EmotionEntry, emo_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Emotion entry not found")
+    row.emotion = payload.emotion.strip()
+    row.intensity = payload.intensity
+    row.note = payload.note
+    db.commit()
+    db.refresh(row)
+    return _emo_out(row)
+
+
+@router.delete("/emotions/{emo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_emotion(
+    emo_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(EmotionEntry, emo_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Emotion entry not found")
     db.delete(row)
     db.commit()
     return None

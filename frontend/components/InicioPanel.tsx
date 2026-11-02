@@ -173,6 +173,40 @@ export function InicioPanel() {
         {t.inicio.intro}
       </p>
 
+      {/* Avance de la plataforma: línea de tiempo con las novedades
+          reales del sistema (lib/novedades.ts), de lo más reciente a
+          lo más antiguo. Si no hay ninguna, no se muestra nada: sin
+          texto de relleno ni avance inventado, y sin porcentajes. */}
+      {(() => {
+        const avances = novedadesOrdenadas();
+        if (avances.length === 0) return null;
+        return (
+          <section aria-label={t.inicio.progressTitle} className="mb-5 rounded-lg border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold text-zinc-100">{t.inicio.progressTitle}</h2>
+              <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                {t.inicio.progressCount.replace("{nombre}", String(avances.length))}
+              </span>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">{t.inicio.progressIntro}</p>
+            <ol className="mt-3 space-y-3 border-l-2 border-emerald-900/60 pl-4">
+              {avances.map((n) => (
+                <li key={`avance-${n.date}-${n.title}`}>
+                  <p className="text-xs text-zinc-500">{fmtDate(n.date)}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
+                    {n.title}
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                      {t.inicio.systemNews}
+                    </span>
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{n.body}</p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        );
+      })()}
+
       {isAdmin && (
         <form onSubmit={savePost} className="space-y-3">
           <input aria-label={t.inicio.titleAria} className={inputCls} placeholder={t.inicio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />

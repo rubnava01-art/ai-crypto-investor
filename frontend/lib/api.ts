@@ -549,6 +549,14 @@ export interface Revelation {
   created_at: string | null;
 }
 
+export interface EmotionEntry {
+  id: number;
+  emotion: string;
+  intensity: number;
+  note: string;
+  created_at: string | null;
+}
+
 // ---------- Clases (Estudiar) ----------
 
 export type EduClassKind = "grabada" | "envivo";
@@ -992,6 +1000,13 @@ export const api = {
     request<Revelation>("/api/espacio/revelations", { method: "POST", auth: true, body }),
   deleteRevelation: (id: number) =>
     request<void>(`/api/espacio/revelations/${id}`, { method: "DELETE", auth: true }),
+  listEmotions: () => request<EmotionEntry[]>("/api/espacio/emotions", { auth: true }),
+  createEmotion: (body: { emotion: string; intensity: number; note?: string }) =>
+    request<EmotionEntry>("/api/espacio/emotions", { method: "POST", auth: true, body }),
+  updateEmotion: (id: number, body: { emotion: string; intensity: number; note?: string }) =>
+    request<EmotionEntry>(`/api/espacio/emotions/${id}`, { method: "PUT", auth: true, body }),
+  deleteEmotion: (id: number) =>
+    request<void>(`/api/espacio/emotions/${id}`, { method: "DELETE", auth: true }),
   listInvoices: () => request<Invoice[]>("/api/facturas/invoices", { auth: true }),
   createInvoice: (body: { number?: string; client_name: string; client_email?: string; client_phone?: string; items: InvoiceItem[]; tax_rate?: number; notes?: string }) =>
     request<Invoice>("/api/facturas/invoices", { method: "POST", auth: true, body }),

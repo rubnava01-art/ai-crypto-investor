@@ -439,6 +439,26 @@ class Revelation(Base):
     )
 
 
+class EmotionEntry(Base):
+    """An emotion check-in in the Espacio module (manejo de emociones).
+
+    Mirrors Revelation: written by Rubén himself (how he feels, intensity
+    1-5, optional note) — never generated or invented by the system.
+    Any authenticated user reads; only admins write/edit/delete.
+    New table: create_all covers it, no migration needed.
+    """
+
+    __tablename__ = "emotion_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    emotion: Mapped[str] = mapped_column(String(40), nullable=False)
+    intensity: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Invoice(Base):
     """An invoice generated in the Facturas module.
 

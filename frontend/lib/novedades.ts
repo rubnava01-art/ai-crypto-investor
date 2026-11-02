@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-02",
+    title: "Avance en Inicio, emociones en Espacio y Espacio más rápido",
+    body: "Publicado el 2 de noviembre: Inicio muestra el avance de la plataforma con las novedades fechadas; Espacio suma manejo de emociones (cómo te sientes, intensidad y nota, con historial); Accesos con botones más grandes y accesibles; y Espacio ya no descarga el audio al abrir la página, solo al pulsar Reproducir. Sin cambios en permisos ni en el trading.",
+  },
+  {
     date: "2026-11-01",
     title: "La plataforma tiene una interfaz más profesional",
     body: "Publicado el 1 de noviembre: nueva interfaz PRO con mejor contraste, botones y campos de 44 px con foco visible, y mejor vista en móvil. Sin cambios en rutas, permisos ni en el trading.",

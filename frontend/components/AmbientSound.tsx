@@ -134,12 +134,16 @@ export function AmbientSound() {
         {t.ambient.intro}
       </p>
 
-      {/* Elemento de audio sin controles visibles; loop y precarga activos. */}
+      {/* Elemento de audio sin controles visibles. Sin src inicial ni
+          precarga (optimización 2026-11-02): con preload="auto" el
+          navegador descargaba 1.4 MB de MP3 al abrir Espacio aunque
+          nunca se tocara Reproducir. Ahora el audio se descarga solo
+          al tocar Reproducir — play() ya pone el src antes de
+          reproducir, así que la regla iOS del gesto sigue intacta. */}
       <audio
         ref={audioRef}
-        src={SOUNDS[0].src}
         loop
-        preload="auto"
+        preload="none"
         onError={onAudioError}
         aria-hidden="true"
       />

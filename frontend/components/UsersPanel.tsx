@@ -241,14 +241,16 @@ export function UsersPanel() {
                   <>
                     <button
                       onClick={() => approve(u)}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      aria-label={t.usuarios.approveTitle}
+                      className="min-h-[44px] rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                       title={t.usuarios.approveTitle}
                     >
                       {t.usuarios.activate}
                     </button>
                     <button
                       onClick={() => reject(u)}
-                      className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                      aria-label={t.usuarios.rejectTitle}
+                      className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                       title={t.usuarios.rejectTitle}
                     >
                       {t.usuarios.reject}
@@ -260,7 +262,8 @@ export function UsersPanel() {
                       meSuper && (
                         <button
                           onClick={() => setSuper(u, false)}
-                          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                          aria-label={t.usuarios.removeSuperTitle}
+                          className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                           title={t.usuarios.removeSuperTitle}
                         >
                           {t.usuarios.removeSuper}
@@ -270,7 +273,8 @@ export function UsersPanel() {
                       <>
                         <button
                           onClick={() => toggleRole(u)}
-                          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                          aria-label={t.usuarios.changeRoleTitle}
+                          className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                           title={t.usuarios.changeRoleTitle}
                         >
                           {u.is_admin ? t.usuarios.makeTrial : t.usuarios.makeAdmin}
@@ -278,7 +282,8 @@ export function UsersPanel() {
                         {meSuper && (
                           <button
                             onClick={() => setSuper(u, true)}
-                            className="rounded-lg border border-violet-900/60 px-3 py-1.5 text-xs text-violet-300 hover:bg-violet-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
+                            aria-label={t.usuarios.grantSuperTitle}
+                            className="min-h-[44px] rounded-lg border border-violet-900/60 px-3 py-1.5 text-xs text-violet-300 hover:bg-violet-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60"
                             title={t.usuarios.grantSuperTitle}
                           >
                             {t.usuarios.makeSuper}
@@ -292,14 +297,16 @@ export function UsersPanel() {
                         setPwValue("");
                         setPwTemp(null);
                       }}
-                      className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      aria-label={t.usuarios.pwTitle}
+                      className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                       title={t.usuarios.pwTitle}
                     >
                       {t.usuarios.pwButton}
                     </button>
                     <button
                       onClick={() => remove(u)}
-                      className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                      aria-label={t.usuarios.deleteTitle}
+                      className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                       title={t.usuarios.deleteTitle}
                     >
                       {t.usuarios.delete}
