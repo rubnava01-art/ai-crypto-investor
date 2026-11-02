@@ -63,3 +63,51 @@ def test_market_prices_exchange_down_serves_stale(client, monkeypatch):
     assert r.status_code == 200, r.text
     assert r.json()["stale"] is True
     assert len(r.json()["prices"]) == 4
+
+
+def test_market_prices_one_coin_down_keeps_others(client, monkeypatch):
+    """One coin's ticker failing must not blank the whole price list."""
+    _PRICES_CACHE["at"] = 0.0
+    _PRICES_CACHE["payload"] = None
+
+    def _partial_ticker(exchange, pair):
+        if pair == "ETH/USD":
+            raise ConnectionError("ETH feed down")
+        return _fake_ticker(exchange, pair)
+
+    monkeypatch.setattr(market_mod.exchanges, "fetch_ticker", _partial_ticker)
+    monkeypatch.setattr(market_mod.exchanges, "fetch_ohlcv", _fake_ohlcv)
+    headers = _auth_client(client)
+    r = client.get("/api/market/prices", headers=headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["stale"] is False
+    assert len(body["prices"]) == 4
+    by_symbol = {p["symbol"]: p for p in body["prices"]}
+    assert by_symbol["ETH"]["price_usd"] is None
+    assert by_symbol["BTC"]["price_usd"] == 50000.0
+
+
+def test_market_prices_cache_is_per_exchange(client, admin_headers, monkeypatch):
+    """A cached kraken payload must not answer a coinbase request."""
+    _PRICES_CACHE["at"] = 0.0
+    _PRICES_CACHE["payload"] = None
+
+    def _per_exchange_ticker(exchange, pair):
+        return {"last": 50000.0 if exchange == "kraken" else 60000.0, "percentage": 1.5}
+
+    monkeypatch.setattr(market_mod.exchanges, "fetch_ticker", _per_exchange_ticker)
+    monkeypatch.setattr(market_mod.exchanges, "fetch_ohlcv", _fake_ohlcv)
+    # Shared admin_headers fixture: a fresh login here would eat the
+    # suite-wide 10/min login budget and flake under a full run.
+    headers = admin_headers
+    first = client.get("/api/market/prices", headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["source"] == "kraken"
+    assert first.json()["prices"][0]["price_usd"] == 50000.0
+    # Within the 60s TTL: a different exchange must refetch, not reuse kraken's cache.
+    second = client.get("/api/market/prices?exchange=coinbase", headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["source"] == "coinbase"
+    assert second.json()["prices"][0]["price_usd"] == 60000.0
+    assert second.json()["stale"] is False

@@ -338,6 +338,7 @@ const DICT: Record<Lang, Dictionary> = {
       liveNote: "Precios en tiempo real (WebSocket público de Kraken) · cambio 24h cada minuto",
       publicNote: "Precios públicos de Kraken (solo lectura) · {time} UTC",
       staleNote: "Precios en caché (exchange no disponible) · {time} UTC — pueden estar desactualizados",
+      refresh: "Actualizar precios",
     },
     ai: {
       title: "Asistente IA",
@@ -816,6 +817,8 @@ const DICT: Record<Lang, Dictionary> = {
       commentAria: "Escribe un comentario",
       commentPlaceholder: "Escribe un comentario…",
       comment: "Comentar",
+      systemNews: "Actualización de la plataforma",
+      viewInInicio: "Ver en Inicio",
     },
     inventario: {
       title: "Inventario",
@@ -1150,6 +1153,7 @@ const DICT: Record<Lang, Dictionary> = {
       liveNote: "Real-time prices (public Kraken WebSocket) · 24h change every minute",
       publicNote: "Public Kraken prices (read-only) · {time} UTC",
       staleNote: "Cached prices (exchange unreachable) · {time} UTC — may be outdated",
+      refresh: "Refresh prices",
     },
     ai: {
       title: "AI assistant",
@@ -1628,6 +1632,8 @@ const DICT: Record<Lang, Dictionary> = {
       commentAria: "Write a comment",
       commentPlaceholder: "Write a comment…",
       comment: "Comment",
+      systemNews: "Platform update",
+      viewInInicio: "See in Home",
     },
     inventario: {
       title: "Inventory",

@@ -92,7 +92,7 @@ def _utcnow() -> str:
 def get_candles(
     symbol: str = Query("BTC/USD"),
     timeframe: str = Query("1h"),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, ge=1, le=500),
     exchange: str = Query(DEFAULT_EXCHANGE),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -200,10 +200,28 @@ def trigger_ingest(
 
 
 def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
-    """Real public prices for the top coins (no API keys needed)."""
+    """Real public prices for the top coins (no API keys needed).
+
+    Per-coin resilience: one coin's ticker failing must not blank the
+    whole list — that coin is reported with price None and the rest
+    still load.
+    """
     out: list[CoinPriceOut] = []
     for symbol, name, pair in MARKET_COINS:
-        t = exchanges.fetch_ticker(exchange, pair)
+        try:
+            t = exchanges.fetch_ticker(exchange, pair)
+        except Exception:  # noqa: BLE001 - one bad coin, not a failed endpoint
+            out.append(
+                CoinPriceOut(
+                    symbol=symbol,
+                    name=name,
+                    pair=pair,
+                    price_usd=None,
+                    change_24h_pct=None,
+                    sparkline_24h=[],
+                )
+            )
+            continue
         last = t.get("last")
         pct = t.get("percentage")
         spark: list[float] = []
@@ -232,17 +250,28 @@ def get_market_prices(
 ):
     """Live prices for the top coins from the exchange's public API.
 
-    Cached 60s. Serves stale cache (flagged) when the exchange is
-    unreachable; 503 only when there is nothing to show (never fake data).
+    Cached 60s per exchange. Serves stale cache (flagged) when the
+    exchange is unreachable; 503 only when there is nothing to show
+    (never fake data). The cache is only valid for the exchange that
+    filled it: a request for another exchange must refetch instead of
+    receiving the first exchange's prices under the wrong source.
     """
     now = time.monotonic()
-    if _PRICES_CACHE["payload"] is not None and now - _PRICES_CACHE["at"] < _PRICES_TTL_S:
+    if (
+        _PRICES_CACHE["payload"] is not None
+        and _PRICES_CACHE["payload"].get("source") == exchange
+        and now - _PRICES_CACHE["at"] < _PRICES_TTL_S
+    ):
         payload = _PRICES_CACHE["payload"]
         return MarketPricesResponse(**{**payload, "stale": False})
     try:
         prices = _fetch_market_prices(exchange)
+        if prices and all(p.price_usd is None for p in prices):
+            # Total failure is still an outage, not a live empty list:
+            # fall through to the stale-cache / 503 path below.
+            raise RuntimeError("all coin tickers failed")
     except Exception as e:  # noqa: BLE001 - surface as 503, never fake
-        if _PRICES_CACHE["payload"] is not None:
+        if _PRICES_CACHE["payload"] is not None and _PRICES_CACHE["payload"].get("source") == exchange:
             payload = _PRICES_CACHE["payload"]
             return MarketPricesResponse(**{**payload, "stale": True})
         raise HTTPException(

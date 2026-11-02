@@ -62,3 +62,14 @@ def test_ticker_unreachable_is_503(client, auth_headers):
     with patch("app.data.exchanges.fetch_ticker", side_effect=RuntimeError("down")):
         r = client.get("/api/market/ticker?symbol=BTC/USD", headers=auth_headers)
     assert r.status_code == 503
+
+
+def test_candles_rejects_nonpositive_limit(client, auth_headers):
+    # limit=-1 en SQLite significa "sin límite": sin ge=1 devolvería
+    # toda la tabla en vez de un 422.
+    for bad in ("0", "-5"):
+        r = client.get(
+            f"/api/market/candles?symbol=BTC/USD&limit={bad}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)

@@ -3,15 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
+import { novedadesOrdenadas, type NovedadSistema } from "../lib/novedades";
 import { Panel } from "./Panel";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 /** Inicio: noticias y actualizaciones de la plataforma como posts, con
- * comentarios. La lista empieza VACÍA — aquí nada se inventa. Solo el
- * administrador publica y edita posts; cualquier usuario autenticado
- * comenta, y borra solo sus propios comentarios (el admin, cualquiera). */
+ * comentarios. La lista de posts del administrador empieza VACÍA — aquí
+ * nada se inventa. Solo el administrador publica y edita posts; cualquier
+ * usuario autenticado comenta, y borra solo sus propios comentarios
+ * (el admin, cualquiera). ADEMÁS, la lista mezcla tarjetas del sistema
+ * (lib/novedades.ts): avances reales de la app que viajan dentro del
+ * frontend publicado, sin autor, sin comentarios y sin botones de
+ * editar/borrar — nunca se atribuyen al administrador ni al dueño. */
 export function InicioPanel() {
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
@@ -129,15 +134,38 @@ export function InicioPanel() {
     }
   };
 
-  const fmtDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "";
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "";
+    // Fecha sola (AAAA-MM-DD, como las novedades del sistema): construirla
+    // en hora local para que no se corra un día por la zona horaria.
+    const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    const d = soloFecha
+      ? new Date(Number(soloFecha[1]), Number(soloFecha[2]) - 1, Number(soloFecha[3]))
+      : new Date(iso);
+    return d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  // Lista mezclada: posts del administrador + novedades del sistema, de
+  // lo más reciente a lo más antiguo. Si el arreglo del sistema está
+  // vacío, no aparece ninguna sección del sistema.
+  type ItemLista =
+    | { kind: "admin"; post: HomePost }
+    | { kind: "system"; entry: NovedadSistema };
+  const items: ItemLista[] = [
+    ...(posts ?? []).map((p): ItemLista => ({ kind: "admin", post: p })),
+    ...novedadesOrdenadas().map((entry): ItemLista => ({ kind: "system", entry })),
+  ].sort((a, b) => {
+    const fa = a.kind === "admin" ? a.post.created_at ?? "" : a.entry.date;
+    const fb = b.kind === "admin" ? b.post.created_at ?? "" : b.entry.date;
+    return fa < fb ? 1 : fa > fb ? -1 : 0;
+  });
 
   return (
     <Panel
       title={t.inicio.title}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-          {posts === null ? t.inicio.loading : t.inicio.postsCount.replace("{nombre}", String(posts.length))}
+          {posts === null ? t.inicio.loading : t.inicio.postsCount.replace("{nombre}", String(items.length))}
         </span>
       }
     >
@@ -171,13 +199,29 @@ export function InicioPanel() {
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {posts === null ? (
           <p className="py-2 text-sm text-zinc-500">{t.inicio.loadingPosts}</p>
-        ) : posts.length === 0 ? (
+        ) : items.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
             {t.inicio.emptyPosts}
           </p>
         ) : (
           <ul className="space-y-4">
-            {posts.map((p) => {
+            {items.map((item) => {
+              if (item.kind === "system") {
+                const n = item.entry;
+                return (
+                  <li key={`sistema-${n.date}-${n.title}`} className="rounded-lg border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-lg font-semibold leading-snug text-zinc-100">{n.title}</span>
+                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                        {t.inicio.systemNews}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-zinc-400">{fmtDate(n.date)}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{n.body}</p>
+                  </li>
+                );
+              }
+              const p = item.post;
               const open = expanded.has(p.id);
               const rows = comments[p.id];
               return (

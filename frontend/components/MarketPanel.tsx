@@ -200,6 +200,13 @@ export function MarketPanel() {
               : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))}
         </p>
       )}
+      <button
+        type="button"
+        onClick={load}
+        className="mt-3 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:border-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+      >
+        {t.market.refresh}
+      </button>
     </Panel>
   );
 }
