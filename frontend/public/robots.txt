@@ -1,0 +1,8 @@
+# Gestión SEO 2026-11-03 (reel Peter Lead): no bloquear bots.
+# El fallo que señalaba el reel era un robots.txt que bloqueaba bots.
+# Aquí no se bloquea nada público; solo se excluye /api/ (no es contenido).
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://crypto-investor-web.onrender.com/sitemap.xml

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-03",
+    title: "SEO básico aplicado (reel Peter Lead)",
+    body: "Publicado el 3 de noviembre: robots.txt que no bloquea bots, sitemap con las entradas públicas, títulos y descripción con los servicios de la plataforma, analítica preparada (apagada hasta activar) y verificación de Search Console lista. La página de Google no aplica a la app.",
+  },
+  {
+    date: "2026-11-03",
     title: "Seguridad reforzada, estado persistente y UX reorganizada",
     body: "Publicado el 3 de noviembre: seguridad reforzada (contraseña mínima de 12, datos personales redactados para la demo, sandbox solo en staging, sin siembra de la demo en producción); kill switch, escáner y modo ahora persistentes; navegación reorganizada en 6 familias; y la diaria del 3 (validación del exchange y botón Actualizar con estado de carga). Trading real sigue apagado y las etiquetas de simulación intactas.",
   },
