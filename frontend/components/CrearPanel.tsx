@@ -6,7 +6,9 @@ import {
   type AIStatusResponse, type CopyDraft, type CopyPlatform, type CopyTone, type MeResponse, type TrendNote,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 import { LogoGenerator } from "./LogoGenerator";
 import { ShirtMockupGenerator } from "./ShirtMockupGenerator";
 
@@ -25,7 +27,9 @@ const fmtDate = (iso: string | null, locale: string) =>
   iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
 function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const tones: { value: CopyTone; label: string }[] = [
     { value: "directo", label: t.crear.toneDirecto },
@@ -45,14 +49,16 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      setDrafts(await api.listCopies());
+      const _load1 = await api.listCopies();
+      if (isCancelled()) return;
+      setDrafts(_load1);
     } catch {
       setDrafts([]);
     }
   }, []);
 
   useEffect(() => {
-    api.aiStatus().then(setAiStatus).catch(() => setAiStatus(null));
+    api.aiStatus().then((v) => { if (!isCancelled()) setAiStatus(v); }).catch(() => { if (!isCancelled()) setAiStatus(null); });
     load();
   }, [load]);
 
@@ -76,7 +82,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const remove = async (d: CopyDraft) => {
-    if (!window.confirm(t.crear.confirmDeleteCopy)) return;
+    if (!(await confirm(t.crear.confirmDeleteCopy))) return;
     setError(null);
     setMsg(null);
     try {
@@ -88,6 +94,8 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.crear.copyTitle}
       badge={
@@ -114,7 +122,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <form onSubmit={generate} className="space-y-3">
-          <input aria-label={t.crear.topicAria}
+          <Field label={t.crear.topicAria}><input aria-label={t.crear.topicAria}
             className={inputCls}
             placeholder={t.crear.topicPlaceholder}
             value={topic}
@@ -122,18 +130,18 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
             required
             maxLength={200}
             autoComplete="off"
-          />
+          /></Field>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <select className={inputCls} value={platform} onChange={(e) => setPlatform(e.target.value as CopyPlatform)} aria-label={t.crear.platformAria}>
+            <Field label={t.crear.platformAria}><select className={inputCls} value={platform} onChange={(e) => setPlatform(e.target.value as CopyPlatform)} aria-label={t.crear.platformAria}>
               {PLATFORMS.map((p) => (
                 <option key={p.value} value={p.value}>{t.crear.platformPrefix}{p.label}</option>
               ))}
-            </select>
-            <select className={inputCls} value={tone} onChange={(e) => setTone(e.target.value as CopyTone)} aria-label={t.crear.toneAria}>
+            </select></Field>
+            <Field label={t.crear.toneAria}><select className={inputCls} value={tone} onChange={(e) => setTone(e.target.value as CopyTone)} aria-label={t.crear.toneAria}>
               {tones.map((tn) => (
                 <option key={tn.value} value={tn.value}>{t.crear.tonePrefix}{tn.label}</option>
               ))}
-            </select>
+            </select></Field>
           </div>
           <button
             type="submit"
@@ -171,7 +179,7 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
                     {isAdmin && (
                       <button
                         onClick={() => remove(d)}
-                        className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                        className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         {t.crear.deleteBtn}
                       </button>
@@ -185,11 +193,14 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
     </Panel>
+    </>
   );
 }
 
 function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [trends, setTrends] = useState<TrendNote[] | null>(null);
   const [title, setTitle] = useState("");
@@ -200,7 +211,9 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      setTrends(await api.listTrends());
+      const _load2 = await api.listTrends();
+      if (isCancelled()) return;
+      setTrends(_load2);
     } catch {
       setTrends([]);
     }
@@ -228,7 +241,7 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const remove = async (tr: TrendNote) => {
-    if (!window.confirm(t.crear.confirmDeleteTrend.replace("{titulo}", tr.title))) return;
+    if (!(await confirm(t.crear.confirmDeleteTrend.replace("{titulo}", tr.title)))) return;
     setError(null);
     try {
       await api.deleteTrend(tr.id);
@@ -239,6 +252,8 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.crear.trendsTitle}
       badge={
@@ -268,7 +283,7 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
                 {isAdmin && (
                   <button
                     onClick={() => remove(tr)}
-                    className="ml-auto rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    className="min-h-[44px] ml-auto rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {t.crear.deleteBtn}
                   </button>
@@ -284,9 +299,9 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <form onSubmit={add} className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
           <p className="text-sm font-semibold text-zinc-200">{t.crear.newTrend}</p>
-          <input aria-label={t.crear.trendTitleAria} className={inputCls} placeholder={t.crear.trendTitlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <input aria-label={t.crear.sourceAria} className={inputCls} placeholder={t.crear.sourcePlaceholder} value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" />
-          <textarea aria-label={t.crear.summaryAria} className={inputCls} placeholder={t.crear.summaryPlaceholder} value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} />
+          <Field label={t.crear.trendTitleAria}><input aria-label={t.crear.trendTitleAria} className={inputCls} placeholder={t.crear.trendTitlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.crear.sourceAria}><input aria-label={t.crear.sourceAria} className={inputCls} placeholder={t.crear.sourcePlaceholder} value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" /></Field>
+          <Field label={t.crear.summaryAria}><textarea aria-label={t.crear.summaryAria} className={inputCls} placeholder={t.crear.summaryPlaceholder} value={summary} onChange={(e) => setSummary(e.target.value)} rows={2} /></Field>
           <button
             type="submit"
             disabled={busy || !title.trim()}
@@ -299,15 +314,17 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       )}
       {!isAdmin && error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </Panel>
+    </>
   );
 }
 
 export function CrearPanel() {
+  const isCancelled = useCancelled();
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
   }, []);
 
   return (

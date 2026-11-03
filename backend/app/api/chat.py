@@ -30,11 +30,14 @@ class ChatMessageCreate(BaseModel):
     text: str = Field(min_length=1, max_length=500)
 
 
-def _out(m: ChatMessage) -> ChatMessageOut:
+def _out(m: ChatMessage, redact_names: bool = False) -> ChatMessageOut:
+    # Decisión 6 (2026-11-02): la demo no ve nombres personales
+    # (display_name) de nadie; el texto del chat compartido queda visible
+    # por diseño, pero la etiqueta del autor cae al username.
     return ChatMessageOut(
         id=m.id,
         author_username=m.author_username,
-        author_label=m.author_label,
+        author_label=m.author_username if redact_names else m.author_label,
         text=m.text,
         created_at=m.created_at.isoformat() if m.created_at else None,
     )
@@ -51,7 +54,8 @@ def list_messages(
         .limit(MAX_MESSAGES)
         .all()
     )
-    return [_out(m) for m in reversed(rows)]
+    redact = not user.is_admin
+    return [_out(m, redact) for m in reversed(rows)]
 
 
 @router.post("/messages", response_model=ChatMessageOut, status_code=status.HTTP_201_CREATED)

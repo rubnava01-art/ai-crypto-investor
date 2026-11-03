@@ -11,9 +11,9 @@ def _admin(client):
 
 def _make_viewer(client):
     h = _admin(client)
-    r = client.post("/api/users", json={"username": "viewer1", "password": "viewerpass", "role": "prueba"}, headers=h)
+    r = client.post("/api/users", json={"username": "viewer1", "password": "viewerpass12", "role": "prueba"}, headers=h)
     assert r.status_code in (201, 409), r.text
-    return _login(client, "viewer1", "viewerpass")
+    return _login(client, "viewer1", "viewerpass12")
 
 
 def test_me_reports_role(client):
@@ -27,7 +27,7 @@ def test_me_reports_role(client):
 
 def test_admin_user_crud(client):
     h = _admin(client)
-    r = client.post("/api/users", json={"username": "nuevo", "password": "pass1234", "role": "prueba"}, headers=h)
+    r = client.post("/api/users", json={"username": "nuevo", "password": "pass1234abcd", "role": "prueba"}, headers=h)
     assert r.status_code == 201, r.text
     uid = r.json()["id"]
     assert r.json()["role"] == "prueba"
@@ -43,7 +43,7 @@ def test_admin_user_crud(client):
     r = client.delete(f"/api/users/{uid}", headers=h)
     assert r.status_code == 204
 
-    r = client.post("/api/users", json={"username": "admin", "password": "xxxx", "role": "prueba"}, headers=h)
+    r = client.post("/api/users", json={"username": "admin", "password": "xxxx12345678", "role": "prueba"}, headers=h)
     assert r.status_code == 409
 
 
@@ -58,7 +58,7 @@ def test_admin_cannot_delete_self_or_demote_self(client):
 def test_viewer_blocked_from_controls(client):
     h = _make_viewer(client)
     assert client.get("/api/users", headers=h).status_code == 403
-    assert client.post("/api/users", json={"username": "x1", "password": "pass1234"}, headers=h).status_code == 403
+    assert client.post("/api/users", json={"username": "x1", "password": "pass1234abcd"}, headers=h).status_code == 403
     assert client.post("/api/scanner/start", headers=h).status_code == 403
     assert client.post("/api/scanner/stop", headers=h).status_code == 403
     assert client.post("/api/simulation/mode", json={"mode": "paper"}, headers=h).status_code == 403

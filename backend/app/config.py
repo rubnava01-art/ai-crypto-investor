@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     real_trading_enabled: bool = False
     default_simulation_mode: str = "simulation"  # simulation | paper
 
+    # Demo accounts + sandbox (decisiones de Rubén 2026-11-02, las 6).
+    # seed_demo_accounts: siembra la cuenta demo "prueba" SOLO cuando es
+    # True Y el entorno no es producción. Por defecto False: en
+    # producción nunca se siembra, aunque la variable esté puesta.
+    # allow_sandbox: el modo sandbox solo funciona cuando es True
+    # (setup de staging explícito). En producción es 403 siempre.
+    seed_demo_accounts: bool = False
+    allow_sandbox: bool = False
+
     # Exchange API keys (Phase 5+). Read-only keys only: no withdrawal
     # permission + IP whitelist at the exchange. Never stored in the DB.
     kraken_api_key: str = ""
@@ -61,6 +70,38 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def build_git_sha() -> str:
+    """Identify the deployed build (Fase 3, M14/quick-win #3): Render
+    injects RENDER_GIT_COMMIT; GIT_SHA covers other hosts. Never a
+    hardcoded SHA, never a .git read at runtime (the container has no
+    .git): "unknown" when neither env var exists."""
+    return (
+        os.environ.get("GIT_SHA", "").strip()
+        or os.environ.get("RENDER_GIT_COMMIT", "").strip()
+        or "unknown"
+    )
+
+
+def build_timestamp_utc() -> str | None:
+    """Build timestamp when the deploy pipeline provides one
+    (BUILD_TIMESTAMP env); None otherwise — never invented."""
+    value = os.environ.get("BUILD_TIMESTAMP", "").strip()
+    return value or None
+
+
+def validate_cors_origins(cors_origins: str) -> None:
+    """Fail closed (Fase 3, M11): '*' combined with credentials makes
+    Starlette reflect ANY origin with credentials attached — the API
+    would be callable from any website with the user's token. Refuse
+    to start in that configuration instead of serving it."""
+    origins = [o.strip() for o in (cors_origins or "").split(",") if o.strip()]
+    if "*" in origins:
+        raise RuntimeError(
+            "Refusing to start: CORS_ORIGINS contains '*' with "
+            "allow_credentials=True. List explicit frontend origins."
+        )
 
 
 def assert_production_secrets(s: "Settings | None" = None) -> None:

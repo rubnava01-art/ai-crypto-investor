@@ -70,11 +70,11 @@ def viewer_headers(app, auth_headers):
     with TestClient(app) as c:
         r = c.post(
             "/api/users",
-            json={"username": "suiteviewer", "password": "viewerpass", "role": "prueba"},
+            json={"username": "suiteviewer", "password": "viewerpass12", "role": "prueba"},
             headers=auth_headers,
         )
         assert r.status_code in (201, 409), r.text
-        r = c.post("/api/auth/login", json={"username": "suiteviewer", "password": "viewerpass"})
+        r = c.post("/api/auth/login", json={"username": "suiteviewer", "password": "viewerpass12"})
         assert r.status_code == 200, r.text
         token = r.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

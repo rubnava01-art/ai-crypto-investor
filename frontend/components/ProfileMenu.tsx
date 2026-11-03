@@ -104,7 +104,7 @@ export function ProfileEditor({
             type="button"
             onClick={onClose}
             aria-label={t.perfil.closeAria}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
           >
             ✕
           </button>
@@ -185,6 +185,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => setMe(null));
@@ -199,6 +200,20 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
+  // Fase 5 (F2): Escape cierra el menú y devuelve el foco al botón que lo
+  // abrió (antes solo cerraba con clic fuera y el foco se perdía).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const displayName = profile?.display_name?.trim() || me?.username || "…";
   const initial = displayName.slice(0, 1).toUpperCase();
   // Demo-word cleanup (2026-10-28): the generic "modo demo" suffix is
@@ -210,6 +225,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -257,6 +273,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <div
           role="dialog"
           aria-modal="true"
+          aria-label={t.perfil.editorLoadFailedAria}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
           onClick={() => setEditing(false)}
         >

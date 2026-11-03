@@ -8,6 +8,8 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useAsyncLoad, useCancelled } from "../lib/useLoad";
+import { ApiErrorBanner, copyTextWithFallback, LoadMore, useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-cyan-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60";
@@ -26,7 +28,11 @@ function applyTokens(text: string, c: CrmContact | null, fallbackName: string) {
 
 function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: EmailTemplate) => void }) {
   const { t: tt } = useLanguage();
-  const [rows, setRows] = useState<EmailTemplate[] | null>(null);
+  const { confirm, dialog } = useConfirm(tt);
+  // Tri-estado (Fase 4, FE3/FE2): plantillas con useAsyncLoad.
+  const templatesLoad = useAsyncLoad<EmailTemplate[]>((signal) => api.listEmailTemplates({ signal }), []);
+  const rows = templatesLoad.data;
+  const templatesError = templatesLoad.error;
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -34,17 +40,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setRows(await api.listEmailTemplates());
-    } catch {
-      setRows([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const load = templatesLoad.reload;
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +62,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
   };
 
   const remove = async (t: EmailTemplate) => {
-    if (!window.confirm(tt.correos.confirmDeleteTemplate.replace("{nombre}", t.name))) return;
+    if (!(await confirm(tt.correos.confirmDeleteTemplate.replace("{nombre}", t.name)))) return;
     try {
       await api.deleteEmailTemplate(t.id);
       await load();
@@ -76,11 +72,13 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={tt.correos.templatesTitle}
       badge={
         <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
-          {rows === null ? tt.correos.badgeLoading : tt.correos.templatesCount.replace("{n}", String(rows.length))}
+          {rows === null ? (templatesError ? "—" : tt.correos.badgeLoading) : tt.correos.templatesCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
@@ -93,9 +91,9 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-3">
-          <input aria-label={tt.correos.templateNameAria} className={inputCls} placeholder={tt.correos.templateNamePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
-          <input aria-label={tt.correos.subjectAria} className={inputCls} placeholder={tt.correos.subjectPlaceholder} value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" />
-          <textarea aria-label={tt.correos.bodyAria} className={inputCls} placeholder={tt.correos.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <Field label={tt.correos.templateNameAria}><input aria-label={tt.correos.templateNameAria} className={inputCls} placeholder={tt.correos.templateNamePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={tt.correos.subjectAria}><input aria-label={tt.correos.subjectAria} className={inputCls} placeholder={tt.correos.subjectPlaceholder} value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" /></Field>
+          <Field label={tt.correos.bodyAria}><textarea aria-label={tt.correos.bodyAria} className={inputCls} placeholder={tt.correos.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} /></Field>
           <button type="submit" disabled={busy || !name.trim()} className="min-h-[44px] w-full rounded-lg bg-cyan-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
             {busy ? tt.correos.saving : tt.correos.saveTemplate}
           </button>
@@ -105,9 +103,10 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
       )}
 
       <div className="mt-5 border-t border-zinc-800 pt-4">
-        {rows === null ? (
+        {templatesError ? <ApiErrorBanner error={templatesError} t={tt} onRetry={templatesLoad.reload} /> : null}
+        {rows === null && !templatesError ? (
           <p className="py-2 text-sm text-zinc-500">{tt.correos.loadingTemplates}</p>
-        ) : rows.length === 0 ? (
+        ) : rows === null ? null : rows.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">{tt.correos.emptyTemplates}</p>
         ) : (
           <ul className="divide-y divide-zinc-800/70">
@@ -119,10 +118,10 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
                   <span className="ml-auto flex items-center gap-2">
                     {isAdmin && (
                       <>
-                        <button onClick={() => onUse(t)} className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+                        <button onClick={() => onUse(t)} className="min-h-[44px] rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                           {tt.correos.use}
                         </button>
-                        <button onClick={() => remove(t)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
+                        <button onClick={() => remove(t)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                           {tt.correos.delete}
                         </button>
                       </>
@@ -136,6 +135,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
         )}
       </div>
     </Panel>
+    </>
   );
 }
 
@@ -196,10 +196,9 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
     : null;
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(t.correos.copyText.replace("{nombre}", toName).replace("{email}", toEmail).replace("{asunto}", subject).replace("{cuerpo}", body));
+    if (await copyTextWithFallback(t.correos.copyText.replace("{nombre}", toName).replace("{email}", toEmail).replace("{asunto}", subject).replace("{cuerpo}", body))) {
       setMsg(t.correos.msgCopied);
-    } catch {
+    } else {
       setError(t.correos.errCopy);
     }
   };
@@ -244,16 +243,16 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
 
         <div className="space-y-3">
           {contacts.length > 0 && (
-            <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} aria-label={t.correos.crmContactAria}>
+            <Field label={t.correos.crmContactAria}><select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} aria-label={t.correos.crmContactAria}>
               <option value="">{t.correos.crmContactOption}</option>
               {contacts.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
+            </select></Field>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <input aria-label={t.correos.manualNameAria} className={inputCls} placeholder={t.correos.manualNamePlaceholder} value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" />
-            <input aria-label={t.correos.manualEmailAria} className={inputCls} placeholder={t.correos.manualEmailPlaceholder} value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" />
+            <Field label={t.correos.manualNameAria}><input aria-label={t.correos.manualNameAria} className={inputCls} placeholder={t.correos.manualNamePlaceholder} value={manualName} onChange={(e) => setManualName(e.target.value)} maxLength={200} autoComplete="off" /></Field>
+            <Field label={t.correos.manualEmailAria}><input aria-label={t.correos.manualEmailAria} className={inputCls} placeholder={t.correos.manualEmailPlaceholder} value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} maxLength={200} autoComplete="off" /></Field>
           </div>
 
           {contact && recovered && (
@@ -276,8 +275,8 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
           )}
 
           <form onSubmit={save} className="space-y-3">
-            <input aria-label={t.correos.subjectAria2} className={inputCls} placeholder={t.correos.subjectPlaceholder2} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" />
-            <textarea aria-label={t.correos.bodyAria2} className={inputCls} placeholder={t.correos.bodyPlaceholder2} value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
+            <Field label={t.correos.subjectAria2}><input aria-label={t.correos.subjectAria2} className={inputCls} placeholder={t.correos.subjectPlaceholder2} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" /></Field>
+            <Field label={t.correos.bodyAria2}><textarea aria-label={t.correos.bodyAria2} className={inputCls} placeholder={t.correos.bodyPlaceholder2} value={body} onChange={(e) => setBody(e.target.value)} required rows={5} /></Field>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                 {t.correos.copyMail}
@@ -308,21 +307,18 @@ function Composer({ isAdmin, onSaved, templateToUse, onTemplateApplied }: {
 
 function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: number }) {
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
-  const [rows, setRows] = useState<EmailLog[] | null>(null);
+  // Tri-estado (Fase 4, FE3/FE2): log con useAsyncLoad; refreshKey lo recarga.
+  const logsLoad = useAsyncLoad<EmailLog[]>((signal) => api.listEmailLogs({ signal }), [refreshKey]);
+  const rows = logsLoad.data;
+  const logsError = logsLoad.error;
   const [error, setError] = useState<string | null>(null);
+  // Render incremental en cliente (Fase 4, FE10): el backend no pagina el
+  // log, así que se muestran los primeros 20 y "cargar más" revela el resto.
+  const [logsVisible, setLogsVisible] = useState(20);
 
-  const load = useCallback(async () => {
-    try {
-      setRows(await api.listEmailLogs());
-    } catch {
-      setRows([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, refreshKey]);
+  const load = logsLoad.reload;
 
   const changeStatus = async (r: EmailLog, st: EmailLogStatus) => {
     try {
@@ -334,7 +330,7 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
   };
 
   const remove = async (r: EmailLog) => {
-    if (!window.confirm(t.correos.confirmDeleteLog.replace("{asunto}", r.subject))) return;
+    if (!(await confirm(t.correos.confirmDeleteLog.replace("{asunto}", r.subject)))) return;
     try {
       await api.deleteEmailLog(r.id);
       await load();
@@ -344,11 +340,13 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.correos.logsTitle}
       badge={
         <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
-          {rows === null ? t.correos.badgeLoading : t.correos.logsCount.replace("{n}", String(rows.length))}
+          {rows === null ? (logsError ? "—" : t.correos.badgeLoading) : t.correos.logsCount.replace("{n}", String(rows.length))}
         </span>
       }
     >
@@ -356,13 +354,15 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
         {t.correos.logsIntro}
       </p>
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-      {rows === null ? (
+      {logsError ? <ApiErrorBanner error={logsError} t={t} onRetry={logsLoad.reload} /> : null}
+      {rows === null && !logsError ? (
         <p className="py-2 text-sm text-zinc-500">{t.correos.loadingLogs}</p>
-      ) : rows.length === 0 ? (
+      ) : rows === null ? null : rows.length === 0 ? (
         <p className="py-2 text-sm text-zinc-500">{t.correos.emptyLogs}</p>
       ) : (
+        <>
         <ul className="divide-y divide-zinc-800/70">
-          {rows.map((r) => (
+          {rows.slice(0, logsVisible).map((r) => (
             <li key={r.id} className="py-3">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{r.subject || t.correos.noSubject}</span>
@@ -374,12 +374,12 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
                 <span className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-zinc-500">{fmtDate(r.created_at, locale)}</span>
                   {isAdmin && r.status === "preparado" && (
-                    <button onClick={() => changeStatus(r, "enviado")} className="rounded-lg border border-emerald-900/60 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                    <button onClick={() => changeStatus(r, "enviado")} className="min-h-[44px] rounded-lg border border-emerald-900/60 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                       {t.correos.markSent}
                     </button>
                   )}
                   {isAdmin && (
-                    <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
+                    <button onClick={() => remove(r)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                       {t.correos.delete}
                     </button>
                   )}
@@ -389,8 +389,16 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
             </li>
           ))}
         </ul>
+        <LoadMore
+          visible={logsVisible}
+          total={rows.length}
+          t={t}
+          onLoadMore={() => setLogsVisible((v) => v + 20)}
+        />
+        </>
       )}
     </Panel>
+    </>
   );
 }
 
@@ -399,10 +407,11 @@ export function CorreosPanel() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingTemplate, setPendingTemplate] = useState<EmailTemplate | null>(null);
   const isAdmin = !!me?.is_admin;
+  const isCancelled = useCancelled();
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-  }, []);
+    api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
+  }, [isCancelled]);
 
   return (
     <div className="space-y-4">

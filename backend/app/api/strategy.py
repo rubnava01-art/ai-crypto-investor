@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.rate_limit import strategy_limiter
 from app.core.security import get_current_user
 from app.data import ingest
 from app.database import get_db
@@ -38,6 +39,13 @@ def evaluate(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Per-USER limiter (M3): every evaluate writes a Signal +
+    # RiskDecision row and reads 200 candles — it used to be unlimited.
+    if not strategy_limiter.allow(f"strategy:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas evaluaciones. Espera un minuto.",
+        )
     candles = ingest.latest_candles(db, symbol, timeframe, 200)
     if len(candles) < 60:
         raise HTTPException(

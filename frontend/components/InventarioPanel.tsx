@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type InventoryItem, type InventoryUnit, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
+import { formatMoney } from "../lib/format";
+import { useCancelled } from "../lib/useLoad";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -14,7 +17,9 @@ const UNITS: InventoryUnit[] = ["pieza", "kg", "litro", "metro", "caja", "otro"]
  * inventa. Solo el administrador crea, edita y borra; prueba solo lee.
  * `Stock bajo` se calcula solo (cantidad <= stock mínimo). */
 export function InventarioPanel() {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [me, setMe] = useState<MeResponse | null>(null);
   const [items, setItems] = useState<InventoryItem[] | null>(null);
@@ -45,14 +50,16 @@ export function InventarioPanel() {
 
   const load = useCallback(async () => {
     try {
-      setItems(await api.listInventoryItems());
+      const _load1 = await api.listInventoryItems();
+      if (isCancelled()) return;
+      setItems(_load1);
     } catch {
       setItems([]);
     }
   }, []);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
     load();
   }, [load]);
 
@@ -116,7 +123,7 @@ export function InventarioPanel() {
   };
 
   const remove = async (it: InventoryItem) => {
-    if (!window.confirm(t.inventario.deleteConfirm.replace("{nombre}", it.name))) return;
+    if (!(await confirm(t.inventario.deleteConfirm.replace("{nombre}", it.name)))) return;
     setError(null);
     try {
       await api.deleteInventoryItem(it.id);
@@ -149,10 +156,12 @@ export function InventarioPanel() {
     setMinStock(String(it.min_stock));
   };
 
-  const fmtMoney = (v: number) =>
-    v.toLocaleString(locale, { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
+  // Formato compartido (Fase 4, FE6): antes formateador local duplicado.
+  const fmtMoney = (v: number) => formatMoney(v, "MXN", locale);
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.inventario.title}
       badge={
@@ -170,10 +179,10 @@ export function InventarioPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-3">
-          <input aria-label={t.inventario.nameAria} className={inputCls} placeholder={t.inventario.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" />
+          <Field label={t.inventario.nameAria}><input aria-label={t.inventario.nameAria} className={inputCls} placeholder={t.inventario.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
           <textarea aria-label={t.inventario.descAria} className={inputCls} placeholder={t.inventario.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <input aria-label={t.inventario.skuAria} className={inputCls} placeholder={t.inventario.skuPlaceholder} value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" />
+            <Field label={t.inventario.skuAria}><input aria-label={t.inventario.skuAria} className={inputCls} placeholder={t.inventario.skuPlaceholder} value={sku} onChange={(e) => setSku(e.target.value)} maxLength={64} autoComplete="off" /></Field>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.unitLabel}</span>
               <select className={inputCls} value={unit} onChange={(e) => setUnit(e.target.value as InventoryUnit)}>
@@ -215,13 +224,13 @@ export function InventarioPanel() {
       )}
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        <input aria-label={t.inventario.searchAria}
+        <Field label={t.inventario.searchAria}><input aria-label={t.inventario.searchAria}
           className={inputCls}
           placeholder={t.inventario.searchPlaceholder}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           autoComplete="off"
-        />
+        /></Field>
         {items === null ? (
           <p className="py-2 text-sm text-zinc-500">{t.inventario.loadingItems}</p>
         ) : visible.length === 0 ? (
@@ -248,16 +257,16 @@ export function InventarioPanel() {
                   )}
                   {isAdmin && (
                     <span className="ml-auto flex items-center gap-2">
-                      <button onClick={() => adjust(it, -1)} aria-label={t.inventario.removeOneAria} className="min-h-[40px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      <button onClick={() => adjust(it, -1)} aria-label={t.inventario.removeOneAria} className="min-h-[44px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         −
                       </button>
-                      <button onClick={() => adjust(it, 1)} aria-label={t.inventario.addOneAria} className="min-h-[40px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      <button onClick={() => adjust(it, 1)} aria-label={t.inventario.addOneAria} className="min-h-[44px] min-w-[40px] rounded-lg border border-zinc-700 px-2 py-1 text-base font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         +
                       </button>
-                      <button onClick={() => startEdit(it)} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      <button onClick={() => startEdit(it)} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.inventario.edit}
                       </button>
-                      <button onClick={() => remove(it)} className="min-h-[40px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      <button onClick={() => remove(it)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.inventario.delete}
                       </button>
                     </span>
@@ -274,5 +283,6 @@ export function InventarioPanel() {
         )}
       </div>
     </Panel>
+    </>
   );
 }

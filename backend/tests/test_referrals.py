@@ -51,10 +51,13 @@ def test_referrals_admin_flow(client, admin_headers):
     assert ref["code"] == c["share_code"]
     rid = ref["id"]
 
-    # explicit referrer-specific code is kept
+    # explicit referrer-specific code is kept. Carlos brings his OWN
+    # contact (Fase 2 dedup is campaign+referred_contact: reusing Luis's
+    # contact here would be the same referred person twice).
     r = client.post(
         f"/api/referrals/campaigns/{cid}/referrals",
-        json=_referral(referrer_name="Bea", referred_name="Carlos", code="bea-99"),
+        json=_referral(referrer_name="Bea", referred_name="Carlos",
+                       referred_contact="carlos@example.com", code="bea-99"),
         headers=h,
     )
     assert r.status_code == 201, r.text

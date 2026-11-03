@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type MeResponse, type Recommendation, type RecommendationCategory } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
@@ -12,7 +14,9 @@ const inputCls =
  * de Crear. La lista empieza VACÍA — aquí nada se inventa. Prueba solo
  * lee. */
 export function RecomendacionesPanel() {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<Recommendation[] | null>(null);
   const [title, setTitle] = useState("");
@@ -28,14 +32,16 @@ export function RecomendacionesPanel() {
 
   const load = useCallback(async () => {
     try {
-      setRows(await api.listRecommendations());
+      const _load1 = await api.listRecommendations();
+      if (isCancelled()) return;
+      setRows(_load1);
     } catch {
       setRows([]);
     }
   }, []);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
     load();
   }, [load]);
 
@@ -70,7 +76,7 @@ export function RecomendacionesPanel() {
   };
 
   const remove = async (r: Recommendation) => {
-    if (!window.confirm(t.recomendaciones.confirmDelete.replace("{titulo}", r.title))) return;
+    if (!(await confirm(t.recomendaciones.confirmDelete.replace("{titulo}", r.title)))) return;
     setError(null);
     try {
       await api.deleteRecommendation(r.id);
@@ -89,6 +95,8 @@ export function RecomendacionesPanel() {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.recomendaciones.panelTitle}
       badge={
@@ -104,9 +112,9 @@ export function RecomendacionesPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-3">
-          <input aria-label={t.recomendaciones.titleAria} className={inputCls} placeholder={t.recomendaciones.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label={t.recomendaciones.descAria} className={inputCls} placeholder={t.recomendaciones.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input aria-label={t.recomendaciones.urlAria} className={inputCls} placeholder={t.recomendaciones.urlPlaceholder} value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" />
+          <Field label={t.recomendaciones.titleAria}><input aria-label={t.recomendaciones.titleAria} className={inputCls} placeholder={t.recomendaciones.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.recomendaciones.descAria}><textarea aria-label={t.recomendaciones.descAria} className={inputCls} placeholder={t.recomendaciones.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></Field>
+          <Field label={t.recomendaciones.urlAria}><input aria-label={t.recomendaciones.urlAria} className={inputCls} placeholder={t.recomendaciones.urlPlaceholder} value={url} onChange={(e) => setUrl(e.target.value)} autoComplete="off" /></Field>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-zinc-400">{t.recomendaciones.categoryLabel}</span>
             <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as RecommendationCategory)}>
@@ -123,7 +131,7 @@ export function RecomendacionesPanel() {
               {busy ? t.recomendaciones.saveBusy : editing ? t.recomendaciones.update : t.recomendaciones.publish}
             </button>
             {editing && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+              <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                 {t.recomendaciones.cancelBtn}
               </button>
             )}
@@ -151,10 +159,10 @@ export function RecomendacionesPanel() {
                   <span className="text-sm font-semibold text-zinc-100">{r.title}</span>
                   {isAdmin && (
                     <span className="ml-auto flex gap-2">
-                      <button onClick={() => startEdit(r)} className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+                      <button onClick={() => startEdit(r)} className="min-h-[44px] rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                         {t.recomendaciones.editBtn}
                       </button>
-                      <button onClick={() => remove(r)} className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+                      <button onClick={() => remove(r)} className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                         {t.recomendaciones.deleteBtn}
                       </button>
                     </span>
@@ -172,5 +180,6 @@ export function RecomendacionesPanel() {
         )}
       </div>
     </Panel>
+    </>
   );
 }

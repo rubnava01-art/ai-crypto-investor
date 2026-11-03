@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-03",
+    title: "Seguridad reforzada, estado persistente y UX reorganizada",
+    body: "Publicado el 3 de noviembre: seguridad reforzada (contraseña mínima de 12, datos personales redactados para la demo, sandbox solo en staging, sin siembra de la demo en producción); kill switch, escáner y modo ahora persistentes; navegación reorganizada en 6 familias; y la diaria del 3 (validación del exchange y botón Actualizar con estado de carga). Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-02",
     title: "Avance en Inicio, emociones en Espacio y Espacio más rápido",
     body: "Publicado el 2 de noviembre: Inicio muestra el avance de la plataforma con las novedades fechadas; Espacio suma manejo de emociones (cómo te sientes, intensidad y nota, con historial); Accesos con botones más grandes y accesibles; y Espacio ya no descarga el audio al abrir la página, solo al pulsar Reproducir. Sin cambios en permisos ni en el trading.",

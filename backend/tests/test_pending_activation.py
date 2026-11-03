@@ -38,7 +38,7 @@ def _register(client, username):
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": username, "password": "pass1234", "challenge_id": cid, "answer": answer},
+        json={"username": username, "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
     )
     assert r.status_code == 201, r.text
     return r.json()
@@ -60,7 +60,7 @@ def test_register_creates_pending_and_login_blocked(client, admin_headers):
     assert body["status"] == "pending"
 
     # Contraseña correcta pero pendiente: 403, sin token.
-    r = client.post("/api/auth/login", json={"username": "pend1", "password": "pass1234"})
+    r = client.post("/api/auth/login", json={"username": "pend1", "password": "pass1234abcd"})
     assert r.status_code == 403, r.text
     assert "pendiente" in r.json()["detail"]
 
@@ -74,7 +74,7 @@ def test_approve_enables_login(client, admin_headers):
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "active"
 
-    r = client.post("/api/auth/login", json={"username": "pend2", "password": "pass1234"})
+    r = client.post("/api/auth/login", json={"username": "pend2", "password": "pass1234abcd"})
     assert r.status_code == 200, r.text
     assert len(r.json()["access_token"]) > 20
 
@@ -86,7 +86,7 @@ def test_reject_deletes_account(client, admin_headers):
 
     users = _list_users(client, admin_headers)
     assert "pend3" not in users
-    r = client.post("/api/auth/login", json={"username": "pend3", "password": "pass1234"})
+    r = client.post("/api/auth/login", json={"username": "pend3", "password": "pass1234abcd"})
     assert r.status_code == 401
 
 
@@ -95,7 +95,7 @@ def test_non_admin_cannot_approve_or_reject(client, admin_headers):
     # Prueba activa creada por el admin para intentar aprobar/rechazar.
     r = client.post(
         "/api/users",
-        json={"username": "probador", "password": "pass1234", "role": "prueba"},
+        json={"username": "probador", "password": "pass1234abcd", "role": "prueba"},
         headers=admin_headers,
     )
     assert r.status_code == 201, r.text
@@ -117,7 +117,7 @@ def test_approve_non_pending_is_409_and_admin_created_is_active(client, admin_he
 
     r = client.post(
         "/api/users",
-        json={"username": "creadoadmin", "password": "pass1234", "role": "prueba"},
+        json={"username": "creadoadmin", "password": "pass1234abcd", "role": "prueba"},
         headers=admin_headers,
     )
     assert r.status_code == 201, r.text

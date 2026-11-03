@@ -19,10 +19,17 @@ Status (cuentas por aprobar, 2026-10-30, decisión del dueño):
   Old accounts have no pending row, so nothing changes for them.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password, is_super_admin, require_admin
+from app.core.hardening import audit
+from app.core.security import (
+    check_password_bytes,
+    hash_password,
+    is_super_admin,
+    require_admin,
+    revoke_user_tokens,
+)
 from app.database import get_db
 from app.models.tables import PendingActivation, SuperAdminGrant, User
 
@@ -39,15 +46,38 @@ class UserOut(BaseModel):
     created_at: str | None = None
 
 
+def _password_byte_cap(v: str | None) -> str | None:
+    """bcrypt cap (B2): reject passwords past 72 UTF-8 bytes. The
+    minimum for SETTING a password is 12 (decisión de Rubén 2026-11-02);
+    login keeps no minimum so existing accounts still sign in."""
+    if v is None:
+        return v
+    try:
+        check_password_bytes(v)
+    except ValueError as e:
+        raise ValueError(str(e)) from e
+    return v
+
+
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
-    password: str = Field(min_length=4, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
     role: str = "prueba"  # "super_admin" | "admin" | "prueba"
+
+    @field_validator("password")
+    @classmethod
+    def _password_bytes(cls, v: str) -> str:
+        return _password_byte_cap(v)  # type: ignore[return-value]
 
 
 class UpdateUserRequest(BaseModel):
     role: str | None = None  # "super_admin" | "admin" | "prueba"
-    password: str | None = Field(default=None, min_length=4, max_length=128)
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def _password_bytes(cls, v: str | None) -> str | None:
+        return _password_byte_cap(v)
 
 
 def _out(
@@ -157,6 +187,9 @@ def create_user(
         _set_super(db, user, True)
     db.commit()
     db.refresh(user)
+    # Auditoría (M2): quién creó a quién, con qué rol. Sin contraseñas.
+    audit(db, admin, "users.create", "user", str(user.id),
+          details={"username": user.username, "role": payload.role})
     return _out(user, db)
 
 
@@ -172,10 +205,13 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
     caller_super = is_super_admin(admin, db)
     target_super = is_super_admin(user, db)
+    was_admin = user.is_admin
     if target_super and not caller_super:
         raise HTTPException(
             status_code=403, detail="Only a super admin can change a super admin's account"
         )
+    role_changed = False
+    role_downgrade = False
     if payload.role is not None:
         want_super = payload.role.strip().lower() == "super_admin"
         if want_super and not caller_super:
@@ -186,6 +222,7 @@ def update_user(
             raise HTTPException(
                 status_code=400, detail="You cannot remove your own super admin status"
             )
+        role_changed = True
         if want_super:
             user.is_admin = True
             _set_super(db, user, True)
@@ -197,12 +234,26 @@ def update_user(
                 admins = db.query(User).filter(User.is_admin.is_(True)).count()
                 if admins <= 1:
                     raise HTTPException(status_code=400, detail="Cannot demote the last admin")
+            # Perder super, o pasar de admin a prueba, es una degradación:
+            # los tokens viejos de esa cuenta mueren (B1).
+            if target_super or (was_admin and not new_admin):
+                role_downgrade = True
             _set_super(db, user, False)
             user.is_admin = new_admin
+    password_changed = bool(payload.password)
     if payload.password:
         user.password_hash = hash_password(payload.password)
+    if password_changed or role_downgrade:
+        revoke_user_tokens(user)
     db.commit()
     db.refresh(user)
+    # Auditoría (M2): cambio de rol y/o reseteo de contraseña. El valor
+    # de la contraseña nunca se registra, solo el hecho del cambio.
+    if role_changed or password_changed:
+        audit(db, admin, "users.update", "user", str(user.id),
+              details={"username": user.username,
+                       "role_changed": role_changed,
+                       "password_changed": password_changed})
     return _out(user, db)
 
 
@@ -231,6 +282,8 @@ def approve_user(
     db.delete(row)
     db.commit()
     db.refresh(user)
+    audit(db, admin, "users.approve", "user", str(user.id),
+          details={"username": user.username})
     return _out(user, db)
 
 
@@ -260,6 +313,9 @@ def reject_user(
             status_code=400,
             detail="Cannot reject an admin account; demote it first",
         )
+    # Auditoría ANTES de borrar (después ya no hay fila que referenciar).
+    audit(db, admin, "users.reject", "user", str(user.id),
+          details={"username": user.username})
     db.delete(row)
     db.delete(user)
     db.commit()
@@ -288,6 +344,9 @@ def delete_user(
         admins = db.query(User).filter(User.is_admin.is_(True)).count()
         if admins <= 1:
             raise HTTPException(status_code=400, detail="Cannot delete the last admin")
+    # Auditoría ANTES de borrar (después ya no hay fila que referenciar).
+    audit(db, admin, "users.delete", "user", str(user.id),
+          details={"username": user.username})
     _set_super(db, user, False)  # explicit: SQLite may not enforce the FK cascade
     pending = (
         db.query(PendingActivation)

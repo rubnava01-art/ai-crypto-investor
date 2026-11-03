@@ -5,11 +5,13 @@ import { api, type UserProfile } from "../lib/api";
 import { Panel } from "./Panel";
 import { ProfileEditor } from "./ProfileMenu";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 /** Mi perfil como dashboard: foto, datos del usuario y edición. Los
  * campos vacíos se muestran como "Sin registrar" — aquí nada se
  * inventa. La edición reutiliza el mismo editor del menú de perfil. */
 export function PerfilPanel() {
+  const isCancelled = useCancelled();
   const { lang, t } = useLanguage();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [failed, setFailed] = useState(false);
@@ -22,7 +24,7 @@ export function PerfilPanel() {
   };
 
   useEffect(() => {
-    api.getMyProfile().then(setProfile).catch(() => setFailed(true));
+    api.getMyProfile().then((v) => { if (!isCancelled()) setProfile(v); }).catch(() => { if (!isCancelled()) setFailed(true); });
   }, [editing]);
 
   const fmtDate = (iso: string | null) =>

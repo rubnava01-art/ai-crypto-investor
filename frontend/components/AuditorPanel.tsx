@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type WebAudit } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
@@ -14,6 +15,7 @@ const inputCls =
  * ni PageSpeed, no hay rastreo, sitemap ni Core Web Vitals. El servidor
  * rechaza URLs privadas/reservadas antes de descargar nada. */
 export function AuditorPanel() {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [url, setUrl] = useState("");
@@ -24,7 +26,9 @@ export function AuditorPanel() {
 
   const loadRecent = useCallback(async () => {
     try {
-      setRecent(await api.listWebAudits());
+      const _load1 = await api.listWebAudits();
+      if (isCancelled()) return;
+      setRecent(_load1);
     } catch {
       setRecent([]);
     }

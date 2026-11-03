@@ -11,7 +11,12 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.config import assert_production_secrets, settings
+from app.config import (
+    assert_production_secrets,
+    build_git_sha,
+    settings,
+    validate_cors_origins,
+)
 
 logger = logging.getLogger("ai-crypto-investor")
 from app.core.security import hash_password
@@ -50,14 +55,20 @@ def seed_demo_data() -> None:
             db.add(SuperAdminGrant(user_id=owner.id))
             db.commit()
         # Demo read-only "prueba" account (view + tests only, no controls).
-        if db.query(User).filter(User.username == "prueba").first() is None:
-            db.add(
-                User(
-                    username="prueba",
-                    password_hash=hash_password("prueba"),
-                    is_admin=False,
+        # Decisión de Rubén 2026-11-02: la siembra ocurre SOLO con el flag
+        # explícito SEED_DEMO_ACCOUNTS=true Y fuera de producción. En
+        # producción nunca se crea. Una fila "prueba" que ya exista en la
+        # base NO se borra aquí: borrarla es destructivo y necesita su
+        # palabra aparte; solo se deja de sembrar.
+        if settings.seed_demo_accounts and settings.environment != "production":
+            if db.query(User).filter(User.username == "prueba").first() is None:
+                db.add(
+                    User(
+                        username="prueba",
+                        password_hash=hash_password("prueba"),
+                        is_admin=False,
+                    )
                 )
-            )
         sv = db.query(StrategyVersion).order_by(StrategyVersion.id).first()
         if sv is None:
             sv = StrategyVersion(
@@ -129,6 +140,27 @@ async def lifespan(app: FastAPI):
     # Fail closed en producción antes de sembrar nada (corrida 3 agentes).
     assert_production_secrets()
     seed_demo_data()
+    # Fase 2/3: restore persisted runtime state + reconcile crash
+    # leftovers BEFORE the scanner loop starts, so the loop never runs
+    # on reset (in-memory) state. Never breaks boot: a failure here is
+    # logged, not fatal — the app must still serve (the old behavior
+    # was "reset state", which is the safe fallback).
+    db = SessionLocal()
+    try:
+        from app.core.runtime import reconcile_stale_pending_orders, restore_runtime_state
+
+        summary = restore_runtime_state(db)
+        stale = reconcile_stale_pending_orders(db)
+        logger.info(
+            "build git_sha=%s runtime=%s stale_pending_reconciled=%s",
+            build_git_sha(),
+            summary,
+            stale,
+        )
+    except Exception:  # noqa: BLE001 - boot must not die on restore
+        logger.exception("runtime restore/reconciliation failed; using in-memory state")
+    finally:
+        db.close()
     task = asyncio.create_task(_scanner_loop())
     yield
     task.cancel()
@@ -142,6 +174,19 @@ async def _scanner_loop() -> None:
     await asyncio.sleep(5)  # let the app finish starting
     while True:
         try:
+            # Retention (Fase 3, M5): at most once a day, best-effort,
+            # independent of the scanner flag — growth tables prune even
+            # when the scanner is off.
+            try:
+                from app.core.retention import maybe_daily_prune
+
+                _ret_db = SessionLocal()
+                try:
+                    maybe_daily_prune(_ret_db)
+                finally:
+                    _ret_db.close()
+            except Exception:  # noqa: BLE001 - retention never kills the loop
+                pass
             if state.scanner_running:
                 db = SessionLocal()
                 try:
@@ -224,6 +269,8 @@ def create_app() -> FastAPI:
             status_code=500,
             content={"detail": "Error interno del servidor.", "error_id": error_id},
         )
+    # Fail closed (Fase 3, M11): '*' + credentials must never serve.
+    validate_cors_origins(settings.cors_origins)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
@@ -240,6 +287,10 @@ def create_app() -> FastAPI:
     # list/dashboard payloads shrink ~70-80% on the wire). Binary PDF
     # downloads are already compressed and stay untouched in practice.
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # Outermost of all (added last): global 120s request timeout (M16).
+    from app.core.timeout import RequestTimeoutMiddleware
+
+    app.add_middleware(RequestTimeoutMiddleware)
     app.include_router(auth.router)
     app.include_router(system.router)
     app.include_router(portfolio.router)

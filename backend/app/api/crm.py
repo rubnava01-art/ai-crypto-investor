@@ -100,8 +100,17 @@ def list_contacts(
 ):
     query = db.query(Contact)
     if q and q.strip():
-        term = f"%{q.strip()}%"
-        query = query.filter(or_(Contact.name.ilike(term), Contact.email.ilike(term)))
+        # Escape LIKE wildcards (M10): a user's % or _ used to act as
+        # wildcards and over-expose results. Backslash-escaped, with
+        # SQLAlchemy's escape parameter (not string surgery).
+        raw = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        term = f"%{raw}%"
+        query = query.filter(
+            or_(
+                Contact.name.ilike(term, escape="\\"),
+                Contact.email.ilike(term, escape="\\"),
+            )
+        )
     if status_filter:
         query = query.filter(Contact.status == _check_status(status_filter))
     return [_out(c) for c in query.order_by(Contact.id.desc()).offset(offset).limit(limit).all()]

@@ -11,7 +11,9 @@ import {
   type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
@@ -22,7 +24,9 @@ const inputCls =
  * etapas y tiene tareas y notas. Empieza VACÍO. Solo el admin escribe;
  * prueba solo lee. */
 function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const [tasks, setTasks] = useState<DigitalTask[] | null>(null);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,7 +34,9 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
 
   const load = useCallback(async () => {
     try {
-      setTasks(await api.listDigitalTasks(project.id));
+      const _load1 = await api.listDigitalTasks(project.id);
+      if (isCancelled()) return;
+      setTasks(_load1);
     } catch {
       setTasks([]);
     }
@@ -66,7 +72,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
   };
 
   const remove = async (tk: DigitalTask) => {
-    if (!window.confirm(t.desarrollo.confirmDeleteTask.replace("{titulo}", tk.title))) return;
+    if (!(await confirm(t.desarrollo.confirmDeleteTask.replace("{titulo}", tk.title)))) return;
     try {
       await api.deleteDigitalTask(tk.id);
       await load();
@@ -76,6 +82,8 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
   };
 
   return (
+    <>
+      {dialog}
     <div className="mt-3 border-t border-zinc-800 pt-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.desarrollo.tasksHeading}</p>
       {tasks === null ? (
@@ -96,7 +104,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
               />
               <span className={`flex-1 ${tk.done ? "text-zinc-400 line-through" : "text-zinc-200"}`}>{tk.title}</span>
               {isAdmin && (
-                <button onClick={() => remove(tk)} className="rounded border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+                <button onClick={() => remove(tk)} className="min-h-[44px] rounded border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                   {t.desarrollo.deleteBtn}
                 </button>
               )}
@@ -106,7 +114,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       )}
       {isAdmin && (
         <form onSubmit={add} className="mt-2 flex gap-2">
-          <input aria-label={t.desarrollo.newTaskAria} className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.desarrollo.newTaskPlaceholder} maxLength={256} autoComplete="off" />
+          <Field label={t.desarrollo.newTaskAria} className="flex-1"><input aria-label={t.desarrollo.newTaskAria} className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.desarrollo.newTaskPlaceholder} maxLength={256} autoComplete="off" /></Field>
           <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50">
             {t.desarrollo.addTask}
           </button>
@@ -114,11 +122,14 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       )}
       {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </div>
+    </>
   );
 }
 
 export function DesarrolloPanel() {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const stages: { value: DigitalStage; label: string }[] = [
     { value: "diagnostico", label: t.desarrollo.stageDiagnostico },
     { value: "propuesta", label: t.desarrollo.stagePropuesta },
@@ -141,15 +152,17 @@ export function DesarrolloPanel() {
 
   const load = useCallback(async () => {
     try {
-      setProjects(await api.listDigitalProjects());
+      const _load2 = await api.listDigitalProjects();
+      if (isCancelled()) return;
+      setProjects(_load2);
     } catch {
       setProjects([]);
     }
   }, []);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-    api.listContacts().then(setContacts).catch(() => setContacts([]));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
+    api.listContacts().then((v) => { if (!isCancelled()) setContacts(v); }).catch(() => { if (!isCancelled()) setContacts([]); });
     load();
   }, [load]);
 
@@ -189,7 +202,7 @@ export function DesarrolloPanel() {
   };
 
   const remove = async (p: DigitalProject) => {
-    if (!window.confirm(t.desarrollo.confirmDeleteProject.replace("{titulo}", p.title))) return;
+    if (!(await confirm(t.desarrollo.confirmDeleteProject.replace("{titulo}", p.title)))) return;
     setError(null);
     try {
       await api.deleteDigitalProject(p.id);
@@ -200,6 +213,8 @@ export function DesarrolloPanel() {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.desarrollo.panelTitle}
       badge={
@@ -215,7 +230,7 @@ export function DesarrolloPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-3">
-          <input aria-label={t.desarrollo.projectAria} className={inputCls} placeholder={t.desarrollo.projectPlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
+          <Field label={t.desarrollo.projectAria}><input aria-label={t.desarrollo.projectAria} className={inputCls} placeholder={t.desarrollo.projectPlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-zinc-400">{t.desarrollo.companyLabel}</span>
             <select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)}>
@@ -237,7 +252,7 @@ export function DesarrolloPanel() {
               ))}
             </select>
           </label>
-          <textarea aria-label={t.desarrollo.notesAria} className={inputCls} placeholder={t.desarrollo.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <Field label={t.desarrollo.notesAria}><textarea aria-label={t.desarrollo.notesAria} className={inputCls} placeholder={t.desarrollo.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></Field>
           <button
             type="submit"
             disabled={busy || !title.trim()}
@@ -271,7 +286,7 @@ export function DesarrolloPanel() {
                 </span>
                 {isAdmin && (
                   <span className="ml-auto flex items-center gap-2">
-                    <select
+                    <Field label={t.desarrollo.stageOf.replace("{titulo}", p.title)}><select
                       aria-label={t.desarrollo.stageOf.replace("{titulo}", p.title)}
                       className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40"
                       value={p.stage}
@@ -282,8 +297,8 @@ export function DesarrolloPanel() {
                           {s.label}
                         </option>
                       ))}
-                    </select>
-                    <button onClick={() => remove(p)} className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+                    </select></Field>
+                    <button onClick={() => remove(p)} className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
                       {t.desarrollo.deleteBtn}
                     </button>
                   </span>
@@ -296,5 +311,6 @@ export function DesarrolloPanel() {
         )}
       </div>
     </Panel>
+    </>
   );
 }

@@ -7,6 +7,8 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
+import { ApiErrorBanner, useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -85,21 +87,32 @@ export function CrmPanel() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Tri-estado (Fase 4, FE3): un fallo de carga ya no se ve como "sin
+  // contactos" — se conserva la lista anterior y se muestra el banner.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const isCancelled = useCancelled();
+  const { confirm, dialog } = useConfirm(t);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-  }, []);
+    api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
+  }, [isCancelled]);
 
   const load = useCallback(async () => {
     try {
-      setContacts(await api.listContacts(query.trim() || undefined, statusFilter || undefined));
-    } catch {
-      setContacts([]);
+      const rows = await api.listContacts(query.trim() || undefined, statusFilter || undefined);
+      if (isCancelled()) return;
+      setContacts(rows);
+      setLoadError(null);
+    } catch (e) {
+      if (isCancelled()) return;
+      // No mapear el error a []: la lista anterior se conserva y el banner
+      // explica el fallo (antes un 403/timeout parecía "sin contactos").
+      setLoadError(e);
     }
-  }, [query, statusFilter]);
+  }, [query, statusFilter, isCancelled]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -161,7 +174,7 @@ export function CrmPanel() {
   };
 
   const remove = async (c: CrmContact) => {
-    if (!window.confirm(t.crm.confirmDelete.replace("{nombre}", c.name))) return;
+    if (!(await confirm(t.crm.confirmDelete.replace("{nombre}", c.name)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -175,6 +188,8 @@ export function CrmPanel() {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.crm.panelTitle}
       badge={
@@ -190,14 +205,14 @@ export function CrmPanel() {
 
       {/* Search + filter */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
-        <input
+        <Field label={t.crm.searchAria}><input
           className={inputCls}
           placeholder={t.crm.searchPlaceholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label={t.crm.searchAria}
-        />
-        <select
+        /></Field>
+        <Field label={t.crm.filterAria}><select
           className={inputCls}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -207,18 +222,63 @@ export function CrmPanel() {
           {statuses.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
-        </select>
+        </select></Field>
       </div>
 
       {/* List */}
+      {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
       {contacts === null ? (
-        <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>
+        loadError ? null : (
+          <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>
+        )
       ) : contacts.length === 0 ? (
         <p className="py-4 text-center text-sm text-zinc-400">
           {t.crm.emptyContacts}{query || statusFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Tarjetas apiladas en teléfono (F7): la tabla, con 6 columnas y
+          scroll horizontal, dejaba nombre y acciones fuera de pantalla. */}
+        <ul className="space-y-3 sm:hidden">
+          {contacts.map((c) => (
+            <li key={c.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-100">{c.name}</p>
+                <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[c.status] ?? statusBadge.inactivo}`}>
+                  {statusLabel(c.status)}
+                </span>
+              </div>
+              {c.email && <p className="mt-1 break-all text-sm text-zinc-300">{c.email}</p>}
+              {c.phone && <p className="text-xs text-zinc-400">{c.phone}</p>}
+              <p className="mt-1 text-xs text-zinc-400">{sourceLabel(c.source)}</p>
+              {c.tags.length > 0 && (
+                <p className="mt-1 flex flex-wrap gap-1">
+                  {c.tags.map((tg) => (
+                    <span key={tg} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{tg}</span>
+                  ))}
+                </p>
+              )}
+              {c.notes && <p className="mt-1 text-xs text-zinc-400">{c.notes}</p>}
+              {isAdmin && (
+                <span className="mt-3 flex gap-1.5">
+                  <button
+                    onClick={() => startEdit(c)}
+                    className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  >
+                    {t.crm.edit}
+                  </button>
+                  <button
+                    onClick={() => remove(c)}
+                    className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-2.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                  >
+                    {t.crm.delete}
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
@@ -261,13 +321,13 @@ export function CrmPanel() {
                       <span className="flex gap-1.5">
                         <button
                           onClick={() => startEdit(c)}
-                          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                          className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                         >
                           {t.crm.edit}
                         </button>
                         <button
                           onClick={() => remove(c)}
-                          className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                          className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                         >
                           {t.crm.delete}
                         </button>
@@ -279,6 +339,7 @@ export function CrmPanel() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Create / edit form (admin only) */}
@@ -288,28 +349,28 @@ export function CrmPanel() {
             {editingId !== null ? t.crm.editTitle : t.crm.newTitle}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <input aria-label={t.crm.nameAria} className={inputCls} placeholder={t.crm.namePlaceholder} value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" />
-            <input aria-label={t.crm.emailAria} className={inputCls} placeholder={t.crm.emailPlaceholder} type="email" value={form.email} onChange={set("email")} autoComplete="off" />
-            <input aria-label={t.crm.phoneAria} className={inputCls} placeholder={t.crm.phonePlaceholder} value={form.phone} onChange={set("phone")} autoComplete="off" />
-            <input aria-label={t.crm.tagsAria} className={inputCls} placeholder={t.crm.tagsPlaceholder} value={form.tags} onChange={set("tags")} autoComplete="off" />
-            <select className={inputCls} value={form.source} onChange={set("source")} aria-label={t.crm.sourceAria}>
+            <Field label={t.crm.nameAria}><input aria-label={t.crm.nameAria} className={inputCls} placeholder={t.crm.namePlaceholder} value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" /></Field>
+            <Field label={t.crm.emailAria}><input aria-label={t.crm.emailAria} className={inputCls} placeholder={t.crm.emailPlaceholder} type="email" value={form.email} onChange={set("email")} autoComplete="off" /></Field>
+            <Field label={t.crm.phoneAria}><input aria-label={t.crm.phoneAria} className={inputCls} placeholder={t.crm.phonePlaceholder} value={form.phone} onChange={set("phone")} autoComplete="off" /></Field>
+            <Field label={t.crm.tagsAria}><input aria-label={t.crm.tagsAria} className={inputCls} placeholder={t.crm.tagsPlaceholder} value={form.tags} onChange={set("tags")} autoComplete="off" /></Field>
+            <Field label={t.crm.sourceAria}><select className={inputCls} value={form.source} onChange={set("source")} aria-label={t.crm.sourceAria}>
               {sources.map((s) => (
                 <option key={s.value} value={s.value}>{t.crm.originOption}{s.label}</option>
               ))}
-            </select>
-            <select className={inputCls} value={form.status} onChange={set("status")} aria-label={t.crm.statusAria}>
+            </select></Field>
+            <Field label={t.crm.statusAria}><select className={inputCls} value={form.status} onChange={set("status")} aria-label={t.crm.statusAria}>
               {statuses.map((s) => (
                 <option key={s.value} value={s.value}>{t.crm.statusOption}{s.label}</option>
               ))}
-            </select>
+            </select></Field>
           </div>
-          <textarea aria-label={t.crm.notesAria}
+          <Field label={t.crm.notesAria}><textarea aria-label={t.crm.notesAria}
             className={inputCls}
             placeholder={t.crm.notesPlaceholder}
             value={form.notes}
             onChange={set("notes")}
             rows={2}
-          />
+          /></Field>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -339,5 +400,6 @@ export function CrmPanel() {
         </div>
       )}
     </Panel>
+    </>
   );
 }

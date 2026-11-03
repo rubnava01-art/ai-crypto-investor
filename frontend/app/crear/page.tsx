@@ -5,7 +5,7 @@ import { useLanguage } from "../../lib/i18n";
 import { ModuleShell } from "../../components/ModuleShell";
 import { Panel } from "../../components/Panel";
 
-const FORGE_URL = "https://rubnava01-art.github.io/New/";
+const FORGE_URL = process.env.NEXT_PUBLIC_FORGE_URL ?? "https://rubnava01-art.github.io/New/";
 
 export default function CrearPage() {
   const { t } = useLanguage();

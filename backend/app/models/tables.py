@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -30,6 +31,12 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Credential version (Fase 2, B1): every issued token carries this
+    # value ("tv"). Bumping it — on password change or role downgrade —
+    # invalidates all tokens issued before the bump. New accounts start
+    # at 0; the column arrives via Alembic migration, never create_all
+    # alone, on existing databases.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Perfil editable (paquete 2026-10-28): nombre, correo, dirección y
     # foto. Todo opcional y vacío al inicio — nunca se inventa contenido.
     # La foto es un data URL (base64, máx. ~500KB) guardado en la DB para
@@ -148,6 +155,7 @@ class StrategyVersion(Base):
 
 class Signal(Base):
     __tablename__ = "signals"
+    __table_args__ = (Index("ix_signals_created_at", "created_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     strategy_version_id: Mapped[int] = mapped_column(
@@ -169,6 +177,7 @@ class Signal(Base):
 
 class RiskDecision(Base):
     __tablename__ = "risk_decisions"
+    __table_args__ = (Index("ix_risk_decisions_signal_id", "signal_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     signal_id: Mapped[int] = mapped_column(ForeignKey("signals.id"), nullable=False)
@@ -183,6 +192,10 @@ class RiskDecision(Base):
 
 class Order(Base):
     __tablename__ = "orders"
+    __table_args__ = (
+        Index("ix_orders_created_at", "created_at"),
+        Index("ix_orders_mode_symbol_status", "mode", "symbol", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     client_order_id: Mapped[str] = mapped_column(
@@ -208,6 +221,7 @@ class Order(Base):
 
 class Fill(Base):
     __tablename__ = "fills"
+    __table_args__ = (Index("ix_fills_order_id", "order_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=False)
@@ -261,6 +275,7 @@ class PortfolioSnapshot(Base):
 
 class SystemEvent(Base):
     __tablename__ = "system_events"
+    __table_args__ = (Index("ix_system_events_created_at", "created_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     level: Mapped[str] = mapped_column(String(8), nullable=False)  # info|warn|error
@@ -273,6 +288,7 @@ class SystemEvent(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_logs_user_id", "user_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -285,14 +301,56 @@ class AuditLog(Base):
     )
 
 
-class IdempotencyKey(Base):
-    """Infrastructure table (beyond the 12 spec tables): records request
-    idempotency keys so retried requests return the original response."""
+class RuntimeSetting(Base):
+    """Persisted runtime state (Fase 2, A3): kill switch, scanner and
+    simulation mode survive free-tier sleep/restarts. Single-key rows:
+    kill_switch ("true"/"false"), scanner_running ("true"/"false"),
+    simulation_mode ("simulation"|"paper"|"real"). The in-memory
+    RuntimeState mirrors these rows; startup restores from them."""
 
-    __tablename__ = "idempotency_keys"
+    __tablename__ = "runtime_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(128), nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class RealCapCounter(Base):
+    """Lock anchor + mirror for the $20 cumulative real-buy hard cap
+    (Fase 2, A2). Exactly one row (id=1). execute_real() takes a row
+    lock (SELECT ... FOR UPDATE) on it, recomputes the cap from Fill
+    rows (the source of truth) and only then sends the order — so the
+    check and the fill insert serialize. `total` mirrors that sum for
+    observability; it is recomputed under the lock, never trusted."""
+
+    __tablename__ = "real_cap_counters"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    total: Mapped[Decimal] = mapped_column(
+        Numeric(24, 10), default=Decimal("0"), nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class IdempotencyKey(Base):
+    """Infrastructure table (beyond the 12 spec tables): records request
+    idempotency keys so retried requests return the original response.
+
+    Scoped by (user_id, route, key) since Fase 2 (M4): the old global
+    unique on `key` alone made two users (or two routes) collide on
+    the same key. Rows older than 24h are pruned (see core/retention)."""
+
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (
+        UniqueConstraint("user_id", "route", "key", name="uq_idempotency_user_route_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(128), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
     route: Mapped[str] = mapped_column(String(128), nullable=False)
     response_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
@@ -445,7 +503,9 @@ class EmotionEntry(Base):
     Mirrors Revelation: written by Rubén himself (how he feels, intensity
     1-5, optional note) — never generated or invented by the system.
     Any authenticated user reads; only admins write/edit/delete.
-    New table: create_all covers it, no migration needed.
+    Covered by the Fase 2 baseline Alembic migration (like every other
+    post-Phase-1 table); create_all is only a safety net, not the
+    schema mechanism.
     """
 
     __tablename__ = "emotion_entries"
@@ -673,9 +733,14 @@ class Referral(Base):
     referrer-specific code set by the admin.
     `status`: pending (referred, not yet a client) -> confirmed (became
     a client) -> rewarded (reward recorded as given). Forward-only.
+    Dedup (Fase 2): one referral per (campaign, referred_contact) when
+    a contact is given — enforced in the API + a partial unique index
+    in the migration (empty contacts stay exempt, so several referrals
+    without contact info remain possible).
     """
 
     __tablename__ = "referrals"
+    __table_args__ = (Index("ix_referrals_campaign_id", "campaign_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     campaign_id: Mapped[int] = mapped_column(
@@ -847,6 +912,7 @@ class TrendSearch(Base):
     """
 
     __tablename__ = "trend_searches"
+    __table_args__ = (Index("ix_trend_searches_user_id", "user_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
@@ -964,6 +1030,7 @@ class HomeComment(Base):
     """
 
     __tablename__ = "home_comments"
+    __table_args__ = (Index("ix_home_comments_post_id", "post_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     post_id: Mapped[int] = mapped_column(

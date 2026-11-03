@@ -1,9 +1,19 @@
-"""System status endpoints. /api/health is public; /api/system/* need auth."""
+"""System status endpoints. /api/health is public; /api/system/* need auth.
+
+Fase 3 (M14): health and system status used to disagree — health said
+"live" when the real flag was on while system_status hardcoded
+mode="demo", exchange_connected=False, data_source="DEMO" always. Now
+both derive from the same facts: mode follows the real-trading flag,
+exchange_connected follows the read-only adapter configuration (no
+network call), and health carries the build git_sha + timestamp so a
+stale Render deploy is visible instead of guessed.
+"""
 from fastapi import APIRouter, Depends
 
-from app.config import settings
+from app.config import build_git_sha, build_timestamp_utc, settings
 from app.core.security import get_current_user
 from app.core.state import state
+from app.exchange import adapter
 from app.models.tables import User
 from app.schemas.api import HealthResponse, SystemStatus, utc_now_iso
 
@@ -14,20 +24,23 @@ router = APIRouter(tags=["system"])
 def health():
     return HealthResponse(
         version=settings.app_version,
-        mode="demo" if not settings.real_trading_enabled else "live",
+        mode="live" if settings.real_trading_enabled else "demo",
         timestamp_utc=utc_now_iso(),
+        git_sha=build_git_sha(),
+        built_utc=build_timestamp_utc(),
     )
 
 
 @router.get("/api/system/status", response_model=SystemStatus)
 def system_status(user: User = Depends(get_current_user)):
+    live = bool(settings.real_trading_enabled)
     return SystemStatus(
-        mode="demo",
-        exchange_connected=False,  # Phase 5: read-only exchange connection
+        mode="live" if live else "demo",
+        exchange_connected=adapter.is_configured(),
         scanner_running=state.scanner_running,
         simulation_mode=state.simulation_mode,  # type: ignore[arg-type]
         kill_switch=state.kill_switch,
-        data_source="DEMO",
+        data_source="LIVE" if live else "DEMO",
         last_update_utc=utc_now_iso(),
     )
 

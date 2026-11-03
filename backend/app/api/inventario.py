@@ -88,6 +88,20 @@ def _validate_non_negative(value: float | int, label: str) -> None:
         raise HTTPException(status_code=422, detail=f"{label} no puede ser negativo.")
 
 
+def _check_sku_unique(db: Session, sku: str, exclude_id: int | None = None) -> None:
+    """Non-empty SKUs must be unique (M18). Empty SKU means "no SKU"
+    and stays exempt — several items without SKU remain possible, and
+    the migration's unique constraint likewise skips duplicates rather
+    than breaking when empty SKUs already repeat."""
+    if not sku:
+        return
+    query = db.query(InventoryItem).filter(InventoryItem.sku == sku)
+    if exclude_id is not None:
+        query = query.filter(InventoryItem.id != exclude_id)
+    if query.first() is not None:
+        raise HTTPException(status_code=409, detail="SKU already exists")
+
+
 def _validate_price(value: float) -> Decimal:
     _validate_non_negative(value, "El precio unitario")
     try:
@@ -117,6 +131,7 @@ def create_item(
         raise HTTPException(status_code=422, detail="El nombre no puede estar vacío.")
     _validate_non_negative(payload.quantity, "La cantidad")
     _validate_non_negative(payload.min_stock, "El stock mínimo")
+    _check_sku_unique(db, payload.sku.strip())
     row = InventoryItem(
         name=payload.name.strip(),
         description=payload.description,
@@ -149,6 +164,7 @@ def update_item(
     if payload.description is not None:
         row.description = payload.description
     if payload.sku is not None:
+        _check_sku_unique(db, payload.sku.strip(), exclude_id=row.id)
         row.sku = payload.sku.strip()
     if payload.quantity is not None:
         _validate_non_negative(payload.quantity, "La cantidad")

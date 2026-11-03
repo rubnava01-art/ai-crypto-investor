@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type EmotionEntry, type MeResponse, type Revelation } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 import { AmbientSound } from "./AmbientSound";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -113,7 +115,7 @@ function MeditationPanel() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 text-center shadow-sm">
           <div
-            className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-teal-500/20 ring-1 ring-teal-500/30 transition-transform duration-1000"
+            className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-teal-500/20 ring-1 ring-teal-500/30 transition-transform duration-1000 motion-reduce:transition-none"
             style={{ transform: `scale(${breathing ? circleScale : 1})` }}
           >
             <span className="text-lg font-semibold text-teal-200">
@@ -152,7 +154,7 @@ function MeditationPanel() {
                 type="button"
                 aria-pressed={timerMin === m}
                 onClick={() => { setTimerMin(m); setTimerLeft(null); setTimerDone(false); }}
-                className={`min-h-[40px] rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${timerMin === m ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+                className={`min-h-[44px] rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${timerMin === m ? "bg-teal-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
               >
                 {m} {t.espacio.min}
               </button>
@@ -179,7 +181,9 @@ function MeditationPanel() {
 /* ------------------------------------------------------------------ */
 
 function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [rows, setRows] = useState<Revelation[] | null>(null);
   const [title, setTitle] = useState("");
@@ -190,7 +194,9 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      setRows(await api.listRevelations());
+      const _load1 = await api.listRevelations();
+      if (isCancelled()) return;
+      setRows(_load1);
     } catch {
       setRows([]);
     }
@@ -219,7 +225,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const remove = async (r: Revelation) => {
-    if (!window.confirm(t.espacio.deleteConfirm.replace("{nombre}", r.title))) return;
+    if (!(await confirm(t.espacio.deleteConfirm.replace("{nombre}", r.title)))) return;
     setError(null);
     try {
       await api.deleteRevelation(r.id);
@@ -230,6 +236,8 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.espacio.revelationsTitle}
       badge={
@@ -245,8 +253,8 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-3">
-          <input aria-label={t.espacio.titleAria} className={inputCls} placeholder={t.espacio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label={t.espacio.textAria} className={inputCls} placeholder={t.espacio.textPlaceholder} value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+          <Field label={t.espacio.titleAria}><input aria-label={t.espacio.titleAria} className={inputCls} placeholder={t.espacio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.espacio.textAria}><textarea aria-label={t.espacio.textAria} className={inputCls} placeholder={t.espacio.textPlaceholder} value={text} onChange={(e) => setText(e.target.value)} rows={3} /></Field>
           <button
             type="submit"
             disabled={busy || !title.trim()}
@@ -275,7 +283,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
                     {isAdmin && (
                       <button
                         onClick={() => remove(r)}
-                        className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                        className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                       >
                         {t.espacio.delete}
                       </button>
@@ -289,6 +297,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
     </Panel>
+    </>
   );
 }
 
@@ -311,7 +320,9 @@ const EMOTION_OPTIONS = [
 ] as const;
 
 function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const emotionLabel = (id: string) => {
     const opt = EMOTION_OPTIONS.find((o) => o.id === id);
@@ -328,7 +339,9 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      setRows(await api.listEmotions());
+      const _load2 = await api.listEmotions();
+      if (isCancelled()) return;
+      setRows(_load2);
     } catch {
       setRows([]);
     }
@@ -367,7 +380,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const remove = async (r: EmotionEntry) => {
-    if (!window.confirm(t.espacio.deleteEmotionConfirm.replace("{nombre}", emotionLabel(r.emotion)))) return;
+    if (!(await confirm(t.espacio.deleteEmotionConfirm.replace("{nombre}", emotionLabel(r.emotion))))) return;
     setError(null);
     try {
       await api.deleteEmotion(r.id);
@@ -378,6 +391,8 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.espacio.emotionsTitle}
       badge={
@@ -398,7 +413,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
               <label htmlFor="emocion-registro" className="text-xs font-semibold text-zinc-300">
                 {t.espacio.emotionAria}
               </label>
-              <select
+              <Field label={t.espacio.emotionAria}><select
                 id="emocion-registro"
                 aria-label={t.espacio.emotionAria}
                 className={`${inputCls} mt-1`}
@@ -410,7 +425,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
                     {t.espacio[o.key] as string}
                   </option>
                 ))}
-              </select>
+              </select></Field>
             </div>
             <div>
               <p id="intensidad-etiqueta" className="text-xs font-semibold text-zinc-300">
@@ -432,7 +447,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
           </div>
-          <textarea aria-label={t.espacio.noteAria} className={inputCls} placeholder={t.espacio.notePlaceholder} value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+          <Field label={t.espacio.noteAria}><textarea aria-label={t.espacio.noteAria} className={inputCls} placeholder={t.espacio.notePlaceholder} value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></Field>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -472,13 +487,13 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
                       <>
                         <button
                           onClick={() => { setEditing(r); setEmotion(r.emotion); setIntensity(r.intensity); setNote(r.note); }}
-                          className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                          className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.espacio.editEmotion}
                         </button>
                         <button
                           onClick={() => remove(r)}
-                          className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                          className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.espacio.delete}
                         </button>
@@ -493,15 +508,17 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
         )}
       </div>
     </Panel>
+    </>
   );
 }
 
 export function EspacioPanel() {
+  const isCancelled = useCancelled();
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
   }, []);
 
   return (

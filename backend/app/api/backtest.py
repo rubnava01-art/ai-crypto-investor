@@ -2,6 +2,7 @@
 import datetime as dt
 import json
 import os
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
@@ -109,9 +110,19 @@ def list_runs(user: User = Depends(get_current_user)):
     return sorted(f[:-5] for f in os.listdir(RUNS_DIR) if f.endswith(".json"))
 
 
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
 @router.get("/runs/{run_id}/csv", response_class=PlainTextResponse)
 def run_csv(run_id: str, user: User = Depends(get_current_user)):
-    path = os.path.join(RUNS_DIR, f"{run_id}.csv")
-    if not os.path.exists(path):
+    # Sanitized (M7): the old code joined the raw parameter into a path
+    # and read whatever it pointed at. Now: strict allowlist + basename
+    # + resolved-prefix check, so only files inside RUNS_DIR ever open.
+    # Invalid ids get the same 404 as missing runs (no probing signal).
+    if not _RUN_ID_RE.match(run_id):
+        raise HTTPException(status_code=404, detail="run not found")
+    runs_dir = os.path.realpath(RUNS_DIR)
+    path = os.path.realpath(os.path.join(runs_dir, f"{os.path.basename(run_id)}.csv"))
+    if os.path.dirname(path) != runs_dir or not os.path.exists(path):
         raise HTTPException(status_code=404, detail="run not found")
     return PlainTextResponse(open(path).read(), media_type="text/csv")

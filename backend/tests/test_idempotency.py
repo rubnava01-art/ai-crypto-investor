@@ -5,11 +5,22 @@ from app.core.state import state
 
 
 @pytest.fixture(autouse=True)
-def _reset_state():
+def _reset_state(client, auth_headers):
+    # Depende de `client` a propósito: el lifespan del TestClient
+    # restaura el estado persistido (Fase 2, A3), así que el reseteo en
+    # memoria debe correr DESPUÉS de crear el cliente, no antes.
     state.kill_switch = False
     state.scanner_running = False
     state.simulation_mode = "simulation"
     yield
+    # El kill switch ya PERSISTE (Fase 2): soltarlo explícitamente para
+    # no filtrarlo al siguiente módulo vía el restore del lifespan.
+    try:
+        client.post("/api/risk/kill-switch/deactivate", headers=auth_headers)
+        client.post("/api/scanner/stop", headers=auth_headers)
+        client.post("/api/simulation/mode", json={"mode": "simulation"}, headers=auth_headers)
+    except Exception:
+        pass
     state.kill_switch = False
     state.scanner_running = False
     state.simulation_mode = "simulation"

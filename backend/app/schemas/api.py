@@ -3,7 +3,7 @@ import datetime as dt
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def utc_now_iso() -> str:
@@ -12,8 +12,24 @@ def utc_now_iso() -> str:
 
 # ---------- auth ----------
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    # Acotados (Fase 2, M10/B2): sin max_length el body no estaba acotado
+    # y bcrypt falla (401) con más de 72 bytes; ahora se rechaza con 422
+    # explícito antes de tocar bcrypt. El login NO impone mínimo (decisión
+    # de Rubén 2026-11-02: el mínimo 12 aplica solo a fijar contraseñas
+    # nuevas o cambiadas, nunca a entrar con una ya existente).
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def _password_within_bcrypt_cap(cls, v: str) -> str:
+        from app.core.security import check_password_bytes
+
+        try:
+            check_password_bytes(v)
+        except ValueError as e:
+            raise ValueError(str(e)) from e
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -27,6 +43,11 @@ class HealthResponse(BaseModel):
     version: str
     mode: str
     timestamp_utc: str
+    # Fase 3 (M14/quick-win #3): which build is actually serving, so the
+    # next "route missing in prod" is diagnosed in seconds, not by
+    # guessing. "unknown" when the deploy pipeline provides no SHA.
+    git_sha: str = "unknown"
+    built_utc: str | None = None
 
 
 class SystemStatus(BaseModel):

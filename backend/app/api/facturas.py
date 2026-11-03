@@ -21,6 +21,14 @@ from app.models.tables import Invoice, User
 router = APIRouter(prefix="/api/facturas", tags=["facturas"])
 
 STATUSES = ("borrador", "enviada", "pagada")
+# Forward-only state machine (Fase 3, M18), mirroring referrals'
+# pending -> confirmed -> rewarded: an invoice may advance (skips
+# allowed: borrador -> pagada is a real flow, the tests use it) but
+# NEVER go back (pagada -> borrador used to be accepted).
+_STATUS_ORDER = {name: i for i, name in enumerate(STATUSES)}
+
+# Tope de líneas por factura (M10): items venía sin tope.
+MAX_INVOICE_ITEMS = 100
 
 
 class InvoiceItem(BaseModel):
@@ -47,7 +55,7 @@ class InvoiceCreate(BaseModel):
     client_name: str = Field(min_length=1, max_length=200)
     client_email: str = Field(default="", max_length=200)
     client_phone: str = Field(default="", max_length=64)
-    items: list[InvoiceItem] = Field(min_length=1)
+    items: list[InvoiceItem] = Field(min_length=1, max_length=MAX_INVOICE_ITEMS)
     tax_rate: float = Field(default=0, ge=0, le=100)
     notes: str = Field(default="", max_length=5000)
 
@@ -89,9 +97,24 @@ def create_invoice(
     db: Session = Depends(get_db),
 ):
     number = payload.number.strip()
-    if not number:
+    if number:
+        # Explicit numbers must be unique (M18; the migration adds the
+        # DB constraint when no duplicates exist — the API check holds
+        # regardless, so behavior never depends on migration outcome).
+        if db.query(Invoice).filter(Invoice.number == number).first() is not None:
+            raise HTTPException(status_code=409, detail="Invoice number already exists")
+    else:
+        # Autonumber: skip taken numbers instead of trusting the count
+        # (the old INV-{count+1} raced with concurrent creates and with
+        # deletions, which reuse numbers).
         count = db.query(Invoice).count()
-        number = f"INV-{count + 1:03d}"
+        for attempt in range(count + 1, count + 101):
+            candidate = f"INV-{attempt:03d}"
+            if db.query(Invoice).filter(Invoice.number == candidate).first() is None:
+                number = candidate
+                break
+        else:
+            raise HTTPException(status_code=409, detail="Could not allocate an invoice number")
     row = Invoice(
         number=number,
         client_name=payload.client_name.strip(),
@@ -120,6 +143,11 @@ def update_invoice_status(
     row = db.get(Invoice, inv_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    if _STATUS_ORDER[payload.status] < _STATUS_ORDER[row.status]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"cannot move invoice from {row.status} to {payload.status}",
+        )
     row.status = payload.status
     db.commit()
     db.refresh(row)

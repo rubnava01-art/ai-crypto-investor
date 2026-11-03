@@ -1,9 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api, ApiError, type CoinPrice } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
+import { apiErrorText } from "./ui";
+
+// URL del WebSocket público de Kraken por variable de entorno (Fase 4,
+// FE12), con el valor actual como fallback y aviso ruidoso si falta (sin
+// fallar en producción: el fallback sigue funcionando).
+export const KRAKEN_WS_URL = process.env.NEXT_PUBLIC_KRAKEN_WS_URL ?? "wss://ws.kraken.com";
+if (typeof window !== "undefined" && !process.env.NEXT_PUBLIC_KRAKEN_WS_URL) {
+  console.warn("[market] NEXT_PUBLIC_KRAKEN_WS_URL no definida: usando wss://ws.kraken.com.");
+}
+
+// Un tick WS se considera fresco durante ~60s (mismo umbral que el stale
+// del REST): pasado ese tiempo, el precio en vivo se atenúa y la nota de
+// pie recibe el mismo tratamiento stale que el REST (FE4).
+const WS_FRESH_MS = 60_000;
 
 const COIN_STYLE: Record<string, { bg: string; glyph: string }> = {
   BTC: { bg: "#F7931A", glyph: "₿" },
@@ -42,22 +57,38 @@ export function MarketPanel() {
   const [prices, setPrices] = useState<CoinPrice[] | null>(null);
   const [meta, setMeta] = useState<{ source: string; updated: string; stale: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [live, setLive] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(false);
+  const [live, setLive] = useState<Record<string, { price: number; at: number }>>({});
   const [wsLive, setWsLive] = useState(false);
-  const { t } = useLanguage();
+  // Reloj para reevaluar la frescura de los ticks aunque no lleguen nuevos.
+  const [now, setNow] = useState(() => Date.now());
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const isCancelled = useCancelled();
+  const restAbortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    restAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    restAbortRef.current = ctrl;
+    setLoading(true);
     try {
-      const r = await api.marketPrices();
+      const r = await api.marketPrices({ signal: ctrl.signal });
+      if (isCancelled() || ctrl.signal.aborted) return;
       setPrices(r.prices);
       setMeta({ source: r.source, updated: r.updated_utc, stale: r.stale });
       setError(null);
     } catch (e) {
+      if (ctrl.signal.aborted || isCancelled()) return;
       if (!(e instanceof ApiError)) setError(t.market.loadFailed);
       else if (e.status === 503) setError(t.market.unavailable);
-      else setError(e.message);
+      else setError(apiErrorText(e, t));
+    } finally {
+      // Solo la carga vigente apaga el estado: una carga abortada por
+      // un clic nuevo no debe apagar el "Actualizando…" de la nueva.
+      if (restAbortRef.current === ctrl) setLoading(false);
     }
-  }, []);
+  }, [isCancelled, t]);
 
   useEffect(() => {
     load();
@@ -68,6 +99,9 @@ export function MarketPanel() {
       if (document.hidden) return;
       load();
     }, 60_000);
+    // Reevaluar frescura cada 15s: un tick deja de ser fresco a los 60s
+    // aunque no llegue ningún evento nuevo que dispare un render.
+    const freshness = setInterval(() => setNow(Date.now()), 15_000);
 
     // Ticks en tiempo real directo del WebSocket público de Kraken (sin clave),
     // con reconexión automática con backoff exponencial si la conexión cae.
@@ -78,7 +112,7 @@ export function MarketPanel() {
 
     const connect = () => {
       if (unmounted) return;
-      const sock = new WebSocket("wss://ws.kraken.com");
+      const sock = new WebSocket(KRAKEN_WS_URL);
       ws = sock;
       sock.onopen = () => {
         retryDelay = 2_000; // la conexión funcionó: reiniciar el backoff
@@ -98,7 +132,7 @@ export function MarketPanel() {
             const sym = PAIR_TO_SYMBOL[msg[3] as string];
             const price = parseFloat(msg[1]?.c?.[0]);
             if (sym && Number.isFinite(price)) {
-              setLive((prev) => ({ ...prev, [sym]: price }));
+              setLive((prev) => ({ ...prev, [sym]: { price, at: Date.now() } }));
             }
           }
         } catch {
@@ -124,6 +158,8 @@ export function MarketPanel() {
     return () => {
       unmounted = true;
       clearInterval(t);
+      clearInterval(freshness);
+      restAbortRef.current?.abort();
       if (retryTimer) clearTimeout(retryTimer);
       try {
         ws?.close();
@@ -133,7 +169,12 @@ export function MarketPanel() {
     };
   }, [load]);
 
-  const liveBadge = wsLive ? (
+  // Frescura WS: conectado Y con al menos un tick reciente. Si no, el
+  // panel vuelve al mismo tratamiento stale que el REST (nota ámbar) y los
+  // precios en vivo se atenúan en vez de mostrarse como actuales.
+  const lastTickAt = Math.max(0, ...Object.values(live).map((v) => v.at));
+  const wsFresh = wsLive && lastTickAt > 0 && now - lastTickAt <= WS_FRESH_MS;
+  const liveBadge = wsFresh ? (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
       <span className="relative flex h-2 w-2">
         <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -156,7 +197,10 @@ export function MarketPanel() {
           {prices.map((c) => {
             const style = COIN_STYLE[c.symbol] ?? { bg: "#52525b", glyph: c.symbol.slice(0, 1) };
             const up = (c.change_24h_pct ?? 0) >= 0;
-            const price = live[c.symbol] ?? c.price_usd;
+            const liveEntry = live[c.symbol];
+            const liveFresh = wsFresh && liveEntry !== undefined;
+            const price = liveEntry?.price ?? c.price_usd;
+            const priceStale = liveEntry !== undefined && !liveFresh;
             return (
               <li key={c.symbol} className="flex items-center gap-3 py-3.5 sm:gap-4">
                 <span
@@ -174,12 +218,13 @@ export function MarketPanel() {
                   <Sparkline data={c.sparkline_24h} up={up} />
                 </div>
                 <div className="w-[7.5rem] shrink-0 text-right sm:w-36">
-                  <p className="text-base font-semibold tabular-nums text-zinc-100">
+                  <p className={`text-base font-semibold tabular-nums ${priceStale ? "text-zinc-400 opacity-60" : "text-zinc-100"}`} title={priceStale ? t.reliability.stalePrice : undefined}>
                     {price == null
                       ? "—"
                       : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: price < 10 ? 4 : 2 })}`}
                   </p>
                   <p className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className="sr-only">{up ? t.market.directionUp : t.market.directionDown} </span>
                     {c.change_24h_pct == null ? "—" : `${up ? "↗" : "↘"} ${Math.abs(c.change_24h_pct).toFixed(2)}%`}
                   </p>
                 </div>
@@ -190,22 +235,23 @@ export function MarketPanel() {
       )}
       {meta && (
         <p
-          className={`mt-3 text-xs leading-relaxed ${meta.stale && !wsLive ? "text-amber-400" : "text-zinc-500"}`}
-          role={meta.stale && !wsLive ? "status" : undefined}
+          className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-zinc-500"}`}
+          role={!wsFresh && (meta.stale || lastTickAt > 0) ? "status" : undefined}
         >
-          {wsLive
+          {wsFresh
             ? t.market.liveNote
-            : meta.stale
-              ? t.market.staleNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))
-              : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString("en-US", { hour12: false }))}
+            : meta.stale || lastTickAt > 0
+              ? t.market.staleNote.replace("{time}", new Date(meta.updated).toLocaleTimeString(locale, { hour12: false }))
+              : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString(locale, { hour12: false }))}
         </p>
       )}
       <button
         type="button"
         onClick={load}
-        className="mt-3 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:border-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+        disabled={loading}
+        className="mt-3 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:border-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {t.market.refresh}
+        {loading ? t.market.refreshing : t.market.refresh}
       </button>
     </Panel>
   );

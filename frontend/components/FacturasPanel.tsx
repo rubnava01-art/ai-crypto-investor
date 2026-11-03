@@ -7,15 +7,16 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useAsyncLoad, useCancelled } from "../lib/useLoad";
+import { ApiErrorBanner, useConfirm, Field } from "./ui";
+import { formatDate, formatMoney } from "../lib/format";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
-const money = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-
-const fmtDate = (iso: string | null, locale: string) =>
-  iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
+// Formato compartido (Fase 4, FE6): antes money/fmtDate locales duplicados.
+const money = (n: number) => formatMoney(n, "USD", "en-US");
+const fmtDate = (iso: string | null, locale: string) => formatDate(iso, locale);
 
 const emptyItem = (): InvoiceItem => ({ description: "", qty: 1, unit_price: 0 });
 
@@ -110,7 +111,7 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
             <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={t.facturas.removeMaterialAria}>×</button>
           </div>
         ))}
-        <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+        <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
           {t.facturas.addMaterial}
         </button>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -168,7 +169,13 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
     thanks: tt.facturas.printThanks,
   };
   const [contacts, setContacts] = useState<CrmContact[]>([]);
-  const [saved, setSaved] = useState<Invoice[] | null>(null);
+  // Tri-estado (Fase 4, FE3/FE2): facturas con useAsyncLoad; un error ya no
+  // se mapea a [] (antes parecía "sin facturas").
+  const savedLoad = useAsyncLoad<Invoice[]>((signal) => api.listInvoices({ signal }), []);
+  const saved = savedLoad.data;
+  const savedError = savedLoad.error;
+  const isCancelled = useCancelled();
+  const { confirm, dialog } = useConfirm(tt);
   const [sellerName, setSellerName] = useState("Rubén Navarrete");
   const [sellerPhone, setSellerPhone] = useState("(562) 317-9226");
   const [sellerEmail, setSellerEmail] = useState("");
@@ -182,18 +189,11 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setSaved(await api.listInvoices());
-    } catch {
-      setSaved([]);
-    }
-  }, []);
+  const load = savedLoad.reload;
 
   useEffect(() => {
-    load();
-    api.listContacts().then(setContacts).catch(() => setContacts([]));
-  }, [load]);
+    api.listContacts().then((c) => { if (!isCancelled()) setContacts(c); }).catch(() => { if (!isCancelled()) setContacts([]); });
+  }, [isCancelled]);
 
   const pickContact = (id: string) => {
     const c = contacts.find((x) => String(x.id) === id);
@@ -248,7 +248,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const remove = async (inv: Invoice) => {
-    if (!window.confirm(tt.facturas.confirmDeleteInvoice.replace("{numero}", inv.number))) return;
+    if (!(await confirm(tt.facturas.confirmDeleteInvoice.replace("{numero}", inv.number)))) return;
     try {
       await api.deleteInvoice(inv.id);
       await load();
@@ -276,6 +276,8 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
     });
 
   return (
+    <>
+      {dialog}
     <div className="space-y-4">
       <MaterialsCalculator onUsePrice={addFromCalculator} />
 
@@ -284,7 +286,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
         title={tt.facturas.genTitle}
         badge={
           <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {saved === null ? tt.facturas.badgeLoading : tt.facturas.savedCount.replace("{n}", String(saved.length))}
+            {saved === null ? (savedError ? "—" : tt.facturas.badgeLoading) : tt.facturas.savedCount.replace("{n}", String(saved.length))}
           </span>
         }
       >
@@ -296,22 +298,22 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && (
           <form onSubmit={save} className="space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <input aria-label={tt.facturas.sellerNameAria} className={inputCls} placeholder={tt.facturas.sellerNamePlaceholder} value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} />
-              <input aria-label={tt.facturas.sellerPhoneAria} className={inputCls} placeholder={tt.facturas.sellerPhonePlaceholder} value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} />
-              <input aria-label={tt.facturas.sellerEmailAria} className={inputCls} placeholder={tt.facturas.sellerEmailPlaceholder} value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} />
+              <Field label={tt.facturas.sellerNameAria}><input aria-label={tt.facturas.sellerNameAria} className={inputCls} placeholder={tt.facturas.sellerNamePlaceholder} value={sellerName} onChange={(e) => setSellerName(e.target.value)} maxLength={200} /></Field>
+              <Field label={tt.facturas.sellerPhoneAria}><input aria-label={tt.facturas.sellerPhoneAria} className={inputCls} placeholder={tt.facturas.sellerPhonePlaceholder} value={sellerPhone} onChange={(e) => setSellerPhone(e.target.value)} maxLength={64} /></Field>
+              <Field label={tt.facturas.sellerEmailAria}><input aria-label={tt.facturas.sellerEmailAria} className={inputCls} placeholder={tt.facturas.sellerEmailPlaceholder} value={sellerEmail} onChange={(e) => setSellerEmail(e.target.value)} maxLength={200} /></Field>
             </div>
             {contacts.length > 0 && (
-              <select className={inputCls} defaultValue="" onChange={(e) => pickContact(e.target.value)} aria-label={tt.facturas.crmClientAria}>
+              <Field label={tt.facturas.crmClientAria}><select className={inputCls} defaultValue="" onChange={(e) => pickContact(e.target.value)} aria-label={tt.facturas.crmClientAria}>
                 <option value="">{tt.facturas.crmClientOption}</option>
                 {contacts.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-              </select>
+              </select></Field>
             )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <input aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} />
-              <input aria-label={tt.facturas.clientEmailAria} className={inputCls} placeholder={tt.facturas.clientEmailPlaceholder} value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} />
-              <input aria-label={tt.facturas.clientPhoneAria} className={inputCls} placeholder={tt.facturas.clientPhonePlaceholder} value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} />
+              <Field label={tt.facturas.clientAria}><input aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} /></Field>
+              <Field label={tt.facturas.clientEmailAria}><input aria-label={tt.facturas.clientEmailAria} className={inputCls} placeholder={tt.facturas.clientEmailPlaceholder} value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} /></Field>
+              <Field label={tt.facturas.clientPhoneAria}><input aria-label={tt.facturas.clientPhoneAria} className={inputCls} placeholder={tt.facturas.clientPhonePlaceholder} value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} /></Field>
             </div>
 
             <p className="pt-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">{tt.facturas.conceptsHeading}</p>
@@ -323,7 +325,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                 <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={tt.facturas.removeConceptAria}>×</button>
               </div>
             ))}
-            <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="min-h-[40px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {tt.facturas.addConcept}
             </button>
 
@@ -331,7 +333,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
               <label className="text-sm text-zinc-400">{tt.facturas.taxLabel}
                 <input className={`${inputCls} mt-1`} type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
               </label>
-              <input aria-label={tt.facturas.notesAria} className={inputCls} placeholder={tt.facturas.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
+              <Field label={tt.facturas.notesAria}><input aria-label={tt.facturas.notesAria} className={inputCls} placeholder={tt.facturas.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} /></Field>
             </div>
 
             <div className="space-y-1 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-200">
@@ -357,9 +359,10 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
             {tt.facturas.savedHeading} ({saved === null ? "…" : saved.length})
           </p>
-          {saved === null ? (
+          {savedError ? <ApiErrorBanner error={savedError} t={tt} onRetry={savedLoad.reload} /> : null}
+          {saved === null && !savedError ? (
             <p className="py-2 text-sm text-zinc-500">{tt.facturas.loadingInvoices}</p>
-          ) : saved.length === 0 ? (
+          ) : saved === null ? null : saved.length === 0 ? (
             <p className="py-2 text-sm text-zinc-500">{tt.facturas.emptyInvoices}</p>
           ) : (
             <ul className="divide-y divide-zinc-800/70">
@@ -379,7 +382,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                         </button>
                         {isAdmin && (
                           <>
-                            <select
+                            <Field label={tt.facturas.invoiceStatusAria}><select
                               className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                               value={inv.status}
                               onChange={(e) => changeStatus(inv, e.target.value as InvoiceStatus)}
@@ -388,7 +391,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                               {(Object.keys(STATUS_LABEL) as InvoiceStatus[]).map((s) => (
                                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                               ))}
-                            </select>
+                            </select></Field>
                             <button onClick={() => remove(inv)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                               {tt.facturas.delete}
                             </button>
@@ -405,6 +408,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       </Panel>
       </div>
     </div>
+    </>
   );
 }
 

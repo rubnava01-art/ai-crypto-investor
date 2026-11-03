@@ -346,6 +346,23 @@ def register_referral(
             detail=f"campaign is {campaign.status}; referrals can only be registered on active campaigns",
         )
     code = (payload.code or "").strip().upper() or campaign.share_code
+    # Dedup (M18): one referral per (campaign, referred_contact) when a
+    # contact is given — the same person cannot be registered twice in
+    # one campaign. Empty contacts stay exempt (no contact to dedup on).
+    referred_contact = payload.referred_contact.strip()
+    if referred_contact and (
+        db.query(Referral)
+        .filter(
+            Referral.campaign_id == campaign.id,
+            Referral.referred_contact == referred_contact,
+        )
+        .first()
+        is not None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A referral for this contact already exists in this campaign",
+        )
     referral = Referral(
         campaign_id=campaign.id,
         referrer_name=payload.referrer_name.strip(),

@@ -30,20 +30,20 @@ def test_register_human_check_and_prueba_role(client, admin_headers):
     # Wrong answer -> rejected, challenge consumed.
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234", "challenge_id": cid, "answer": answer + 1},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer + 1},
     )
     assert r.status_code == 400
     # Same challenge cannot be replayed.
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
     )
     assert r.status_code == 400
 
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
     )
     assert r.status_code == 201, r.text
     assert r.json()["role"] == "prueba"
@@ -53,19 +53,23 @@ def test_register_human_check_and_prueba_role(client, admin_headers):
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
     )
     assert r.status_code == 409
 
-    # The registered account is usable and cannot touch controls.
+    # Pending + minted token: still locked out everywhere (Fase 2, M1) —
+    # a token must not bypass approval. Only after admin approval is
+    # the account usable (and still unable to touch controls).
     h = _token("nuevo1")
     assert client.get("/api/users", headers=h).status_code == 403
+    assert client.get("/api/auth/me", headers=h).status_code == 403
+    users = client.get("/api/users", headers=admin_headers).json()
+    uid = [u for u in users if u["username"] == "nuevo1"][0]["id"]
+    assert client.post(f"/api/users/{uid}/approve", headers=admin_headers).status_code == 200
     me = client.get("/api/auth/me", headers=h).json()
     assert me["role"] == "prueba"
 
     # Cleanup via the seeded super admin.
-    users = client.get("/api/users", headers=admin_headers).json()
-    uid = [u for u in users if u["username"] == "nuevo1"][0]["id"]
     assert client.delete(f"/api/users/{uid}", headers=admin_headers).status_code == 204
 
 
@@ -74,7 +78,7 @@ def test_super_admin_tier_guards(client, admin_headers):
     # and cannot touch the super admin's account.
     r = client.post(
         "/api/users",
-        json={"username": "adminplano", "password": "pass1234", "role": "admin"},
+        json={"username": "adminplano", "password": "pass1234abcd", "role": "admin"},
         headers=admin_headers,
     )
     assert r.status_code == 201, r.text

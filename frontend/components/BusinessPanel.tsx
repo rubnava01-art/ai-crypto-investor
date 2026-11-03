@@ -6,14 +6,18 @@ import {
   type BusinessArea, type BusinessNote, type BusinessTask, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 
 export function BusinessPanel() {
+  const isCancelled = useCancelled();
   const { t: tt } = useLanguage();
+  const { confirm, dialog } = useConfirm(tt);
   const AREAS: { value: BusinessArea; label: string; hint: string }[] = [
     { value: "marketing", label: tt.business.areaMarketing, hint: tt.business.hintMarketing },
     { value: "ventas", label: tt.business.areaVentas, hint: tt.business.hintVentas },
@@ -45,6 +49,7 @@ export function BusinessPanel() {
         api.listBusinessTasks(a),
         me ? Promise.resolve(me) : api.me(),
       ]);
+      if (isCancelled()) return;
       setNotes(n);
       setTasks(t);
       setMe(m);
@@ -108,6 +113,8 @@ export function BusinessPanel() {
   const areaLabel = AREAS.find((a) => a.value === area)?.label ?? area;
 
   return (
+    <>
+      {dialog}
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={tt.business.areasAria}>
         {AREAS.map((a) => (
@@ -144,11 +151,11 @@ export function BusinessPanel() {
                 <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
                   {editingNote?.id === n.id ? (
                     <div className="space-y-3">
-                      <input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                      <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></Field>
                       <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                       <div className="flex gap-2">
-                        <button onClick={saveEdit} className="min-h-[40px] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
-                        <button onClick={() => setEditingNote(null)} className="min-h-[40px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
+                        <button onClick={saveEdit} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
+                        <button onClick={() => setEditingNote(null)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
                       </div>
                     </div>
                   ) : (
@@ -158,14 +165,14 @@ export function BusinessPanel() {
                       {isAdmin && (
                         <div className="mt-3 flex gap-2 text-xs">
                           <button
-                            className="rounded px-1 py-1 text-emerald-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                            className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-emerald-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                             onClick={() => { setEditingNote(n); setEditTitle(n.title); setEditBody(n.body); }}
                           >
                             {tt.business.edit}
                           </button>
                           <button
-                            className="rounded px-1 py-1 text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
-                            onClick={async () => { if (!window.confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title))) return; await api.deleteBusinessNote(n.id); refresh(); }}
+                            className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                            onClick={async () => { if (!(await confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title)))) return; await api.deleteBusinessNote(n.id); refresh(); }}
                           >
                             {tt.business.delete}
                           </button>
@@ -178,19 +185,19 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
-                <input aria-label={tt.business.noteTitleAria}
+                <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria}
                   className={inputCls}
                   placeholder={tt.business.noteTitlePlaceholder}
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
-                />
-                <textarea aria-label={tt.business.noteBodyAria}
+                /></Field>
+                <Field label={tt.business.noteBodyAria}><textarea aria-label={tt.business.noteBodyAria}
                   className={inputCls}
                   rows={3}
                   placeholder={tt.business.noteBodyPlaceholder}
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
-                />
+                /></Field>
                 <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.saveNote}
                 </button>
@@ -218,8 +225,8 @@ export function BusinessPanel() {
                   </span>
                   {isAdmin && (
                     <button
-                      className="rounded px-1 py-1 text-xs text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
-                      onClick={async () => { if (!window.confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title))) return; await api.deleteBusinessTask(t.id); refresh(); }}
+                      className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-xs text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                      onClick={async () => { if (!(await confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title)))) return; await api.deleteBusinessTask(t.id); refresh(); }}
                     >
                       {tt.business.delete}
                     </button>
@@ -229,13 +236,13 @@ export function BusinessPanel() {
             </ul>
             {isAdmin && (
               <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
-                <input aria-label={tt.business.newTaskAria}
+                <Field label={tt.business.newTaskAria} className="flex-1"><input aria-label={tt.business.newTaskAria}
                   className={inputCls}
                   placeholder={tt.business.newTaskPlaceholder}
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
-                />
+                /></Field>
                 <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.add}
                 </button>
@@ -248,5 +255,6 @@ export function BusinessPanel() {
         <p className="text-xs text-zinc-400">{tt.business.viewerNote}</p>
       )}
     </div>
+    </>
   );
 }

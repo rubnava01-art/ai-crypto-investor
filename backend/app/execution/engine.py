@@ -13,11 +13,12 @@ import time
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.data import exchanges
-from app.models.tables import Fill, Order, SystemEvent
+from app.models.tables import Fill, Order, RealCapCounter, SystemEvent
 
 FEE_RATE = Decimal("0.001")
 RETRYABLE = 3
@@ -79,6 +80,16 @@ def execute_sandbox(db: Session, order: Order) -> Order:
     """Sandbox execution via ccxt (needs sandbox API keys; fails cleanly without)."""
     import ccxt as _ccxt  # local import: only needed here
 
+    # Defensa en profundidad (decisión de Rubén 2026-11-02): aunque una
+    # orden sandbox llegue hasta aquí por otra vía, sin ALLOW_SANDBOX
+    # nunca toca Kraken. El gate principal está en POST /api/orders.
+    if not settings.allow_sandbox:
+        order.status = "failed"
+        db.add(SystemEvent(level="error", category="execution",
+                           message="sandbox disabled on this server (staging only)"))
+        db.commit()
+        raise RuntimeError("sandbox disabled on this server (staging only)")
+
     from app.data import _compat
 
     _compat.apply_shims()
@@ -139,28 +150,46 @@ def _real_exchange():
 
 
 def real_buy_cost_total(db: Session) -> Decimal:
-    """Cumulative cost of all real BUY fills — the hard-cap meter."""
-    rows = (
-        db.query(Fill)
+    """Cumulative cost of all real BUY fills — the hard-cap meter.
+    SUM in SQL (Fase 3, M5), not .all() + Python sum. On Postgres the
+    Numeric arithmetic is exact; this is the source of truth the cap
+    check recomputes under the counter lock."""
+    total = (
+        db.query(func.coalesce(func.sum(Fill.price * Fill.quantity + Fill.fee), 0))
         .join(Order, Fill.order_id == Order.id)
         .filter(Order.mode == "real", Order.side == "buy")
-        .all()
+        .scalar()
     )
-    return sum((f.price * f.quantity + f.fee for f in rows), Decimal("0"))
+    return Decimal(str(total or 0))
 
 
 def real_position(db: Session, symbol: str) -> Decimal:
-    """Net real filled quantity for a symbol (buys - sells)."""
-    net = Decimal("0")
-    rows = (
-        db.query(Fill, Order.side)
+    """Net real filled quantity for a symbol (buys - sells), in SQL."""
+    net = (
+        db.query(
+            func.coalesce(
+                func.sum(case((Order.side == "buy", Fill.quantity), else_=-Fill.quantity)),
+                0,
+            )
+        )
         .join(Order, Fill.order_id == Order.id)
         .filter(Order.mode == "real", Order.symbol == symbol)
-        .all()
+        .scalar()
     )
-    for fill, side in rows:
-        net += fill.quantity if side == "buy" else -fill.quantity
-    return net
+    return Decimal(str(net or 0))
+
+
+def _lock_real_cap(db: Session) -> RealCapCounter:
+    """Take the cap counter row lock (SELECT ... FOR UPDATE on
+    Postgres; a no-op on SQLite, where writers already serialize).
+    The lock serializes cap-check with fill-insert across concurrent
+    real orders. Callers hold it until their commit."""
+    counter = db.query(RealCapCounter).with_for_update().first()
+    if counter is None:
+        counter = RealCapCounter(id=1, total=Decimal("0"))
+        db.add(counter)
+        db.flush()
+    return counter
 
 
 def execute_real(db: Session, order: Order) -> Order:
@@ -178,8 +207,18 @@ def execute_real(db: Session, order: Order) -> Order:
     if not settings.real_trading_enabled:
         raise RuntimeError("real trading is disabled (REAL_TRADING_ENABLED off)")
     price = _market_price(order.symbol)
+    counter = None
     if order.side == "buy":
-        projected = real_buy_cost_total(db) + price * order.quantity
+        # ATOMIC CAP (Fase 2, A2): lock the counter row, THEN recompute
+        # from fills (source of truth) and check. Two concurrent real
+        # buys serialize here: the second sees the first's fill before
+        # deciding. The pre-check in create_order is only early
+        # feedback; THIS check is authoritative.
+        counter = _lock_real_cap(db)
+        spent = real_buy_cost_total(db)
+        counter.total = spent
+        db.flush()
+        projected = spent + price * order.quantity * (Decimal("1") + FEE_RATE)
         if projected > Decimal(str(settings.initial_capital_usd)):
             order.status = "failed"
             db.commit()
@@ -224,6 +263,9 @@ def execute_real(db: Session, order: Order) -> Order:
         _record_fill(db, order, avg, filled)
         order.status = "sent"
         _refresh_status(db, order)
+        if counter is not None:
+            # Mirror the new truth while still under the lock.
+            counter.total = real_buy_cost_total(db)
     else:
         # Accepted by the exchange but not filled yet: leave it open ('sent')
         # rather than mislabeling it failed.

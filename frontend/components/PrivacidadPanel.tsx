@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type ComplianceCategory, type ComplianceItem, type ComplianceStatus, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -30,7 +32,9 @@ function statusCls(s: ComplianceStatus) {
  * mano — aquí nada se da por hecho. Esta sección gestiona tareas: no
  * publica textos legales ni afirma que el sitio ya cumple. */
 export function PrivacidadPanel() {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [rows, setRows] = useState<ComplianceItem[] | null>(null);
   const [filter, setFilter] = useState<"todas" | ComplianceCategory>("todas");
@@ -63,14 +67,16 @@ export function PrivacidadPanel() {
 
   const load = useCallback(async () => {
     try {
-      setRows(await api.listComplianceItems());
+      const _load1 = await api.listComplianceItems();
+      if (isCancelled()) return;
+      setRows(_load1);
     } catch {
       setRows([]);
     }
   }, []);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
     load();
   }, [load]);
 
@@ -129,7 +135,7 @@ export function PrivacidadPanel() {
   };
 
   const remove = async (item: ComplianceItem) => {
-    if (!window.confirm(t.privacidad.deleteConfirm.replace("{nombre}", item.title))) return;
+    if (!(await confirm(t.privacidad.deleteConfirm.replace("{nombre}", item.title)))) return;
     setError(null);
     try {
       await api.deleteComplianceItem(item.id);
@@ -149,6 +155,8 @@ export function PrivacidadPanel() {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.privacidad.title}
       badge={
@@ -164,9 +172,9 @@ export function PrivacidadPanel() {
 
       {isAdmin && (
         <form onSubmit={save} className="space-y-3">
-          <input aria-label={t.privacidad.titleAria} className={inputCls} placeholder={t.privacidad.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label={t.privacidad.descAria} className={inputCls} placeholder={t.privacidad.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <textarea aria-label={t.privacidad.notesAria} className={inputCls} placeholder={t.privacidad.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <Field label={t.privacidad.titleAria}><input aria-label={t.privacidad.titleAria} className={inputCls} placeholder={t.privacidad.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.privacidad.descAria}><textarea aria-label={t.privacidad.descAria} className={inputCls} placeholder={t.privacidad.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></Field>
+          <Field label={t.privacidad.notesAria}><textarea aria-label={t.privacidad.notesAria} className={inputCls} placeholder={t.privacidad.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></Field>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-zinc-300">{t.privacidad.groupLabel}</span>
@@ -207,7 +215,7 @@ export function PrivacidadPanel() {
       <div className="mt-4 flex flex-wrap gap-1.5">
         <button
           onClick={() => setFilter("todas")}
-          className={`min-h-[36px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === "todas" ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+          className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === "todas" ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
         >
           {t.privacidad.allFilter}
         </button>
@@ -215,7 +223,7 @@ export function PrivacidadPanel() {
           <button
             key={c}
             onClick={() => setFilter(c)}
-            className={`min-h-[36px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === c ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+            className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === c ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
           >
             {categoryLabel(c)}
           </button>
@@ -241,20 +249,20 @@ export function PrivacidadPanel() {
                   <span className="text-sm font-semibold text-zinc-100">{item.title}</span>
                   {isAdmin && (
                     <span className="ml-auto flex flex-wrap gap-2">
-                      <select
+                      <Field label={t.privacidad.changeStatusAria}><select
                         aria-label={t.privacidad.changeStatusAria}
-                        className="min-h-[36px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                        className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         value={item.status}
                         onChange={(e) => quickStatus(item, e.target.value as ComplianceStatus)}
                       >
                         <option value="pendiente">{t.privacidad.statusPendiente}</option>
                         <option value="en_proceso">{t.privacidad.statusEnProceso}</option>
                         <option value="completado">{t.privacidad.statusCompletado}</option>
-                      </select>
-                      <button onClick={() => startEdit(item)} className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      </select></Field>
+                      <button onClick={() => startEdit(item)} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.privacidad.edit}
                       </button>
-                      <button onClick={() => remove(item)} className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+                      <button onClick={() => remove(item)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
                         {t.privacidad.delete}
                       </button>
                     </span>
@@ -268,5 +276,6 @@ export function PrivacidadPanel() {
         )}
       </div>
     </Panel>
+    </>
   );
 }

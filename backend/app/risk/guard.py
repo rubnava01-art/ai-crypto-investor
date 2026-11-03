@@ -5,6 +5,7 @@ import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -54,14 +55,14 @@ def apply_risk(
     if not ok:
         return GuardResult(False, reason, max_risk_usd=max_risk)
 
-    # Daily loss cap (realized losses today)
-    loss_today = (
-        db.query(Trade)
+    # Daily loss cap (realized losses today) — SUM in SQL (Fase 3, M5),
+    # not .all() + Python sum.
+    loss_sum = (
+        db.query(func.coalesce(func.sum(Trade.pnl_net), 0))
         .filter(Trade.closed_at >= _today_start(), Trade.pnl_net < 0)
-        .with_entities(Trade.pnl_net)
-        .all()
+        .scalar()
     )
-    realized_loss = sum((-p[0] for p in loss_today), Decimal("0"))
+    realized_loss = -Decimal(str(loss_sum or 0))
     potential_loss = max_risk  # worst case: stop hit in full
     ok, reason = risk_math.daily_loss_ok(
         realized_loss, potential_loss, Decimal(settings.max_daily_loss_usd)

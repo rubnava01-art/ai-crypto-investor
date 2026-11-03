@@ -10,6 +10,12 @@ from app.core.idempotency import (
     store_idempotency,
 )
 from app.core.hardening import audit
+from app.core.runtime import (
+    KEY_KILL_SWITCH,
+    KEY_MODE,
+    KEY_SCANNER,
+    persist_runtime_setting,
+)
 from app.core.security import get_current_user, require_admin
 from app.core.state import state
 from app.database import get_db
@@ -57,6 +63,8 @@ def scanner_start(
     # Phase 1: flips a flag. Phase 2 wires the real market-data loop.
     state.scanner_running = True
     audit(db, user, "scanner.start", "scanner", details={"running": True})
+    # Persisted (A3): survives free-tier sleep; restored at boot.
+    persist_runtime_setting(db, KEY_SCANNER, "true")
     return ScannerState(running=True)
 
 
@@ -66,6 +74,7 @@ def scanner_stop(
 ):
     state.scanner_running = False
     audit(db, user, "scanner.stop", "scanner", details={"running": False})
+    persist_runtime_setting(db, KEY_SCANNER, "false")
     return ScannerState(running=False)
 
 
@@ -104,6 +113,7 @@ def set_mode(
     state.simulation_mode = payload.mode
     audit(db, user, "simulation.mode", "simulation",
           details={"from": old, "to": payload.mode})
+    persist_runtime_setting(db, KEY_MODE, payload.mode)
     return SimulationModes(
         current=state.simulation_mode, real_enabled=settings.real_trading_enabled
     )
@@ -185,16 +195,37 @@ def create_order(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Kraken API keys are not configured on the server.",
             )
+    # Decisión de Rubén 2026-11-02: sandbox solo en staging explícito
+    # (ALLOW_SANDBOX=true). En producción siempre es 403, aunque haya
+    # llaves de Kraken configuradas. El trading real sigue OFF.
+    if payload.mode == "sandbox" and not settings.allow_sandbox:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El modo sandbox está desactivado en este servidor (solo staging).",
+        )
     if payload.mode not in ("simulation", "paper", "sandbox", "real"):
         raise HTTPException(status_code=400, detail="mode must be simulation|paper|sandbox|real")
     if payload.side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be buy|sell")
+    # Symbol allowlist (M10): only the pairs the exchange layer supports
+    # (data/exchanges.SYMBOLS) ever reach fetch_ticker — no probing with
+    # arbitrary symbols, no junk in the logs.
+    from app.data.exchanges import SYMBOLS as _ORDER_SYMBOLS
+
+    if payload.symbol not in _ORDER_SYMBOLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"symbol must be one of: {', '.join(_ORDER_SYMBOLS)}",
+        )
+    # Absolute quantity cap (M10): the risk-guard ceiling below does the
+    # real sizing; this only rejects absurd inputs before any pricing.
+    MAX_ORDER_QUANTITY = _D("100")
     try:
         qty = _D(str(payload.quantity))
-        if qty <= 0:
+        if qty <= 0 or qty > MAX_ORDER_QUANTITY:
             raise ValueError()
     except Exception:
-        raise HTTPException(status_code=400, detail="quantity must be a positive decimal")
+        raise HTTPException(status_code=400, detail="quantity must be a positive decimal no greater than 100")
 
     if _state.kill_switch:
         raise HTTPException(status_code=423, detail="Kill switch engaged.")
@@ -208,10 +239,14 @@ def create_order(
             detail="Market price unavailable.",
         )
     if payload.mode == "real":
-        # Hard armor (checked again inside execute_real): $20 cumulative cap
-        # on real buys, and no naked real sells.
+        # Hard armor (checked again, authoritatively, inside execute_real
+        # under the counter lock): $20 cumulative cap on real buys, and
+        # no naked real sells. Fee included in the projection, like the
+        # engine's check.
         if payload.side == "buy":
-            projected = _exec.real_buy_cost_total(db) + price * qty
+            projected = _exec.real_buy_cost_total(db) + price * qty * (
+                _D("1") + _exec.FEE_RATE
+            )
             if projected > _D(str(settings.initial_capital_usd)):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -237,6 +272,15 @@ def create_order(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Risk rejected: {result.reason}",
         )
+    # Risk-guard ceiling (Fase 2, A2): the old code discarded
+    # result.quantity and created the order with whatever quantity the
+    # caller asked for — a "guard-approved" order of arbitrary size.
+    # Now the requested quantity may not exceed the guard's sizing.
+    if result.quantity is None or qty > result.quantity:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Quantity exceeds the risk-guard maximum.",
+        )
 
     order = _Order(
         client_order_id=key,  # idempotency key doubles as client order id
@@ -252,9 +296,13 @@ def create_order(
 
     try:
         order = _exec.execute(db, order, price=price)
-    except RuntimeError as e:
+    except RuntimeError:
+        # Generic error (M9): execution internals (exchange messages,
+        # send errors) never leak to the client; the server log keeps
+        # the detail via the global handler's error_id path.
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e)
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Order execution failed.",
         )
 
     response = OrderOut(
@@ -269,6 +317,50 @@ def create_order(
     )
     store_idempotency(db, key, user, route, 200, response.model_dump(mode="json"))
     return response
+
+
+# ---------- operations (cancel, Fase 2 M15) ----------
+@operations_router.post("/orders/{order_id}/cancel", response_model=OrderOut)
+def cancel_order(
+    order_id: int,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Cancel an order that never finished (M15 remedy). A pending order
+    stuck by a crash used to block the duplicate guard (same symbol+side)
+    forever, with no API remedy — only direct DB intervention. Cancelling
+    frees that guard. Terminal orders cannot be cancelled; a real order
+    already sent to the exchange cannot be un-sent from here (its
+    exchange-side state is authoritative) and must be reconciled at the
+    exchange instead."""
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status in ("executed", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Order cannot be cancelled from status {order.status}",
+        )
+    if order.mode == "real" and order.status in ("sent", "partial"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A real order already sent to the exchange cannot be "
+            "cancelled from here; reconcile it at the exchange.",
+        )
+    order.status = "cancelled"
+    db.commit()
+    audit(db, user, "orders.cancel", "order", str(order.id),
+          details={"symbol": order.symbol, "side": order.side, "mode": order.mode})
+    return OrderOut(
+        id=order.id,
+        client_order_id=order.client_order_id,
+        symbol=order.symbol,
+        side=order.side,
+        quantity=str(order.quantity),
+        status=order.status,
+        mode=order.mode,
+        created_utc=order.created_at.isoformat(),
+    )
 
 
 # ---------- risk ----------
@@ -306,6 +398,7 @@ def kill_switch(
     )
     db.commit()
     audit(db, user, "risk.kill_switch", "risk", details={"engaged": True})
+    persist_runtime_setting(db, KEY_KILL_SWITCH, "true")
     from app.alerts import email as alert_email
 
     alert_email.send_alert(
@@ -321,6 +414,30 @@ def kill_switch(
             db, key, user, route, 200, response.model_dump(mode="json")
         )
     return response
+
+
+@risk_router.post("/kill-switch/deactivate")
+def kill_switch_deactivate(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Release the kill switch (Fase 2, A3). Engaging it used to be a
+    one-way door — the only "release" was restarting the process, and a
+    free-tier sleep released it silently. Now release is explicit,
+    audited, and persisted. Releasing does NOT auto-resume the scanner
+    (see core/runtime boot rules): the admin restarts it deliberately.
+    Idempotent: releasing an already-released switch is a no-op that
+    still reports the state."""
+    was_engaged = state.kill_switch
+    state.kill_switch = False
+    db.add(
+        SystemEvent(level="info", category="risk", message="Kill switch RELEASED")
+    )
+    db.commit()
+    audit(db, user, "risk.kill_switch_deactivate", "risk",
+          details={"was_engaged": was_engaged})
+    persist_runtime_setting(db, KEY_KILL_SWITCH, "false")
+    return {"kill_switch": False, "was_engaged": was_engaged}
 
 
 # ---------- logs ----------

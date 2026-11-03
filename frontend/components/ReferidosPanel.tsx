@@ -9,6 +9,8 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
+import { useAsyncLoad, useCancelled } from "../lib/useLoad";
+import { ApiErrorBanner, copyTextWithFallback, Field } from "./ui";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -84,7 +86,13 @@ export function ReferidosPanel() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
-  const [campaigns, setCampaigns] = useState<ReferralCampaign[] | null>(null);
+  // Tri-estado (Fase 4, FE3/FE2): campañas con useAsyncLoad; un error ya
+  // no se mapea a [] (antes parecía "sin campañas").
+  const campaignsLoad = useAsyncLoad<ReferralCampaign[]>((signal) => api.listReferralCampaigns(undefined, { signal }), []);
+  const campaigns = campaignsLoad.data;
+  const campaignsError = campaignsLoad.error;
+  const [referralsError, setReferralsError] = useState<unknown>(null);
+  const isCancelled = useCancelled();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [referrals, setReferrals] = useState<Referral[] | null>(null);
@@ -101,24 +109,14 @@ export function ReferidosPanel() {
   const [referralForm, setReferralForm] = useState<ReferralForm>(emptyReferralForm);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-  }, []);
+    api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
+  }, [isCancelled]);
 
-  const loadCampaigns = useCallback(async () => {
-    try {
-      setCampaigns(await api.listReferralCampaigns());
-    } catch {
-      setCampaigns([]);
-    }
-  }, []);
+  const loadCampaigns = campaignsLoad.reload;
 
   useEffect(() => {
-    loadCampaigns();
-  }, [loadCampaigns]);
-
-  useEffect(() => {
-    api.listContacts().then(setContacts).catch(() => setContacts([]));
-  }, []);
+    api.listContacts().then((c) => { if (!isCancelled()) setContacts(c); }).catch(() => { if (!isCancelled()) setContacts([]); });
+  }, [isCancelled]);
 
   const selected = campaigns?.find((c) => c.id === selectedId) ?? null;
 
@@ -128,11 +126,16 @@ export function ReferidosPanel() {
       return;
     }
     try {
-      setReferrals(await api.listReferrals(selectedId, statusFilter || undefined));
-    } catch {
-      setReferrals([]);
+      const rows = await api.listReferrals(selectedId, statusFilter || undefined);
+      if (isCancelled()) return;
+      setReferrals(rows);
+      setReferralsError(null);
+    } catch (e) {
+      if (isCancelled()) return;
+      // No mapear el error a []: se conservan los referidos anteriores.
+      setReferralsError(e);
     }
-  }, [selectedId, statusFilter]);
+  }, [selectedId, statusFilter, isCancelled]);
 
   useEffect(() => {
     loadReferrals();
@@ -252,11 +255,10 @@ export function ReferidosPanel() {
 
   const copyShareCode = async () => {
     if (!selected) return;
-    try {
-      await navigator.clipboard.writeText(selected.share_code);
+    if (await copyTextWithFallback(selected.share_code)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       setError(t.referidos.errCopy.replace("{codigo}", selected.share_code));
     }
   };
@@ -281,7 +283,7 @@ export function ReferidosPanel() {
         )}
         {isAdmin && showCampaignForm && (
           <form onSubmit={submitCampaign} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4 sm:p-5">
-            <input aria-label={t.referidos.campaignNameAria} className={inputCls} placeholder={t.referidos.campaignNamePlaceholder} value={campaignForm.name} onChange={setC("name")} required />
+            <Field label={t.referidos.campaignNameAria}><input aria-label={t.referidos.campaignNameAria} className={inputCls} placeholder={t.referidos.campaignNamePlaceholder} value={campaignForm.name} onChange={setC("name")} required /></Field>
             <label className="block text-sm text-zinc-400">
               {t.referidos.businessLabel}
               <select className={inputCls} value={campaignForm.business_contact_id} onChange={setC("business_contact_id")}>
@@ -304,7 +306,7 @@ export function ReferidosPanel() {
                 <input className={inputCls} type="number" min="0" max={campaignForm.reward_type === "percentage" ? 100 : undefined} step="any" value={campaignForm.reward_value} onChange={setC("reward_value")} />
               </label>
             </div>
-            <input aria-label={t.referidos.rewardNoteAria} className={inputCls} placeholder={t.referidos.rewardNotePlaceholder} value={campaignForm.reward_note} onChange={setC("reward_note")} />
+            <Field label={t.referidos.rewardNoteAria}><input aria-label={t.referidos.rewardNoteAria} className={inputCls} placeholder={t.referidos.rewardNotePlaceholder} value={campaignForm.reward_note} onChange={setC("reward_note")} /></Field>
             <label className="block text-sm text-zinc-400">
               {t.referidos.statusLabel}
               <select className={inputCls} value={campaignForm.status} onChange={setC("status")}>
@@ -324,7 +326,8 @@ export function ReferidosPanel() {
           </form>
         )}
 
-        {campaigns === null && <p className="text-sm text-zinc-400">{t.referidos.loadingCampaigns}</p>}
+        {campaignsError ? <ApiErrorBanner error={campaignsError} t={t} onRetry={campaignsLoad.reload} /> : null}
+        {campaigns === null && !campaignsError && <p className="text-sm text-zinc-400">{t.referidos.loadingCampaigns}</p>}
         {campaigns !== null && campaigns.length === 0 && (
           <p className="text-sm text-zinc-400">{t.referidos.emptyCampaigns}</p>
         )}
@@ -401,13 +404,13 @@ export function ReferidosPanel() {
           {isAdmin && showReferralForm && (
             <form onSubmit={submitReferral} className="mb-6 space-y-3 rounded-lg border border-zinc-700 p-4 sm:p-5">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input aria-label={t.referidos.referrerNameAria} className={inputCls} placeholder={t.referidos.referrerNamePlaceholder} value={referralForm.referrer_name} onChange={setR("referrer_name")} required />
-                <input aria-label={t.referidos.referrerContactAria} className={inputCls} placeholder={t.referidos.referrerContactPlaceholder} value={referralForm.referrer_contact} onChange={setR("referrer_contact")} />
-                <input aria-label={t.referidos.referredNameAria} className={inputCls} placeholder={t.referidos.referredNamePlaceholder} value={referralForm.referred_name} onChange={setR("referred_name")} required />
-                <input aria-label={t.referidos.referredContactAria} className={inputCls} placeholder={t.referidos.referredContactPlaceholder} value={referralForm.referred_contact} onChange={setR("referred_contact")} />
+                <Field label={t.referidos.referrerNameAria}><input aria-label={t.referidos.referrerNameAria} className={inputCls} placeholder={t.referidos.referrerNamePlaceholder} value={referralForm.referrer_name} onChange={setR("referrer_name")} required /></Field>
+                <Field label={t.referidos.referrerContactAria}><input aria-label={t.referidos.referrerContactAria} className={inputCls} placeholder={t.referidos.referrerContactPlaceholder} value={referralForm.referrer_contact} onChange={setR("referrer_contact")} /></Field>
+                <Field label={t.referidos.referredNameAria}><input aria-label={t.referidos.referredNameAria} className={inputCls} placeholder={t.referidos.referredNamePlaceholder} value={referralForm.referred_name} onChange={setR("referred_name")} required /></Field>
+                <Field label={t.referidos.referredContactAria}><input aria-label={t.referidos.referredContactAria} className={inputCls} placeholder={t.referidos.referredContactPlaceholder} value={referralForm.referred_contact} onChange={setR("referred_contact")} /></Field>
               </div>
-              <input aria-label={t.referidos.codeAria} className={inputCls} placeholder={t.referidos.codePlaceholder.replace("{codigo}", selected.share_code)} value={referralForm.code} onChange={setR("code")} />
-              <input aria-label={t.referidos.notesAria} className={inputCls} placeholder={t.referidos.notesPlaceholder} value={referralForm.notes} onChange={setR("notes")} />
+              <Field label={t.referidos.codeAria}><input aria-label={t.referidos.codeAria} className={inputCls} placeholder={t.referidos.codePlaceholder.replace("{codigo}", selected.share_code)} value={referralForm.code} onChange={setR("code")} /></Field>
+              <Field label={t.referidos.notesAria}><input aria-label={t.referidos.notesAria} className={inputCls} placeholder={t.referidos.notesPlaceholder} value={referralForm.notes} onChange={setR("notes")} /></Field>
               <div className="flex gap-2">
                 <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.register}</button>
                 <button type="button" onClick={() => setShowReferralForm(false)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.cancel}</button>
@@ -415,7 +418,8 @@ export function ReferidosPanel() {
             </form>
           )}
 
-          {referrals === null && <p className="text-sm text-zinc-400">{t.referidos.loadingReferrals}</p>}
+          {referralsError ? <ApiErrorBanner error={referralsError} t={t} onRetry={loadReferrals} /> : null}
+          {referrals === null && !referralsError && <p className="text-sm text-zinc-400">{t.referidos.loadingReferrals}</p>}
           {referrals !== null && referrals.length === 0 && (
             <p className="text-sm text-zinc-400">{t.referidos.emptyReferrals}</p>
           )}

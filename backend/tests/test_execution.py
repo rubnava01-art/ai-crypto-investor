@@ -60,7 +60,10 @@ def test_real_mode_raises(db):
         exec_engine.execute(db, o)
 
 
-def test_sandbox_without_keys_fails_cleanly(db):
+def test_sandbox_without_keys_fails_cleanly(db, monkeypatch):
+    # El gate ALLOW_SANDBOX se abre solo para probar la vía sin llaves;
+    # sin el flag, execute_sandbox rechaza con "disabled" (test nuevo).
+    monkeypatch.setattr(exec_engine.settings, "allow_sandbox", True)
     o = _order(db, mode="sandbox", client_order_id="c-sb")
     with pytest.raises(RuntimeError, match="not configured"):
         exec_engine.execute_sandbox(db, o)

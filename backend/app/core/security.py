@@ -1,4 +1,24 @@
-"""Authentication: password hashing (bcrypt) and JWT bearer tokens."""
+"""Authentication: password hashing (bcrypt) and JWT bearer tokens.
+
+Fase 2 (M1, B1, B2):
+- Tokens carry `user_id` (and credential version `tv`) in addition to
+  `sub`. Legacy sub-only tokens — e.g. tokens minted by tests, or any
+  token issued before this change — are still accepted during their
+  60-minute window: the user is resolved by username and the extra
+  claims are enforced only when present. After at most 60 minutes every
+  live token carries the new claims.
+- `get_current_user()` re-checks the pending-activation row on every
+  request (login alone used to check it): a pending account sees
+  nothing even if it somehow holds a token.
+- Credential version: bumping `User.token_version` (password change,
+  role downgrade) invalidates every token issued before the bump that
+  carries a `tv` claim. Tokens without `tv` (pre-change) expire within
+  60 minutes and cannot be renewed without re-login.
+- bcrypt truncates silently past 72 bytes: passwords longer than 72
+  UTF-8 bytes are REJECTED (never truncated, never pre-hashed into a
+  collision) by `check_password_bytes()`; `hash_password()` also
+  refuses them defensively so no caller can hash one by accident.
+"""
 import datetime as dt
 
 import bcrypt
@@ -9,12 +29,29 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models.tables import User
+from app.models.tables import PendingActivation, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# bcrypt hard limit: inputs past 72 bytes are silently truncated by the
+# algorithm, so two passwords differing only after byte 72 would
+# collide. Reject, don't truncate.
+MAX_PASSWORD_BYTES = 72
+
+# Mensaje de pendiente: byte-idéntico al de login (los tests lo buscan).
+PENDING_DETAIL = "Tu cuenta está pendiente de activación por un administrador."
+
+
+def check_password_bytes(password: str) -> None:
+    """Raise ValueError if the password exceeds bcrypt's 72-byte cap."""
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            "La contraseña supera el límite de 72 bytes de bcrypt."
+        )
+
 
 def hash_password(password: str) -> str:
+    check_password_bytes(password)
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
@@ -27,11 +64,31 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(username: str) -> str:
+def revoke_user_tokens(user: User) -> None:
+    """Invalidate every token issued before this point (that carries a
+    `tv` claim). Call it on password change and on role downgrade."""
+    user.token_version = (user.token_version or 0) + 1
+
+
+def create_access_token(
+    username: str,
+    user_id: int | None = None,
+    token_version: int | None = None,
+) -> str:
     expire = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
         minutes=settings.jwt_expire_minutes
     )
-    payload = {"sub": username, "exp": expire, "iat": dt.datetime.now(dt.timezone.utc)}
+    payload: dict = {
+        "sub": username,
+        "exp": expire,
+        "iat": dt.datetime.now(dt.timezone.utc),
+    }
+    # New claims; omitted for legacy callers (tests minting tokens by
+    # username only) so old call sites keep working.
+    if user_id is not None:
+        payload["user_id"] = user_id
+    if token_version is not None:
+        payload["tv"] = token_version
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -63,6 +120,32 @@ def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
+    # A token naming a different user id than the resolved user is
+    # forged or recycled (username re-created): reject it. Legacy
+    # sub-only tokens carry no user_id and skip this check.
+    token_user_id = payload.get("user_id")
+    if token_user_id is not None and token_user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
+    # Credential version: a token issued before a password change or
+    # role downgrade is dead. Legacy tokens without `tv` skip this and
+    # expire on their own within 60 minutes.
+    token_tv = payload.get("tv")
+    if token_tv is not None and token_tv != (user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revocado."
+        )
+    # Pending accounts see nothing, even with a token in hand (M1).
+    if (
+        db.query(PendingActivation)
+        .filter(PendingActivation.user_id == user.id)
+        .first()
+        is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=PENDING_DETAIL
         )
     return user
 

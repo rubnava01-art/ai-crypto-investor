@@ -46,7 +46,11 @@ class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, max_length=100)
     email: str | None = Field(default=None, max_length=255)
     address: str | None = Field(default=None, max_length=500)
-    avatar_data_url: str | None = None
+    # Input bound (M10): the decoded image was already capped at 500 KiB
+    # with magic bytes, but the base64 STRING itself was unbounded.
+    # 1,000,000 chars ≈ 750 KiB raw — comfortably above any valid avatar
+    # (500 KiB raw ≈ 667K chars + header) and closed to abuse.
+    avatar_data_url: str | None = Field(default=None, max_length=1_000_000)
 
 
 def _out(u: User, db: Session) -> ProfileOut:

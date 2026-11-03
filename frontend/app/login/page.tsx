@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken, ApiError } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
+import { SkipLink } from "../../components/ui";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
  * claude.ai — one centered card, generous spacing, no clutter.
@@ -11,8 +12,16 @@ import { useLanguage } from "../../lib/i18n";
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
  * pendiente responde 403 con el aviso en español. */
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Fase 4 (FE7): volver al destino preservado (?next=) tras el login y
+  // avisar cuando la llegada es por sesión expirada (?expired=1). Solo se
+  // aceptan destinos internos ("/..." sin "//") para no abrir redirects.
+  const nextParam = searchParams.get("next");
+  const nextDest =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
+  const sessionExpired = searchParams.get("expired") === "1";
   const { t } = useLanguage();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -49,7 +58,7 @@ export default function LoginPage() {
     try {
       const res = await api.login(username, password);
       setToken(res.access_token);
-      router.replace("/");
+      router.replace(nextDest);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.login.errorLogin);
     } finally {
@@ -89,7 +98,8 @@ export default function LoginPage() {
     "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition-colors hover:border-zinc-600 focus:border-emerald-500";
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+      <SkipLink label={t.shell.skipLink} />
       <div className="mb-8 flex flex-col items-center text-center">
         <span aria-hidden="true" className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50">
           P
@@ -106,6 +116,7 @@ export default function LoginPage() {
       </div>
 
       <form
+        id="contenido"
         onSubmit={mode === "login" ? onSubmit : onRegister}
         className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl sm:p-8"
       >
@@ -129,9 +140,12 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             placeholder={t.login.passwordPlaceholder}
-            minLength={4}
+            minLength={mode === "register" ? 12 : 1}
             required
           />
+          {mode === "register" && (
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.login.passwordMinHint}</p>
+          )}
         </label>
 
         {mode === "register" && (
@@ -155,12 +169,18 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={loadChallenge}
-                className="shrink-0 rounded-xl border border-zinc-700 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                className="min-h-[44px] shrink-0 rounded-xl border border-zinc-700 px-3 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
               >
                 {t.login.anotherQuestion}
               </button>
             </div>
           </div>
+        )}
+
+        {sessionExpired && mode === "login" && (
+          <p role="status" className="mb-5 rounded-xl bg-amber-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-amber-300">
+            {t.reliability.sessionExpired}
+          </p>
         )}
 
         {notice && (
@@ -187,14 +207,14 @@ export default function LoginPage() {
           {mode === "login" ? (
             <>
               {t.login.noAccount}{" "}
-              <button type="button" onClick={() => switchMode("register")} className="inline-block py-1 font-semibold text-emerald-400 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => switchMode("register")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-emerald-400 underline-offset-4 hover:underline">
                 {t.login.registerLink}
               </button>
             </>
           ) : (
             <>
               {t.login.hasAccount}{" "}
-              <button type="button" onClick={() => switchMode("login")} className="inline-block py-1 font-semibold text-emerald-400 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => switchMode("login")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-emerald-400 underline-offset-4 hover:underline">
                 {t.login.loginSubmit}
               </button>
             </>
@@ -203,5 +223,14 @@ export default function LoginPage() {
       </form>
 
     </main>
+  );
+}
+
+// useSearchParams exige un límite Suspense en el prerender estático.
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   );
 }

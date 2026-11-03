@@ -62,6 +62,9 @@ def ai_ask(
             detail="La pregunta es demasiado larga (máx. 2000 caracteres).",
         )
     result = assistant.ask(db, user, question, signal_id=payload.signal_id)
+    # Audit WITHOUT the question excerpt (Fase 3, B6): user content does
+    # not belong in the audit trail. (The learning loop's own
+    # AIExplanation table is a separate feature store, untouched here.)
     audit(
         db,
         user,
@@ -71,7 +74,6 @@ def ai_ask(
             "refused": result["refused"],
             "demo": result["demo"],
             "signal_id": result["signal_id"],
-            "question_excerpt": question[:120],
         },
     )
     return AIAskResponse(

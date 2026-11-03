@@ -84,8 +84,9 @@ def exchange_balances(
         )
     try:
         raw = adapter.ReadOnlyAdapter().fetch_balance()
-    except adapter.ExchangeNotConfigured as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except adapter.ExchangeNotConfigured:
+        # Generic error (M9): adapter internals never reach the client.
+        raise HTTPException(status_code=503, detail="Exchange not configured.")
     except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

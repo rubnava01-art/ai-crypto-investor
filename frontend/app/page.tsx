@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   api, getToken, setToken, ApiError,
@@ -9,6 +9,7 @@ import {
   type OperationsResponse, type RiskLimits, type LogEntry, type SignalSide,
 } from "../lib/api";
 import { Panel } from "../components/Panel";
+import { LoadMore, SkipLink, newId } from "../components/ui";
 import { ModuleNav } from "../components/ModuleNav";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
@@ -44,9 +45,6 @@ const AiAssistant = dynamic(
 const money = (s: string | null) =>
   s == null || s === "" ? "—" : `$${Number(s).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (s: string | null) => (s == null || s === "" ? "—" : `${Number(s).toFixed(2)}%`);
-const time = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("en-US", { timeZone: "UTC", hour12: false }) + " UTC" : "—";
-
 const sideColor: Record<SignalSide, string> = {
   buy: "text-emerald-400",
   sell: "text-red-400",
@@ -68,7 +66,10 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const time = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleString(locale, { timeZone: "UTC", hour12: false }) + " UTC" : "—";
   const [offline, setOffline] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmKill, setConfirmKill] = useState(false);
@@ -82,12 +83,17 @@ export default function DashboardPage() {
   const [operations, setOperations] = useState<OperationsResponse | null>(null);
   const [risk, setRisk] = useState<RiskLimits | null>(null);
   const [logs, setLogs] = useState<LogEntry[] | null>(null);
+  const [logsVisible, setLogsVisible] = useState(25);
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
   // No renderizar el dashboard hasta confirmar sesión: antes, los paneles se
   // montaban y disparaban llamadas sin token (flash de UI privada).
   const [checked, setChecked] = useState(false);
 
+  // Fase 4 (FE2): el reintento manual dormía 1,5s sin cancelación — al
+  // navegar fuera en esa ventana, el setState posterior escribía en un
+  // dashboard desmontado. La guarda se activa al desmontar el efecto.
+  const loadCancelledRef = useRef(false);
   const load = useCallback(async () => {
     setActionError(null);
     // Intento con un reintento: un fallo transitorio de red no debe tirar
@@ -97,6 +103,7 @@ export default function DashboardPage() {
       try {
         // Una sola petición agregada (antes eran 9): carga mucho más rápida.
         const d = await api.dashboard();
+        if (loadCancelledRef.current) return;
         setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
         setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
         setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
@@ -108,27 +115,32 @@ export default function DashboardPage() {
              d.modes, d.operations, d.risk, d.logs].some((s) => s == null)) {
           setActionError(t.dashboard.partialError);
         }
-        api.me().then(setMe).catch(() => setMe(null));
+        api.me().then((m) => { if (!loadCancelledRef.current) setMe(m); }).catch(() => { if (!loadCancelledRef.current) setMe(null); });
         return;
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           setToken(null);
-          router.replace("/login");
+          router.replace(`/login?next=${encodeURIComponent("/")}`);
           return;
         }
         if (i === attempts.length - 1) {
-          setOffline(true);
+          if (!loadCancelledRef.current) setOffline(true);
         } else {
           await new Promise((r) => setTimeout(r, 1500));
+          if (loadCancelledRef.current) return;
         }
       }
     }
   }, [router]);
 
   useEffect(() => {
-    if (!getToken()) { router.replace("/login"); return; }
+    if (!getToken()) { router.replace(`/login?next=${encodeURIComponent("/")}`); return; }
+    loadCancelledRef.current = false;
     setChecked(true);
     load();
+    return () => {
+      loadCancelledRef.current = true;
+    };
   }, [load, router]);
 
   async function scanner(action: "start" | "stop") {
@@ -151,7 +163,7 @@ export default function DashboardPage() {
 
   async function engageKillSwitch() {
     try {
-      const res = await api.killSwitch(crypto.randomUUID());
+      const res = await api.killSwitch(newId());
       setRisk((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
       setSystem((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
     } catch (err) {
@@ -174,13 +186,18 @@ export default function DashboardPage() {
   if (!checked) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <p className="text-sm text-zinc-400">{t.dashboard.loading}</p>
+        <div role="status" aria-label={t.dashboard.loading} className="space-y-4">
+          <div aria-hidden="true" className="h-8 w-48 motion-safe:animate-pulse rounded-lg bg-zinc-800" />
+          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
+          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <main className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <SkipLink label={t.shell.skipLink} />
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div>
           <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
@@ -232,42 +249,15 @@ export default function DashboardPage() {
         </p>
       )}
 
+      <section id="contenido" tabIndex={-1} aria-label={t.dashboard.heroHeading} className="mb-6 outline-none sm:mb-8">
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.heroHeading}</h2>
       <div className="mb-5">
         <MarketPanel />
       </div>
 
-      {me && !isAdmin && (
-        <div className="mb-5 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3.5 text-sm leading-relaxed text-sky-300">
-          <strong className="font-semibold">{t.dashboard.testModeTitle}</strong> {t.dashboard.testModeBody}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {/* System status */}
-        <Panel title={t.dashboard.systemTitle} badge={<DemoBadge />}>
-          {system ? (
-            <dl className="space-y-2.5 text-sm">
-              {[
-                [t.dashboard.exchangeConnected, <StatusDot key="e" on={system.exchange_connected} />],
-                [t.dashboard.scanner, <StatusDot key="s" on={system.scanner_running} />],
-                [t.dashboard.simulationMode, <span key="m" className="font-mono">{system.simulation_mode}</span>],
-                [t.dashboard.killSwitch, <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? t.dashboard.killOn : t.dashboard.killOff}</span>],
-                [t.dashboard.dataSource, <span key="d" className="font-mono">{system.data_source}</span>],
-                [t.dashboard.lastUpdate, <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
-              ].map(([label, value]) => (
-                <div key={label as string} className="flex items-center justify-between gap-2">
-                  <dt className="text-zinc-400">{label}</dt>
-                  <dd className="flex items-center gap-2">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
-          )}
-        </Panel>
-
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
         {/* Equity & balance */}
-        <Panel title={t.dashboard.capitalTitle} badge={<DemoBadge />}>
+        <Panel title={t.dashboard.capitalTitle} badge={<DemoBadge quiet />}>
           {balances ? (
             <div>
               <p className="text-3xl font-bold tracking-tight tabular-nums sm:text-4xl">{money(balances.equity_usd)}</p>
@@ -282,54 +272,46 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        {/* P&L + drawdown */}
-        <Panel title={t.dashboard.pnlTitle} badge={<DemoBadge />}>
-          {performance ? (
-            <dl className="space-y-2 text-sm">
+        {/* Invertir: entrar / salir / validar (solo admin) */}
+        {isAdmin && (
+          <InvestorPanel
+            mode={sim?.current ?? "simulation"}
+            realEnabled={sim?.real_enabled ?? false}
+            equityUsd={balances ? Number(balances.equity_usd) : null}
+            onExecuted={load}
+          />
+        )}
+
+      </div>
+      </section>
+
+      {me && !isAdmin && (
+        <div className="mb-5 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3.5 text-sm leading-relaxed text-sky-300">
+          <strong className="font-semibold">{t.dashboard.testModeTitle}</strong> {t.dashboard.testModeBody}
+        </div>
+      )}
+
+      <section aria-label={t.dashboard.secondaryHeading} className="mb-6 sm:mb-8">
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.secondaryHeading}</h2>
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {/* System status */}
+        <Panel title={t.dashboard.systemTitle} badge={<DemoBadge quiet />}>
+          {system ? (
+            <dl className="space-y-2.5 text-sm">
               {[
-                [t.dashboard.realized, money(performance.realized_pnl_usd)],
-                [t.dashboard.unrealized, money(performance.unrealized_pnl_usd)],
-                [t.dashboard.maxDrawdown, pct(performance.max_drawdown_pct)],
-                [t.dashboard.fees, money(performance.fees_paid_usd)],
+                [t.dashboard.exchangeConnected, <StatusDot key="e" on={system.exchange_connected} srText={system.exchange_connected ? t.reliability.statusConnected : t.reliability.statusDisconnected} />],
+                [t.dashboard.scanner, <StatusDot key="s" on={system.scanner_running} srText={system.scanner_running ? t.dashboard.running : t.dashboard.stopped} />],
+                [t.dashboard.simulationMode, <span key="m" className="font-mono">{system.simulation_mode}</span>],
+                [t.dashboard.killSwitch, <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? t.dashboard.killOn : t.dashboard.killOff}</span>],
+                [t.dashboard.dataSource, <span key="d" className="font-mono">{system.data_source}</span>],
+                [t.dashboard.lastUpdate, <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
               ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between">
+                <div key={label as string} className="flex items-center justify-between gap-2">
                   <dt className="text-zinc-400">{label}</dt>
-                  <dd className="font-mono">{value}</dd>
+                  <dd className="flex items-center gap-2">{value}</dd>
                 </div>
               ))}
-              <p className="pt-2 text-xs text-zinc-400">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
             </dl>
-          ) : (
-            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
-          )}
-        </Panel>
-
-        {/* Signals */}
-        <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge />}>
-          {signals ? (
-            signals.signals.length === 0 ? (
-              <EmptyState text={t.dashboard.noSignals} />
-            ) : (
-              <ul className="space-y-3">
-                {signals.signals.map((sig) => (
-                  <li key={sig.id} className="rounded-lg border border-zinc-800 p-3.5 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-semibold">{sig.symbol}</span>
-                      <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-xs text-zinc-400 sm:grid-cols-3">
-                      <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
-                      <span>{t.dashboard.target} {money(sig.target_price)}</span>
-                      <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      {sig.status} · {time(sig.created_utc)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )
           ) : (
             <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
@@ -358,20 +340,46 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        {/* Invertir: entrar / salir / validar (solo admin) */}
-        {isAdmin && (
-          <InvestorPanel
-            mode={sim?.current ?? "simulation"}
-            realEnabled={sim?.real_enabled ?? false}
-            equityUsd={balances ? Number(balances.equity_usd) : null}
-            onExecuted={load}
-          />
-        )}
+        {/* Logs feed */}
+        <Panel title={t.dashboard.logsTitle}>
+          {logs ? (
+            logs.length === 0 ? (
+              <EmptyState text={t.dashboard.noLogs} />
+            ) : (
+              <>
+              <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
+                {logs.slice(0, logsVisible).map((l) => (
+                  <li key={l.id} className="flex gap-2 font-mono">
+                    <span className="shrink-0 text-zinc-500">{time(l.created_utc)}</span>
+                    <span className={`shrink-0 font-semibold ${
+                      l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-500"
+                    }`}>
+                      {l.level}
+                    </span>
+                    <span className="break-words text-zinc-400">
+                      <span className="text-zinc-500">[{l.category}]</span> {l.message}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <LoadMore visible={logsVisible} total={logs.length} t={t} onLoadMore={() => setLogsVisible((v) => v + 25)} />
+              </>
+            )
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
+          )}
+        </Panel>
 
+      </div>
+      </section>
+
+      <section aria-label={t.dashboard.controlTitle} className="mb-6 sm:mb-8">
+        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.controlTitle}</h2>
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* Scanner controls */}
         <Panel title={t.dashboard.scannerControlsTitle}>
           <div className="flex items-center gap-3">
-            <StatusDot on={scanning} />
+            <StatusDot on={scanning} srText={scanning ? t.dashboard.running : t.dashboard.stopped} />
             <span className="text-sm text-zinc-300">{scanning ? t.dashboard.running : t.dashboard.stopped}</span>
           </div>
           {isAdmin ? (
@@ -421,7 +429,7 @@ export default function DashboardPage() {
         </Panel>
 
         {/* Risk limits + kill switch */}
-        <Panel title={t.dashboard.riskTitle} badge={<DemoBadge />} accent>
+        <Panel title={t.dashboard.riskTitle} badge={<DemoBadge quiet />} accent>
           {risk ? (
             <div>
               <dl className="space-y-2 text-sm">
@@ -469,6 +477,63 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+      </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {/* P&L + drawdown */}
+        <Panel title={t.dashboard.pnlTitle} badge={<DemoBadge quiet />}>
+          {performance ? (
+            <dl className="space-y-2 text-sm">
+              {[
+                [t.dashboard.realized, money(performance.realized_pnl_usd)],
+                [t.dashboard.unrealized, money(performance.unrealized_pnl_usd)],
+                [t.dashboard.maxDrawdown, pct(performance.max_drawdown_pct)],
+                [t.dashboard.fees, money(performance.fees_paid_usd)],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between">
+                  <dt className="text-zinc-400">{label}</dt>
+                  <dd className="font-mono">{value}</dd>
+                </div>
+              ))}
+              <p className="pt-2 text-xs text-zinc-400">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
+            </dl>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Signals */}
+        <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge quiet />}>
+          {signals ? (
+            signals.signals.length === 0 ? (
+              <EmptyState text={t.dashboard.noSignals} />
+            ) : (
+              <ul className="space-y-3">
+                {signals.signals.map((sig) => (
+                  <li key={sig.id} className="rounded-lg border border-zinc-800 p-3.5 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold">{sig.symbol}</span>
+                      <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-xs text-zinc-400 sm:grid-cols-3">
+                      <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
+                      <span>{t.dashboard.target} {money(sig.target_price)}</span>
+                      <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {sig.status} · {time(sig.created_utc)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )
           ) : (
             <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
           )}
@@ -527,33 +592,6 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-            )
-          ) : (
-            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
-          )}
-        </Panel>
-
-        {/* Logs feed */}
-        <Panel title={t.dashboard.logsTitle}>
-          {logs ? (
-            logs.length === 0 ? (
-              <EmptyState text={t.dashboard.noLogs} />
-            ) : (
-              <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
-                {logs.map((l) => (
-                  <li key={l.id} className="flex gap-2 font-mono">
-                    <span className="shrink-0 text-zinc-500">{time(l.created_utc)}</span>
-                    <span className={`shrink-0 font-semibold ${
-                      l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-500"
-                    }`}>
-                      {l.level}
-                    </span>
-                    <span className="break-words text-zinc-400">
-                      <span className="text-zinc-500">[{l.category}]</span> {l.message}
-                    </span>
-                  </li>
-                ))}
-              </ul>
             )
           ) : (
             <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />

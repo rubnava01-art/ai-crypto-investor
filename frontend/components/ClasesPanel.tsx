@@ -6,7 +6,9 @@ import {
   type EduClass, type EduClassKind, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
@@ -19,7 +21,9 @@ const fmtDateTime = (iso: string | null, locale: string) =>
     : null;
 
 function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [rows, setRows] = useState<EduClass[] | null>(null);
   const [title, setTitle] = useState("");
@@ -35,7 +39,9 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
 
   const load = useCallback(async () => {
     try {
-      setRows(await api.listClasses(kind));
+      const _load1 = await api.listClasses(kind);
+      if (isCancelled()) return;
+      setRows(_load1);
     } catch {
       setRows([]);
     }
@@ -82,7 +88,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
   };
 
   const remove = async (c: EduClass) => {
-    if (!window.confirm(t.clases.confirmDelete.replace("{titulo}", c.title))) return;
+    if (!(await confirm(t.clases.confirmDelete.replace("{titulo}", c.title)))) return;
     setError(null);
     try {
       await api.deleteClass(c.id);
@@ -93,6 +99,8 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={isLive ? t.clases.liveTitle : t.clases.recordedTitle}
       badge={
@@ -108,9 +116,9 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
 
       {isAdmin && (
         <form onSubmit={add} className="space-y-3">
-          <input aria-label={t.clases.titleAria} className={inputCls} placeholder={t.clases.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label={t.clases.descAria} className={inputCls} placeholder={t.clases.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-          <input aria-label={t.clases.urlAria} className={inputCls} placeholder={isLive ? t.clases.urlPlaceholderLive : t.clases.urlPlaceholderRecorded} value={url} onChange={(e) => setUrl(e.target.value)} maxLength={500} autoComplete="off" />
+          <Field label={t.clases.titleAria}><input aria-label={t.clases.titleAria} className={inputCls} placeholder={t.clases.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.clases.descAria}><textarea aria-label={t.clases.descAria} className={inputCls} placeholder={t.clases.descPlaceholder} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></Field>
+          <Field label={t.clases.urlAria}><input aria-label={t.clases.urlAria} className={inputCls} placeholder={isLive ? t.clases.urlPlaceholderLive : t.clases.urlPlaceholderRecorded} value={url} onChange={(e) => setUrl(e.target.value)} maxLength={500} autoComplete="off" /></Field>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {isLive && (
               <label className="text-xs text-zinc-400">{t.clases.dateLabel}
@@ -156,7 +164,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                         href={c.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`rounded-lg px-3 py-2 text-xs font-semibold text-white ${isLive ? "bg-red-600 hover:bg-red-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
+                        className={`inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-white ${isLive ? "bg-red-600 hover:bg-red-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
                       >
                         {isLive ? t.clases.joinLive : t.clases.watchRecorded}
                       </a>
@@ -164,7 +172,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                     {isAdmin && (
                       <button
                         onClick={() => remove(c)}
-                        className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                        className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         {t.clases.deleteBtn}
                       </button>
@@ -178,15 +186,17 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
         )}
       </div>
     </Panel>
+    </>
   );
 }
 
 export function ClasesPanel() {
+  const isCancelled = useCancelled();
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
   }, []);
 
   return (

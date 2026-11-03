@@ -28,10 +28,11 @@ data, no invented keywords.
 from concurrent.futures import ThreadPoolExecutor, wait
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import tendencias_limiter
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.tables import TrendSearch, User
@@ -116,23 +117,24 @@ def fetch_question_suggestions(keyword: str, fetcher=None) -> tuple[dict[str, li
     jobs = [(lang, build_query(keyword, prefix)) for lang, prefixes in PREFIXES.items() for prefix in prefixes]
     results: dict[str, list[str]] = {"es": [], "en": []}
     any_success = False
-    executor = ThreadPoolExecutor(max_workers=8)
-    try:
-        futures = {executor.submit(fetch, query): lang for lang, query in jobs}
-        done, _ = wait(futures.keys(), timeout=OVERALL_TIMEOUT)
-        for future in done:
-            lang = futures[future]
-            try:
-                suggestions, ok = future.result()
-            except Exception:
-                continue
-            if ok:
-                any_success = True
-            results[lang].extend(suggestions)
-    finally:
-        # Don't let slow prefixes hold the request past the budget.
-        executor.shutdown(wait=False, cancel_futures=True)
+    # Shared pool (Fase 3, B5): the old code created a ThreadPoolExecutor
+    # per request and abandoned it with shutdown(wait=False) — orphaned
+    # threads up to 3s per request. One pool for the process instead.
+    futures = {_EXECUTOR.submit(fetch, query): lang for lang, query in jobs}
+    done, _ = wait(futures.keys(), timeout=OVERALL_TIMEOUT)
+    for future in done:
+        lang = futures[future]
+        try:
+            suggestions, ok = future.result()
+        except Exception:
+            continue
+        if ok:
+            any_success = True
+        results[lang].extend(suggestions)
     return {lang: _dedupe(items) for lang, items in results.items()}, any_success
+
+
+_EXECUTOR = ThreadPoolExecutor(max_workers=8)
 
 
 class TrendResearchOut(BaseModel):
@@ -169,6 +171,13 @@ def research_trends(
     db: Session = Depends(get_db),
 ):
     keyword = _validate_keyword(keyword)
+    # Per-USER limiter (M3): research writes a TrendSearch row AND fans
+    # out to Google on every call — it used to be unlimited.
+    if not tendencias_limiter.allow(f"tendencias:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas investigaciones. Espera un minuto.",
+        )
     db.add(TrendSearch(user_id=user.id, keyword=keyword))
     db.commit()
     suggestions, any_success = fetch_question_suggestions(keyword)

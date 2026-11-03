@@ -43,8 +43,10 @@ def _safe(name, fn):
 def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {
         "system": _safe("system", lambda: _dump(system.system_status(user))),
-        "balances": _safe("balances", lambda: _dump(portfolio.balances(user))),
-        "performance": _safe("performance", lambda: _dump(portfolio.performance(user))),
+        # Portfolio now computes from paper rows, so it needs the session
+        # (Fase 3, M17) — the dashboard already holds one, pass it through.
+        "balances": _safe("balances", lambda: _dump(portfolio.balances(user, db))),
+        "performance": _safe("performance", lambda: _dump(portfolio.performance(user, db))),
         "signals": _safe("signals", lambda: _dump(signals.list_signals(user, db))),
         "strategies": _safe("strategies", lambda: [_dump(s) for s in misc.list_strategies(user, db)]),
         "modes": _safe("modes", lambda: _dump(misc.get_modes(user))),

@@ -5,11 +5,13 @@ connection, endpoints return 503 with a clear message (never fake data).
 """
 import datetime as dt
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import market_limiter
 from app.core.security import get_current_user, require_admin
 from app.data import exchanges, ingest
 from app.database import get_db
@@ -33,6 +35,33 @@ _PRICES_TTL_S = 60.0
 # (corrida 3 agentes): antes cada llamada pegaba al exchange sin caché.
 _TICKER_CACHE: dict[tuple, dict] = {}
 _TICKER_TTL_S = 60.0
+
+# Executor COMPARTIDO (Fase 3, B5-style): un pool por proceso para el
+# fetch paralelo de /prices, no uno por request (el patrón viejo de
+# tendencias creaba y abandonaba un pool por llamada).
+_PRICES_EXECUTOR = ThreadPoolExecutor(max_workers=8)
+_PRICES_OVERALL_TIMEOUT_S = 60.0
+
+
+def _validate_exchange(exchange: str) -> None:
+    """422 antes de tocar la red: un exchange no soportado antes caía
+    en 503 tras intentar (y esperar) la conexión, y en /prices tras
+    4 tickers + 4 OHLCV fallidos. No consume el limitador."""
+    if exchange not in exchanges.SUPPORTED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Exchange no soportado: {exchange}. Usa: {', '.join(exchanges.SUPPORTED)}.",
+        )
+
+
+def _check_market_limit(user: User) -> None:
+    """Per-USER limiter (M3): the market endpoints hit a public exchange
+    and used to be unlimited for any authenticated user."""
+    if not market_limiter.allow(f"market:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas consultas de mercado. Espera un minuto.",
+        )
 
 
 class CandleOut(BaseModel):
@@ -97,6 +126,8 @@ def get_candles(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _validate_exchange(exchange)
+    _check_market_limit(user)
     candles = ingest.latest_candles(db, symbol, timeframe, limit)
     if not candles:
         raise HTTPException(
@@ -129,6 +160,8 @@ def get_ticker(
     user: User = Depends(get_current_user),
 ):
     """Ticker con caché de 60 s (stale si el exchange falla), como /prices."""
+    _validate_exchange(exchange)
+    _check_market_limit(user)
     key = (exchange, symbol)
     now = time.monotonic()
     cached = _TICKER_CACHE.get(key)
@@ -163,6 +196,8 @@ def get_indicators(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _validate_exchange(exchange)
+    _check_market_limit(user)
     candles = ingest.latest_candles(db, symbol, timeframe, 200)
     if len(candles) < 35:
         raise HTTPException(
@@ -189,55 +224,81 @@ def trigger_ingest(
     db: Session = Depends(get_db),
 ):
     """Manually trigger one ingestion cycle (also runs on the scanner loop)."""
+    _validate_exchange(exchange)
+    _check_market_limit(user)
     try:
         n = ingest.ingest_ohlcv(db, exchange, symbol, timeframe)
     except Exception as e:  # noqa: BLE001
+        # Generic error (M9): exchange internals never reach the client.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Ingestion failed ({exchange}): {type(e).__name__}: {str(e)[:120]}",
+            detail=f"Ingestion failed ({exchange}): {type(e).__name__}",
         )
     return {"ingested": n, "symbol": symbol, "timeframe": timeframe, "source": exchange}
+
+
+def _fetch_one_coin(exchange: str, symbol: str, name: str, pair: str) -> CoinPriceOut:
+    """One coin's ticker + sparkline. Per-coin resilience: a failure
+    reports this coin with price None instead of failing the endpoint."""
+    try:
+        t = exchanges.fetch_ticker(exchange, pair)
+    except Exception:  # noqa: BLE001 - one bad coin, not a failed endpoint
+        return CoinPriceOut(
+            symbol=symbol, name=name, pair=pair,
+            price_usd=None, change_24h_pct=None, sparkline_24h=[],
+        )
+    last = t.get("last")
+    pct = t.get("percentage")
+    spark: list[float] = []
+    try:
+        ohlcv = exchanges.fetch_ohlcv(exchange, pair, "1h", limit=24)
+        spark = [float(row[4]) for row in ohlcv if row[4] is not None]
+    except Exception:  # noqa: BLE001 - sparkline is best-effort
+        spark = []
+    return CoinPriceOut(
+        symbol=symbol,
+        name=name,
+        pair=pair,
+        price_usd=float(last) if last is not None else None,
+        change_24h_pct=float(pct) if pct is not None else None,
+        sparkline_24h=spark,
+    )
 
 
 def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
     """Real public prices for the top coins (no API keys needed).
 
-    Per-coin resilience: one coin's ticker failing must not blank the
-    whole list — that coin is reported with price None and the rest
-    still load.
+    PARALLEL (Fase 3, M16): the old code fetched 4 tickers + 4 OHLCV
+    sequentially — up to minutes of blocking when the exchange is slow.
+    Coins now fetch concurrently on the shared pool with an overall
+    budget; a coin that times out reports price None like any other
+    per-coin failure, and the endpoint still serves the rest.
     """
+    futures = {
+        _PRICES_EXECUTOR.submit(_fetch_one_coin, exchange, symbol, name, pair): (
+            symbol,
+            name,
+            pair,
+        )
+        for symbol, name, pair in MARKET_COINS
+    }
+    done, _pending = wait(futures.keys(), timeout=_PRICES_OVERALL_TIMEOUT_S)
+    by_pair = {}
+    for future in done:
+        try:
+            coin = future.result()
+        except Exception:  # noqa: BLE001 - per-coin failure, not endpoint failure
+            continue
+        by_pair[coin.pair] = coin
     out: list[CoinPriceOut] = []
     for symbol, name, pair in MARKET_COINS:
-        try:
-            t = exchanges.fetch_ticker(exchange, pair)
-        except Exception:  # noqa: BLE001 - one bad coin, not a failed endpoint
-            out.append(
-                CoinPriceOut(
-                    symbol=symbol,
-                    name=name,
-                    pair=pair,
-                    price_usd=None,
-                    change_24h_pct=None,
-                    sparkline_24h=[],
-                )
-            )
-            continue
-        last = t.get("last")
-        pct = t.get("percentage")
-        spark: list[float] = []
-        try:
-            ohlcv = exchanges.fetch_ohlcv(exchange, pair, "1h", limit=24)
-            spark = [float(row[4]) for row in ohlcv if row[4] is not None]
-        except Exception:  # noqa: BLE001 - sparkline is best-effort
-            spark = []
         out.append(
-            CoinPriceOut(
-                symbol=symbol,
-                name=name,
-                pair=pair,
-                price_usd=float(last) if last is not None else None,
-                change_24h_pct=float(pct) if pct is not None else None,
-                sparkline_24h=spark,
+            by_pair.get(
+                pair,
+                CoinPriceOut(
+                    symbol=symbol, name=name, pair=pair,
+                    price_usd=None, change_24h_pct=None, sparkline_24h=[],
+                ),
             )
         )
     return out
@@ -256,6 +317,8 @@ def get_market_prices(
     filled it: a request for another exchange must refetch instead of
     receiving the first exchange's prices under the wrong source.
     """
+    _validate_exchange(exchange)
+    _check_market_limit(user)
     now = time.monotonic()
     if (
         _PRICES_CACHE["payload"] is not None

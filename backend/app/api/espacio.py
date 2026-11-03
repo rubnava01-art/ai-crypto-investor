@@ -10,8 +10,10 @@ Three pieces:
    optional note), following the Monitor de Emociones pattern — also
    written only by him, never generated.
 
-Permissions: any authenticated user reads; only admins write/edit/delete
-(require_admin -> 403 for prueba), mirroring the other modules.
+Permissions: admins read and write the journal and the emotion
+check-ins. The demo role ("prueba") sees NEITHER list (empty lists,
+decisión 6 de Rubén 2026-11-02: son datos personales del dueño).
+Writes are admin-only (require_admin -> 403 for prueba).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
@@ -52,6 +54,10 @@ def list_revelations(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # Decisión 6 (2026-11-02): el diario es personal del dueño; la demo
+    # no ve nada (lista vacía, sin textos ni conteos que filtren nada).
+    if not user.is_admin:
+        return []
     rows = db.query(Revelation).order_by(Revelation.id.desc()).offset(offset).limit(limit).all()
     return [_rev_out(r) for r in rows]
 
@@ -120,6 +126,11 @@ def list_emotions(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # Decisión 6 (2026-11-02): las emociones son datos personales del
+    # dueño. La demo no ve nada: lista vacía, sin notas, sin conteos
+    # que filtren contenido. La escritura ya era solo admin.
+    if not user.is_admin:
+        return []
     rows = db.query(EmotionEntry).order_by(EmotionEntry.id.desc()).offset(offset).limit(limit).all()
     return [_emo_out(r) for r in rows]
 

@@ -8,7 +8,9 @@
 - The list starts EMPTY — the system never invents news. The admin
   publishes the first update from the Inicio tab.
 - Author names prefer the user's display_name and fall back to the
-  username; a deleted author shows as "Usuario".
+  username; a deleted author shows as "Usuario". For non-admin readers
+  (demo "prueba"), names ALWAYS fall back to the username (decisión 6
+  de Rubén 2026-11-02: el display_name es un dato personal).
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -65,10 +67,12 @@ def _authors_map(db: Session, user_ids: set[int | None]) -> dict[int, User]:
     return {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()}
 
 
-def _author_parts(authors: dict[int, User], user_id: int | None) -> tuple[str, str | None]:
+def _author_parts(authors: dict[int, User], user_id: int | None, redact_names: bool = False) -> tuple[str, str | None]:
     u = authors.get(user_id) if user_id is not None else None
     if u is None:
         return "Usuario", None
+    if redact_names:
+        return u.username, u.username
     return (u.display_name or "").strip() or u.username, u.username
 
 
@@ -77,6 +81,7 @@ def _post_out(
     p: HomePost,
     authors: dict[int, User] | None = None,
     counts: dict[int, int] | None = None,
+    redact_names: bool = False,
 ) -> PostOut:
     if authors is None:
         authors = _authors_map(db, {p.author_id})
@@ -84,7 +89,7 @@ def _post_out(
         count = db.query(HomeComment).filter(HomeComment.post_id == p.id).count()
     else:
         count = counts.get(p.id, 0)
-    name, username = _author_parts(authors, p.author_id)
+    name, username = _author_parts(authors, p.author_id, redact_names)
     return PostOut(
         id=p.id,
         title=p.title,
@@ -105,7 +110,7 @@ def _comment_out(
 ) -> CommentOut:
     if authors is None:
         authors = _authors_map(db, {c.author_id})
-    name, username = _author_parts(authors, c.author_id)
+    name, username = _author_parts(authors, c.author_id, redact_names=not me.is_admin)
     return CommentOut(
         id=c.id,
         post_id=c.post_id,
@@ -138,7 +143,7 @@ def list_posts(
         .group_by(HomeComment.post_id)
         .all()
     ) if rows else {}
-    return [_post_out(db, p, authors, counts) for p in rows]
+    return [_post_out(db, p, authors, counts, redact_names=not user.is_admin) for p in rows]
 
 
 @router.post("/posts", response_model=PostOut, status_code=status.HTTP_201_CREATED)

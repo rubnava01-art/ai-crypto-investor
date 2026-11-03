@@ -73,3 +73,21 @@ def test_candles_rejects_nonpositive_limit(client, auth_headers):
             headers=auth_headers,
         )
         assert r.status_code == 422, (bad, r.text)
+
+
+def test_market_rejects_unsupported_exchange(client, auth_headers):
+    # Antes un exchange inventado caía en 503 tras intentar la red
+    # (en /prices, tras 4 tickers + 4 OHLCV fallidos); ahora es 422
+    # inmediato, sin tocar la red ni consumir el limitador.
+    for url in (
+        "/api/market/candles?symbol=BTC/USD&exchange=binance",
+        "/api/market/ticker?symbol=BTC/USD&exchange=binance",
+        "/api/market/indicators?symbol=BTC/USD&exchange=binance",
+        "/api/market/prices?exchange=binance",
+    ):
+        r = client.get(url, headers=auth_headers)
+        assert r.status_code == 422, (url, r.text)
+    r = client.post(
+        "/api/market/ingest?symbol=BTC/USD&exchange=binance", headers=auth_headers
+    )
+    assert r.status_code == 422, r.text

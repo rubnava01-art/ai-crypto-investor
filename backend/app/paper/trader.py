@@ -9,6 +9,7 @@ import datetime as dt
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -23,25 +24,25 @@ FEE_RATE = Decimal("0.001")
 
 
 def _paper_equity(db: Session) -> Decimal:
-    paper_order_ids = {
-        o.id for o in db.query(Order).filter(Order.mode == "paper").all()
-    }
-    pnl = Decimal("0")
-    for t in db.query(Trade).filter(Trade.closed_at.isnot(None)).all():
-        if t.order_id in paper_order_ids and t.pnl_net is not None:
-            pnl += t.pnl_net
-    return Decimal(settings.initial_capital_usd) + pnl
+    """Paper equity = initial capital + realized PnL of closed paper
+    trades. ONE SQL query (Fase 3, M5): the old code loaded every paper
+    order and every closed trade into Python on each 60s cycle."""
+    pnl = (
+        db.query(func.coalesce(func.sum(Trade.pnl_net), 0))
+        .join(Order, Trade.order_id == Order.id)
+        .filter(Order.mode == "paper", Trade.closed_at.isnot(None))
+        .scalar()
+    )
+    return Decimal(settings.initial_capital_usd) + Decimal(str(pnl or 0))
 
 
 def _open_paper_trades(db: Session) -> list[Trade]:
-    paper_order_ids = [
-        o.id for o in db.query(Order).filter(Order.mode == "paper").all()
-    ]
-    if not paper_order_ids:
-        return []
+    """Open paper trades in ONE query via the join (Fase 3, M5) — the
+    old code first loaded all paper order ids, then queried by IN."""
     return (
         db.query(Trade)
-        .filter(Trade.order_id.in_(paper_order_ids), Trade.closed_at.is_(None))
+        .join(Order, Trade.order_id == Order.id)
+        .filter(Order.mode == "paper", Trade.closed_at.is_(None))
         .all()
     )
 
@@ -72,6 +73,8 @@ def paper_cycle(db: Session) -> dict:
     """Run one paper-trading cycle. Returns a summary dict."""
     summary = {"evaluated": [], "opened": 0, "closed": 0}
     equity = _paper_equity(db)
+    # Open trades once per cycle, not once per symbol (Fase 3, M5).
+    open_trades = _open_paper_trades(db)
 
     for symbol in SYMBOLS:
         candles = ingest.latest_candles(db, symbol, "1h", 200)
@@ -84,7 +87,7 @@ def paper_cycle(db: Session) -> dict:
         price = Decimal(str(closed[-1].close))
 
         # Manage open paper trades for this symbol
-        for trade in _open_paper_trades(db):
+        for trade in open_trades:
             if trade.symbol != symbol:
                 continue
             order = db.query(Order).filter(Order.id == trade.order_id).first()

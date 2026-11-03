@@ -51,7 +51,7 @@ export function AiAssistant() {
   return (
     <Panel
       title={t.ai.title}
-      badge={status && status.demo ? <DemoBadge /> : undefined}
+      badge={status && status.demo ? <DemoBadge quiet /> : undefined}
     >
       <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.ai.intro}

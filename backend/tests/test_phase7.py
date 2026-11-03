@@ -22,13 +22,22 @@ def test_rate_limiter_blocks_after_window():
 
 def test_login_rate_limited(client):
     # 10 allowed per minute per IP; hammer it
-    statuses = set()
-    for _ in range(14):
-        r = client.post(
-            "/api/auth/login", json={"username": "admin", "password": "wrong"}
-        )
-        statuses.add(r.status_code)
-    assert 429 in statuses
+    from app.core.rate_limit import login_limiter, login_lockout
+
+    try:
+        statuses = set()
+        for _ in range(14):
+            r = client.post(
+                "/api/auth/login", json={"username": "admin", "password": "wrong"}
+            )
+            statuses.add(r.status_code)
+        assert 429 in statuses
+    finally:
+        # This test deliberately exhausts login budgets (IP limiter AND
+        # the Fase 2 per-account lockout): reset both, or every later
+        # admin login in the suite would 429.
+        login_limiter._hits.clear()
+        login_lockout.clear()
 
 
 def test_security_headers_present(client, auth_headers):
@@ -49,6 +58,10 @@ def test_kill_switch_writes_audit_and_alerts(client, auth_headers):
     assert r.status_code == 200
     mock_send.assert_called_once()
     assert "KILL SWITCH" in mock_send.call_args[0][0]
+    # Limpieza (Fase 2: el kill switch ya persiste): soltarlo para no
+    # filtrarlo al siguiente módulo vía el restore del lifespan.
+    r = client.post("/api/risk/kill-switch/deactivate", headers=auth_headers)
+    assert r.status_code == 200
 
 
 def test_scanner_start_audited(client, auth_headers):

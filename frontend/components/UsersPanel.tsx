@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type AdminUser } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
 
 export function UsersPanel() {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const roleLabel = (u: AdminUser) =>
     u.status === "pending"
       ? t.usuarios.rolePending
@@ -40,13 +44,17 @@ export function UsersPanel() {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      setUsers(await api.listUsers());
+      const _load1 = await api.listUsers();
+      if (isCancelled()) return;
+      setUsers(_load1);
     } catch {
       setUsers([]);
       setLoadError(t.usuarios.loadError);
     }
     try {
-      setMeSuper((await api.me()).is_super_admin);
+      const _meSuper = await api.me();
+      if (isCancelled()) return;
+      setMeSuper(_meSuper.is_super_admin);
     } catch {
       setMeSuper(false);
     }
@@ -78,6 +86,7 @@ export function UsersPanel() {
   };
 
   const toggleRole = async (u: AdminUser) => {
+    if (!(await confirm(t.usuarios.confirmChangeRole.replace("{nombre}", u.username)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -89,6 +98,7 @@ export function UsersPanel() {
   };
 
   const setSuper = async (u: AdminUser, grant: boolean) => {
+    if (!(await confirm((grant ? t.usuarios.confirmSuperGrant : t.usuarios.confirmSuperRemove).replace("{nombre}", u.username)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -105,6 +115,7 @@ export function UsersPanel() {
   };
 
   const approve = async (u: AdminUser) => {
+    if (!(await confirm(t.usuarios.confirmApprove.replace("{nombre}", u.username)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -117,7 +128,7 @@ export function UsersPanel() {
   };
 
   const reject = async (u: AdminUser) => {
-    if (!window.confirm(t.usuarios.confirmReject.replace("{nombre}", u.username))) return;
+    if (!(await confirm(t.usuarios.confirmReject.replace("{nombre}", u.username)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -172,7 +183,7 @@ export function UsersPanel() {
   };
 
   const remove = async (u: AdminUser) => {
-    if (!window.confirm(t.usuarios.confirmDeleteUser.replace("{nombre}", u.username))) return;
+    if (!(await confirm(t.usuarios.confirmDeleteUser.replace("{nombre}", u.username)))) return;
     setError(null);
     setMsg(null);
     try {
@@ -185,6 +196,8 @@ export function UsersPanel() {
   };
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.usuarios.panelTitle}
       badge={
@@ -316,7 +329,7 @@ export function UsersPanel() {
               </div>
               {pwUserId === u.id && u.status !== "pending" && (
                 <div className="mt-3 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 sm:flex-row sm:items-center">
-                  <input
+                  <Field label={t.usuarios.newPwAria.replace("{nombre}", u.username)} className="flex-1"><input
                     aria-label={t.usuarios.newPwAria.replace("{nombre}", u.username)}
                     className={inputCls}
                     placeholder={t.usuarios.newPwPlaceholder}
@@ -324,7 +337,7 @@ export function UsersPanel() {
                     value={pwValue}
                     onChange={(e) => setPwValue(e.target.value)}
                     autoComplete="new-password"
-                  />
+                  /></Field>
                   <button
                     onClick={() => savePassword(u)}
                     disabled={pwBusy}
@@ -356,7 +369,7 @@ export function UsersPanel() {
       <form onSubmit={create} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
         <p className="text-sm font-semibold text-zinc-200">{t.usuarios.addUser}</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <input aria-label={t.usuarios.userAria}
+          <Field label={t.usuarios.userAria}><input aria-label={t.usuarios.userAria}
             className={inputCls}
             placeholder={t.usuarios.userPlaceholder}
             value={username}
@@ -364,18 +377,18 @@ export function UsersPanel() {
             required
             minLength={3}
             autoComplete="off"
-          />
-          <input aria-label={t.usuarios.passwordAria}
+          /></Field>
+          <Field label={t.usuarios.passwordAria}><input aria-label={t.usuarios.passwordAria}
             className={inputCls}
             placeholder={t.usuarios.passwordPlaceholder}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={4}
+            minLength={12}
             autoComplete="new-password"
-          />
-          <select aria-label={t.usuarios.roleAria}
+          /></Field>
+          <Field label={t.usuarios.roleAria}><select aria-label={t.usuarios.roleAria}
             className={inputCls}
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "prueba" | "super_admin")}
@@ -383,7 +396,7 @@ export function UsersPanel() {
             <option value="prueba">{t.usuarios.roleTrialOption}</option>
             <option value="admin">{t.usuarios.roleAdminOption}</option>
             {meSuper && <option value="super_admin">{t.usuarios.roleSuperOption}</option>}
-          </select>
+          </select></Field>
         </div>
         <button
           type="submit"
@@ -392,9 +405,10 @@ export function UsersPanel() {
         >
           {busy ? t.usuarios.creating : t.usuarios.createUser}
         </button>
-        {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+        {msg && <p role="status" className="text-sm text-emerald-400">{msg}</p>}
         {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       </form>
     </Panel>
+    </>
   );
 }

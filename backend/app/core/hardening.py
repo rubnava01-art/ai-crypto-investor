@@ -17,6 +17,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains"
         )
+        # CSP (Fase 3, M11): the API serves JSON/CSV only — no HTML, no
+        # scripts, no embeds. Restrictive by default; safe for API
+        # clients (fetch/XHR responses do not render documents).
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        )
         return response
 
 

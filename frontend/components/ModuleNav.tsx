@@ -203,43 +203,174 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/usuarios": "usuarios",
 };
 
+/** Familias de navegación (Fase 5, F1): las 20 rutas, sin borrar ni
+ * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
+ * que la propuesta no nombraba se ubican por afinidad y se reportan:
+ * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
+ * digital (adaptación para empresas) en Negocio, e Inicio junto a
+ * Invertir como punto de entrada. */
+const GROUPS: { key: string; hrefs: string[] }[] = [
+  { key: "invertir", hrefs: ["/inicio", "/"] },
+  { key: "estudiar", hrefs: ["/estudiar", "/recomendaciones"] },
+  { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
+  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo"] },
+  { key: "personal", hrefs: ["/espacio", "/perfil"] },
+  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios"] },
+];
+
+/** Acentos por familia (F13, decisión de Rubén 2026-11-02): UN acento por
+ * familia, codificado AQUÍ y en ningún otro sitio. El acento de marca
+ * (emerald) es la familia Invertir; el rojo queda reservado a
+ * peligro/riesgo y no es acento de familia. Los colores de rol (p. ej.
+ * super-admin violet) son otro sistema y no se tocan aquí. Las clases
+ * van literales: Tailwind no genera clases interpoladas. Los acentos
+ * decorativos dentro de paneles (p. ej. teal en Espacio, cyan en
+ * Correos) quedan como decoración interna, no como identidad de
+ * familia; si Rubén quiere alinearlos, es un pase aparte. */
+export const FAMILY_ACCENT: Record<
+  string,
+  { active: string; hint: string; dot: string; ring: string }
+> = {
+  invertir: {
+    active: "bg-emerald-600 text-white ring-emerald-500/50",
+    hint: "text-emerald-100/90",
+    dot: "bg-emerald-500",
+    ring: "focus-visible:ring-emerald-500/60",
+  },
+  estudiar: {
+    active: "bg-sky-600 text-white ring-sky-500/50",
+    hint: "text-sky-100/90",
+    dot: "bg-sky-500",
+    ring: "focus-visible:ring-sky-500/60",
+  },
+  crear: {
+    active: "bg-violet-600 text-white ring-violet-500/50",
+    hint: "text-violet-100/90",
+    dot: "bg-violet-500",
+    ring: "focus-visible:ring-violet-500/60",
+  },
+  negocio: {
+    active: "bg-amber-600 text-white ring-amber-500/50",
+    hint: "text-amber-100/90",
+    dot: "bg-amber-500",
+    ring: "focus-visible:ring-amber-500/60",
+  },
+  personal: {
+    active: "bg-teal-600 text-white ring-teal-500/50",
+    hint: "text-teal-100/90",
+    dot: "bg-teal-500",
+    ring: "focus-visible:ring-teal-500/60",
+  },
+  sistema: {
+    active: "bg-zinc-600 text-white ring-zinc-500/50",
+    hint: "text-zinc-100/90",
+    dot: "bg-zinc-400",
+    ring: "focus-visible:ring-zinc-500/60",
+  },
+};
+
+/** Familia de una ruta (o "invertir" si no está en ningún grupo). */
+export function familyForHref(href: string): string {
+  const g = GROUPS.find((gr) => gr.hrefs.includes(href));
+  return g ? g.key : "invertir";
+}
+
 export function ModuleNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
   // La entrada de Control de usuarios solo se muestra a administradores.
   const [isAdmin, setIsAdmin] = useState(false);
+  // Móvil: solo la familia de la ruta actual empieza abierta.
+  const [open, setOpen] = useState<Record<string, boolean>>(() => {
+    const o: Record<string, boolean> = {};
+    GROUPS.forEach((g) => {
+      o[g.key] = g.hrefs.includes(pathname);
+    });
+    return o;
+  });
   useEffect(() => {
     api
       .me()
       .then((m) => setIsAdmin(m.is_admin))
       .catch(() => setIsAdmin(false));
   }, []);
+
+  const visible = MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin);
+  const byHref = new Map(visible.map((m) => [m.href, m]));
+
+  const link = (m: (typeof MODULES)[number]) => {
+    const navText = t.nav[KEY_BY_HREF[m.href]];
+    const label = navText?.label ?? m.label;
+    const hint = navText?.hint ?? m.hint;
+    const active = pathname === m.href;
+    const accent = FAMILY_ACCENT[familyForHref(m.href)] ?? FAMILY_ACCENT.invertir;
+    return (
+      <Link
+        key={m.href}
+        href={m.href}
+        aria-current={active ? "page" : undefined}
+        className={
+          active
+            ? `flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg ${accent.active} px-4 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-inset transition-colors`
+            : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
+        }
+      >
+        {m.icon}
+        {label}
+        <span className={`hidden text-xs font-normal sm:inline ${active ? accent.hint : "text-zinc-400"}`}>
+          {hint}
+        </span>
+      </Link>
+    );
+  };
+
   return (
-    <nav aria-label={t.header.navAria} className="flex gap-2 overflow-x-auto pb-2 sm:flex-wrap sm:pb-1">
-      {MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin).map((m) => {
-        const navText = t.nav[KEY_BY_HREF[m.href]];
-        const label = navText?.label ?? m.label;
-        const hint = navText?.hint ?? m.hint;
-        const active = pathname === m.href;
-        return (
-          <Link
-            key={m.href}
-            href={m.href}
-            aria-current={active ? "page" : undefined}
-            className={
-              active
-                ? "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-emerald-500/50 transition-colors"
-                : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
-            }
-          >
-            {m.icon}
-            {label}
-            <span className={`hidden text-xs font-normal sm:inline ${active ? "text-emerald-100/90" : "text-zinc-400"}`}>
-              {hint}
-            </span>
-          </Link>
-        );
-      })}
+    <nav aria-label={t.header.navAria}>
+      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 20 ítems. */}
+      <div className="space-y-2 sm:hidden">
+        {GROUPS.map((g) => {
+          const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
+          if (items.length === 0) return null;
+          const isOpen = !!open[g.key];
+          const groupLabel = t.navGroups[g.key] ?? g.key;
+          const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+          return (
+            <div key={g.key} className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => setOpen((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
+                className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
+              >
+                <span className="flex items-center gap-2">
+                  <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
+                  {groupLabel}
+                </span>
+                <span aria-hidden="true" className="text-zinc-400">{isOpen ? "▾" : "▸"}</span>
+              </button>
+              {isOpen && <div className="flex flex-col gap-2 p-2 pt-0">{items.map(link)}</div>}
+            </div>
+          );
+        })}
+      </div>
+      {/* Escritorio: familias seccionadas con encabezado, todas visibles. */}
+      <div className="hidden space-y-4 sm:block">
+        {GROUPS.map((g) => {
+          const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
+          if (items.length === 0) return null;
+          const groupLabel = t.navGroups[g.key] ?? g.key;
+          const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+          return (
+            <section key={g.key} aria-label={groupLabel}>
+              <h2 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
+                {groupLabel}
+              </h2>
+              <div className="flex flex-wrap gap-2">{items.map(link)}</div>
+            </section>
+          );
+        })}
+      </div>
     </nav>
   );
 }

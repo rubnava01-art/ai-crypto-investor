@@ -6,7 +6,9 @@ import {
   type AcademyCourse, type AcademyEnrollment, type CrmContact, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { useConfirm } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
@@ -21,7 +23,9 @@ const fmtDate = (iso: string | null, locale: string) =>
   iso ? new Date(iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
 function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse; isAdmin: boolean; contacts: CrmContact[] }) {
+  const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
+  const { confirm, dialog } = useConfirm(t);
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [students, setStudents] = useState<AcademyEnrollment[] | null>(null);
   const [contactId, setContactId] = useState("");
@@ -32,7 +36,9 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      setStudents(await api.listStudents(course.id));
+      const _load1 = await api.listStudents(course.id);
+      if (isCancelled()) return;
+      setStudents(_load1);
     } catch {
       setStudents([]);
       setLoadError(t.academy.loadError);
@@ -75,7 +81,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
   };
 
   const remove = async (enr: AcademyEnrollment) => {
-    if (!window.confirm(t.academy.confirmRemove.replace("{nombre}", enr.contact_name).replace("{curso}", course.title))) return;
+    if (!(await confirm(t.academy.confirmRemove.replace("{nombre}", enr.contact_name).replace("{curso}", course.title)))) return;
     setError(null);
     try {
       await api.deleteEnrollment(enr.id);
@@ -86,6 +92,8 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
   };
 
   return (
+    <>
+      {dialog}
     <div className="mt-3 border-t border-zinc-800 pt-3">
       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
         {t.academy.students} ({students === null ? "…" : students.length})
@@ -159,10 +167,12 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       )}
       {error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </div>
+    </>
   );
 }
 
 function DownloadButtons({ course }: { course: AcademyCourse }) {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +212,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
 }
 
 export function AcademyPanel() {
+  const isCancelled = useCancelled();
   const { t } = useLanguage();
   const kindLabel = (k: string) => (k === "ebook" ? t.academy.kindEbook : k === "pack" ? t.academy.kindPack : k === "academia" ? t.academy.kindAcademia : k);
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -211,9 +222,9 @@ export function AcademyPanel() {
   const [openId, setOpenId] = useState<number | null>(null);
 
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-    api.listCourses().then(setCourses).catch(() => setCourses([]));
-    api.listContacts().then(setContacts).catch(() => setContacts([]));
+    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
+    api.listCourses().then((v) => { if (!isCancelled()) setCourses(v); }).catch(() => { if (!isCancelled()) setCourses([]); });
+    api.listContacts().then((v) => { if (!isCancelled()) setContacts(v); }).catch(() => { if (!isCancelled()) setContacts([]); });
   }, []);
 
   return (

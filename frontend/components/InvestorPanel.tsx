@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { Panel } from "./Panel";
+import { newId } from "./ui";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
@@ -73,7 +74,7 @@ export function InvestorPanel({
     try {
       const order = await api.createOrder(
         { symbol, side, quantity: qty.toFixed(8), mode: orderMode },
-        crypto.randomUUID()
+        newId()
       );
       setResult(
         (side === "buy" ? t.invertir.resultBuy : t.invertir.resultSell)

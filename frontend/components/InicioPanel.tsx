@@ -5,6 +5,8 @@ import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from 
 import { useLanguage } from "../lib/i18n";
 import { novedadesOrdenadas, type NovedadSistema } from "../lib/novedades";
 import { Panel } from "./Panel";
+import { useAsyncLoad, useCancelled } from "../lib/useLoad";
+import { ApiErrorBanner, LoadMore, useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -21,8 +23,20 @@ export function InicioPanel() {
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [posts, setPosts] = useState<HomePost[] | null>(null);
+  // Tri-estado (Fase 4, FE3/FE2): posts con useAsyncLoad — al desmontar se
+  // aborta el fetch y un error ya no se mapea a [] (antes parecía "sin
+  // noticias"). La lista anterior se conserva y el banner explica el fallo.
+  const postsLoad = useAsyncLoad<HomePost[]>((signal) => api.listHomePosts({ signal }), []);
+  const posts = postsLoad.data;
+  const postsError = postsLoad.error;
   const [comments, setComments] = useState<Record<number, HomeComment[]>>({});
+  const [commentsError, setCommentsError] = useState<Record<number, unknown>>({});
+  // Render incremental en cliente (Fase 4, FE10): el backend no pagina
+  // comentarios, así que se muestran los primeros 20 y "cargar más" revela
+  // el resto sin pedir nada nuevo (parámetro limit = seguimiento backend).
+  const [commentsVisible, setCommentsVisible] = useState<Record<number, number>>({});
+  const isCancelled = useCancelled();
+  const { confirm, dialog } = useConfirm(t);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [title, setTitle] = useState("");
@@ -34,27 +48,22 @@ export function InicioPanel() {
 
   const isAdmin = !!me?.is_admin;
 
-  const load = useCallback(async () => {
-    try {
-      setPosts(await api.listHomePosts());
-    } catch {
-      setPosts([]);
-    }
-  }, []);
-
   useEffect(() => {
-    api.me().then(setMe).catch(() => setMe(null));
-    load();
-  }, [load]);
+    api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
+  }, [isCancelled]);
 
   const loadComments = useCallback(async (postId: number) => {
     try {
       const rows = await api.listHomeComments(postId);
+      if (isCancelled()) return;
       setComments((prev) => ({ ...prev, [postId]: rows }));
-    } catch {
-      setComments((prev) => ({ ...prev, [postId]: [] }));
+      setCommentsError((prev) => ({ ...prev, [postId]: null }));
+    } catch (e) {
+      if (isCancelled()) return;
+      // No vaciar comentarios previos ante un fallo: banner y reintento.
+      setCommentsError((prev) => ({ ...prev, [postId]: e }));
     }
-  }, []);
+  }, [isCancelled]);
 
   const toggleComments = (postId: number) => {
     setExpanded((prev) => {
@@ -89,7 +98,7 @@ export function InicioPanel() {
         setMsg(t.inicio.saved);
       }
       resetForm();
-      await load();
+      postsLoad.reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.inicio.saveError);
     } finally {
@@ -98,11 +107,11 @@ export function InicioPanel() {
   };
 
   const removePost = async (p: HomePost) => {
-    if (!window.confirm(t.inicio.deletePostConfirm.replace("{nombre}", p.title))) return;
+    if (!(await confirm(t.inicio.deletePostConfirm.replace("{nombre}", p.title)))) return;
     setError(null);
     try {
       await api.deleteHomePost(p.id);
-      await load();
+      postsLoad.reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.inicio.deleteError);
     }
@@ -116,19 +125,19 @@ export function InicioPanel() {
       await api.createHomeComment(postId, { body: text });
       setDrafts((prev) => ({ ...prev, [postId]: "" }));
       await loadComments(postId);
-      await load();
+      postsLoad.reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.inicio.commentError);
     }
   };
 
   const removeComment = async (postId: number, c: HomeComment) => {
-    if (!window.confirm(t.inicio.deleteCommentConfirm)) return;
+    if (!(await confirm(t.inicio.deleteCommentConfirm))) return;
     setError(null);
     try {
       await api.deleteHomeComment(c.id);
       await loadComments(postId);
-      await load();
+      postsLoad.reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.inicio.deleteCommentError);
     }
@@ -161,11 +170,13 @@ export function InicioPanel() {
   });
 
   return (
+    <>
+      {dialog}
     <Panel
       title={t.inicio.title}
       badge={
         <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-          {posts === null ? t.inicio.loading : t.inicio.postsCount.replace("{nombre}", String(items.length))}
+          {posts === null && !postsError ? t.inicio.loading : t.inicio.postsCount.replace("{nombre}", String(items.length))}
         </span>
       }
     >
@@ -209,8 +220,8 @@ export function InicioPanel() {
 
       {isAdmin && (
         <form onSubmit={savePost} className="space-y-3">
-          <input aria-label={t.inicio.titleAria} className={inputCls} placeholder={t.inicio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" />
-          <textarea aria-label={t.inicio.bodyAria} className={inputCls} placeholder={t.inicio.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
+          <Field label={t.inicio.titleAria}><input aria-label={t.inicio.titleAria} className={inputCls} placeholder={t.inicio.titlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+          <Field label={t.inicio.bodyAria}><textarea aria-label={t.inicio.bodyAria} className={inputCls} placeholder={t.inicio.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} /></Field>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -230,8 +241,9 @@ export function InicioPanel() {
         </form>
       )}
 
+      {postsError ? <ApiErrorBanner error={postsError} t={t} onRetry={postsLoad.reload} /> : null}
       <div className="mt-4 border-t border-zinc-800 pt-3">
-        {posts === null ? (
+        {posts === null && !postsError ? (
           <p className="py-2 text-sm text-zinc-500">{t.inicio.loadingPosts}</p>
         ) : items.length === 0 ? (
           <p className="py-2 text-sm text-zinc-500">
@@ -266,13 +278,13 @@ export function InicioPanel() {
                       <span className="ml-auto flex gap-2">
                         <button
                           onClick={() => { setEditing(p); setTitle(p.title); setBody(p.body); }}
-                          className="min-h-[36px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                          className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.inicio.edit}
                         </button>
                         <button
                           onClick={() => removePost(p)}
-                          className="min-h-[36px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                          className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 transition-colors hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                         >
                           {t.inicio.delete}
                         </button>
@@ -292,13 +304,17 @@ export function InicioPanel() {
                   </button>
                   {open && (
                     <div className="mt-3 space-y-2 border-t border-zinc-800 pt-3">
+                      {commentsError[p.id] ? (
+                        <ApiErrorBanner error={commentsError[p.id]} t={t} onRetry={() => loadComments(p.id)} />
+                      ) : null}
                       {rows === undefined ? (
                         <p className="text-sm text-zinc-500">{t.inicio.loadingComments}</p>
                       ) : rows.length === 0 ? (
                         <p className="text-sm text-zinc-500">{t.inicio.firstComment}</p>
                       ) : (
+                        <>
                         <ul className="space-y-2">
-                          {rows.map((c) => (
+                          {rows.slice(0, commentsVisible[p.id] ?? 20).map((c) => (
                             <li key={c.id} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-zinc-200">{c.author_name}</span>
@@ -309,7 +325,7 @@ export function InicioPanel() {
                                 {c.can_delete && (
                                   <button
                                     onClick={() => removeComment(p.id, c)}
-                                    className="ml-auto min-h-[36px] rounded-lg px-2 py-1.5 text-xs font-semibold text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                                    className="ml-auto min-h-[44px] rounded-lg px-2 py-1.5 text-xs font-semibold text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                                   >
                                     {t.inicio.delete}
                                   </button>
@@ -319,16 +335,25 @@ export function InicioPanel() {
                             </li>
                           ))}
                         </ul>
+                        <LoadMore
+                          visible={commentsVisible[p.id] ?? 20}
+                          total={rows.length}
+                          t={t}
+                          onLoadMore={() =>
+                            setCommentsVisible((prev) => ({ ...prev, [p.id]: (prev[p.id] ?? 20) + 20 }))
+                          }
+                        />
+                        </>
                       )}
                       <div className="flex gap-2">
-                        <input aria-label={t.inicio.commentAria}
+                        <Field label={t.inicio.commentAria} className="flex-1"><input aria-label={t.inicio.commentAria}
                           className={inputCls}
                           placeholder={t.inicio.commentPlaceholder}
                           value={drafts[p.id] ?? ""}
                           onChange={(e) => setDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
                           maxLength={1000}
                           autoComplete="off"
-                        />
+                        /></Field>
                         <button
                           onClick={() => sendComment(p.id)}
                           disabled={!(drafts[p.id] ?? "").trim()}
@@ -346,5 +371,6 @@ export function InicioPanel() {
         )}
       </div>
     </Panel>
+    </>
   );
 }
