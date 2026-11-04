@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-04",
+    title: "Diaria 4-nov: hora del precio en VALIDAR y verificación en un comando",
+    body: "Publicado el 4 de noviembre: la pantalla VALIDAR de Invertir ya muestra la hora del precio; nuevo script de verificación diaria (pruebas + frontend en un comando). Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-03",
     title: "SEO básico aplicado (reel Peter Lead)",
     body: "Publicado el 3 de noviembre: robots.txt que no bloquea bots, sitemap con las entradas públicas, títulos y descripción con los servicios de la plataforma, analítica preparada (apagada hasta activar) y verificación de Search Console lista. La página de Google no aplica a la app.",

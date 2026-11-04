@@ -146,7 +146,19 @@ export function InvestorPanel({
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.currentPrice}</dt>
-              <dd className="text-right font-mono tabular-nums">${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}</dd>
+              <dd className="text-right font-mono tabular-nums">
+                ${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                {priceUpdatedAt && (
+                  <span className="block text-xs font-sans text-zinc-400">
+                    {t.invertir.updatedAt}{" "}
+                    {priceUpdatedAt.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                )}
+              </dd>
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.estQty}</dt>
