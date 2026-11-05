@@ -27,6 +27,26 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-04",
+    title: "Análisis personal en Mi perfil: Lean Startup, encuesta de 12 y estrés+enfoque",
+    body: "Publicado el 4 de noviembre: sección Análisis personal en Mi perfil con el modelo Lean Startup (crear-medir-aprender), una encuesta rápida de 12 preguntas (fortalezas vs áreas a mejorar) y un autochequeo de estrés y enfoque de 5+5 preguntas, solo en el navegador. El autochequeo es solo reflexión, no un diagnóstico.",
+  },
+  {
+    date: "2026-11-04",
+    title: "Juego en Estudiar: bases, estructura y manejo con quiz",
+    body: "Publicado el 4 de noviembre: sección Juego en Estudiar con las bases de la plataforma, su estructura en 6 familias y 24 módulos y el manejo de Negocio, más un quiz interactivo de 10 preguntas. Solo funciones reales; la simulación queda intacta.",
+  },
+  {
+    date: "2026-11-04",
+    title: "Manuales en Estudiar: manejo general, Invertir (simulación) y Negocio",
+    body: "Publicado el 4 de noviembre: tres manuales en Estudiar — manejo general de la plataforma, manejo de Invertir en simulación y manejo de Negocio (Gestor de Clientes, Facturas, Inventario, Talento, Riesgos, Planillas y Análisis) — en español e inglés, con solo funciones reales. Trading real sigue apagado.",
+  },
+  {
+    date: "2026-11-04",
+    title: "Gestión de empresa: Talento, Riesgos, Planillas, Gestor de Clientes y Análisis de datos",
+    body: "Publicado el 4 de noviembre: tres módulos nuevos en Negocio — Talento humano, Gestión de Riesgos y Planillas (solo registros, sin impuestos ni pagos) —; el CRM ahora es Gestor de Clientes con historial por cliente y asistente por reglas (sin IA); y la herramienta Análisis de datos genera tablas, gráficas y estadísticas desde un texto pegado. Menús más prácticos y lema de mega-plataforma. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-04",
     title: "Diaria 4-nov: hora del precio en VALIDAR y verificación en un comando",
     body: "Publicado el 4 de noviembre: la pantalla VALIDAR de Invertir ya muestra la hora del precio; nuevo script de verificación diaria (pruebas + frontend en un comando). Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

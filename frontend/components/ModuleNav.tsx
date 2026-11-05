@@ -57,7 +57,7 @@ const MODULES = [
   },
   {
     href: "/crm",
-    label: "CRM",
+    label: "Gestor de Clientes",
     hint: "Contactos y clientes",
     icon: (
       <Icon>
@@ -121,6 +121,46 @@ const MODULES = [
     label: "Desarrollo digital",
     hint: "Adaptación digital para empresas",
     icon: <Icon d="M5 21V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v17M9 21v-4h6v4M9 10h.01M15 10h.01M12 7v0" />,
+  },
+  {
+    href: "/talento",
+    label: "Talento humano",
+    hint: "Equipo · roles · personas",
+    icon: (
+      <Icon>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </Icon>
+    ),
+  },
+  {
+    href: "/riesgos",
+    label: "Gestión de Riesgos",
+    hint: "Riesgos · controles · planes",
+    icon: (
+      <Icon>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M12 8v4M12 16h.01" />
+      </Icon>
+    ),
+  },
+  {
+    href: "/planillas",
+    label: "Planillas",
+    hint: "Pagos y registros del equipo",
+    icon: (
+      <Icon>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M9 13h6M9 17h4" />
+      </Icon>
+    ),
+  },
+  {
+    href: "/analisis",
+    label: "Análisis de datos",
+    hint: "Datos · reportes · decisiones",
+    icon: <Icon d="M3 3v18h18M7 15v-4M12 15V7M17 15v-7" />,
   },
   {
     href: "/tendencias",
@@ -195,6 +235,10 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/chat": "chat",
   "/recomendaciones": "recomendaciones",
   "/desarrollo": "desarrollo",
+  "/talento": "talento",
+  "/riesgos": "riesgos",
+  "/planillas": "planillas",
+  "/analisis": "analisis",
   "/tendencias": "tendencias",
   "/auditor": "auditor",
   "/privacidad": "privacidad",
@@ -203,17 +247,24 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/usuarios": "usuarios",
 };
 
-/** Familias de navegación (Fase 5, F1): las 20 rutas, sin borrar ni
+/** Familias de navegación (Fase 5, F1): las 24 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
  * que la propuesta no nombraba se ubican por afinidad y se reportan:
  * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
  * digital (adaptación para empresas) en Negocio, e Inicio junto a
- * Invertir como punto de entrada. */
+ * Invertir como punto de entrada. Las 4 rutas nuevas de Negocio
+ * (Talento humano, Gestión de Riesgos, Planillas, Análisis de datos)
+ * enlazan a páginas que crea el agente Frontend; hasta entonces el
+ * enlace existe en el menú pero la página aún no está servida. Las 3
+ * guías de /estudiar/manual-* pertenecen a la familia Estudiar SIN
+ * entrada propia en el menú: el grupo las reconoce para el acento y la
+ * familia abierta en móvil, y el menú las filtra porque no están en
+ * MODULES. */
 const GROUPS: { key: string; hrefs: string[] }[] = [
   { key: "invertir", hrefs: ["/inicio", "/"] },
-  { key: "estudiar", hrefs: ["/estudiar", "/recomendaciones"] },
+  { key: "estudiar", hrefs: ["/estudiar", "/estudiar/manual-plataforma", "/estudiar/manual-invertir", "/estudiar/manual-negocio", "/estudiar/juego", "/recomendaciones"] },
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
-  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo"] },
+  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
   { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios"] },
 ];
@@ -326,7 +377,7 @@ export function ModuleNav() {
 
   return (
     <nav aria-label={t.header.navAria}>
-      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 20 ítems. */}
+      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 24 ítems. */}
       <div className="space-y-2 sm:hidden">
         {GROUPS.map((g) => {
           const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);

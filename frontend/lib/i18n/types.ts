@@ -20,6 +20,10 @@ export type NavKey =
   | "chat"
   | "recomendaciones"
   | "desarrollo"
+  | "talento"
+  | "riesgos"
+  | "planillas"
+  | "analisis"
   | "tendencias"
   | "auditor"
   | "privacidad"
@@ -30,6 +34,7 @@ export type NavKey =
 export type Dictionary = {
   header: {
     brand: string;
+    tagline: string;
     navAria: string;
     language: string;
   };
@@ -81,5 +86,13 @@ export type Dictionary = {
   inicio: Record<string, string>;
   inventario: Record<string, string>;
   privacidad: Record<string, string>;
+  // Secciones nuevas (frontend empresa/análisis): mismo patrón Record.
+  talento: Record<string, string>;
+  riesgos: Record<string, string>;
+  planillas: Record<string, string>;
+  analisis: Record<string, string>;
+  // Manuales de Estudiar: mismo patrón Record.
+  manuales: Record<string, string>;
+  juego: Record<string, string>;
   reliability: Record<string, string>;
 };

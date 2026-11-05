@@ -1046,6 +1046,86 @@ class HomeComment(Base):
     post: Mapped["HomePost"] = relationship("HomePost", back_populates="comments")
 
 
+class Empleado(Base):
+    """Talento humano (2026-11-04): staff roster records only.
+
+    No SSN, no bank-account fields — deliberately absent, never added.
+    Admin CRUD; prueba sees an empty list (personal data, same pattern
+    as Espacio revelations/emotions, decisión 6). Lists start EMPTY.
+    """
+
+    __tablename__ = "empleados"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    puesto: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    contacto: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    fecha_ingreso: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    estado: Mapped[str] = mapped_column(String(16), default="activo", nullable=False)
+    notas: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class Riesgo(Base):
+    """Gestión de riesgos (2026-11-04): risk register records only.
+
+    Admin writes; any authenticated user may read (read-only for prueba).
+    Lists start EMPTY.
+    """
+
+    __tablename__ = "riesgos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    riesgo: Mapped[str] = mapped_column(String(200), nullable=False)
+    descripcion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    probabilidad: Mapped[str] = mapped_column(String(16), default="media", nullable=False)
+    impacto: Mapped[str] = mapped_column(String(16), default="medio", nullable=False)
+    mitigacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    responsable: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    estado: Mapped[str] = mapped_column(String(16), default="abierto", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class Planilla(Base):
+    """Planillas (2026-11-04): payroll RECORDS only.
+
+    No payments, no money movement, no tax computation anywhere: monto
+    is a stored record amount only, empleado_nombre is a display
+    snapshot stored at creation. Admin CRUD; prueba sees an empty list
+    (sensitive data, same pattern as Espacio). Lists start EMPTY.
+    """
+
+    __tablename__ = "planillas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    periodo: Mapped[str] = mapped_column(String(32), nullable=False)
+    empleado_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("empleados.id", ondelete="SET NULL"), nullable=True
+    )
+    empleado_nombre: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    monto: Mapped[Decimal] = mapped_column(
+        Numeric(24, 2), default=Decimal("0"), nullable=False
+    )
+    estado: Mapped[str] = mapped_column(String(16), default="pendiente", nullable=False)
+    notas: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
 class InventoryItem(Base):
     """An inventory item (módulo Inventario, 2026-10-29).
 

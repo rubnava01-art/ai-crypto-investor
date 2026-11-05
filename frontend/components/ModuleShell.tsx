@@ -66,6 +66,7 @@ export function ModuleShell({
           </p>
           <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">{moduleTitle}</h1>
           <p className="mt-0.5 text-sm leading-relaxed text-zinc-400">{subtitle}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{t.header.tagline}</p>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />

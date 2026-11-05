@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   api, ApiError,
   type CrmContact, type CrmContactInput, type CrmSource, type CrmStatus, type MeResponse,
@@ -9,6 +10,19 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
+
+// Carga diferida (optimización): Historial y Asistente van debajo del panel
+// principal del CRM, fuera de la vista inicial — se descargan solo cuando
+// la página CRM se renderiza, con el mismo patrón dynamic de app/page.tsx.
+// El panel CRM principal no cambia de comportamiento.
+const CrmHistorial = dynamic(
+  () => import("./CrmHistorial").then((m) => m.CrmHistorial),
+  { loading: () => <p className="py-4 text-center text-sm text-zinc-400">Cargando…</p> },
+);
+const CrmAsistente = dynamic(
+  () => import("./CrmAsistente").then((m) => m.CrmAsistente),
+  { loading: () => <p className="py-4 text-center text-sm text-zinc-400">Cargando…</p> },
+);
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -400,6 +414,12 @@ export function CrmPanel() {
         </div>
       )}
     </Panel>
+    {/* Nuevas secciones del CRM (sin tocar la lógica anterior): historial
+      por cliente y asistente por reglas, debajo del panel principal. */}
+    <div className="mt-6 space-y-6">
+      <CrmHistorial />
+      <CrmAsistente />
+    </div>
     </>
   );
 }
