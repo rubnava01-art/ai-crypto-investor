@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-05",
+    title: "Login profesional: animación de entrada más visible y formulario rediseñado",
+    body: "Publicado el 5 de noviembre: el inicio de sesión ahora se ve claramente profesional — la animación de entrada sube 24px con un leve zoom en cascada, y el formulario se rediseñó con iconos en los campos, botón para ver la contraseña, botón con degradado y spinner al procesar, y línea de acento esmeralda en la tarjeta. El funcionamiento del login sigue igual y se respeta el movimiento reducido. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
     title: "Login con intro animado profesional",
     body: "Publicado el 5 de noviembre: el inicio de sesión ahora tiene una entrada animada profesional — la marca, el lema y el formulario entran de forma escalonada con una animación sobria, solo con CSS y respetando el movimiento reducido. El funcionamiento del login sigue igual. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

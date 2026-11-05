@@ -82,6 +82,9 @@ export const dictEs: Dictionary = {
       errorChallenge: "No se pudo cargar la verificación. Inténtalo de nuevo.",
       errorCreate: "No se pudo crear la cuenta.",
       errorLogin: "Login failed",
+      showPassword: "Mostrar contraseña",
+      hidePassword: "Ocultar contraseña",
+      secureNote: "Conexión segura",
     },
     perfil: {
       title: "Mi perfil",

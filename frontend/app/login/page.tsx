@@ -10,8 +10,11 @@ import { SkipLink } from "../../components/ui";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
  * claude.ai — one centered card, generous spacing, no clutter.
- * Intro animado (2026-11-05): entrada escalonada de marca, título y
- * formulario; con movimiento reducido no se anima nada (ver globals.css).
+ * Intro animado (2026-11-05, v2 más visible): entrada escalonada de
+ * marca, título y formulario con subida de 24px + leve escala; con
+ * movimiento reducido no se anima nada (ver globals.css). Formulario
+ * pro: iconos en los campos, mostrar/ocultar contraseña, botón con
+ * gradiente y spinner al procesar, línea de acento en la tarjeta.
  * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
@@ -39,6 +42,7 @@ function LoginPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
 
@@ -56,6 +60,7 @@ function LoginPageInner() {
     setNotice(null);
     setUsername("");
     setPassword("");
+    setShowPassword(false);
     setAnswer("");
     if (m === "register") loadChallenge();
   }
@@ -105,7 +110,7 @@ function LoginPageInner() {
   }
 
   const inputCls =
-    "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition-colors hover:border-zinc-600 focus:border-emerald-500";
+    "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition hover:border-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30";
 
   return (
     <main data-login className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
@@ -117,16 +122,16 @@ function LoginPageInner() {
         className="pointer-events-none absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.08),transparent_60%)]"
       />
       <div className="relative mb-8 flex flex-col items-center text-center">
-        <span aria-hidden="true" className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50${reducedMotion ? "" : " login-intro-badge"}`}>
+        <span aria-hidden="true" className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 text-2xl font-bold text-white shadow-xl shadow-emerald-950/60 ring-1 ring-white/20${reducedMotion ? "" : " login-intro-badge"}`}>
           G
         </span>
-        <p className={`text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400${introCls ? " login-intro" : ""}`} style={introStyle(90)}>
+        <p className={`text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400${introCls ? " login-intro" : ""}`} style={introStyle(100)}>
           {t.header.brand}
         </p>
-        <h1 className={`mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(170)}>
+        <h1 className={`mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(200)}>
           {mode === "login" ? t.login.welcome : t.login.createAccount}
         </h1>
-        <p className={`mt-1 max-w-xs text-sm leading-relaxed text-zinc-400${introCls ? " login-intro" : ""}`} style={introStyle(250)}>
+        <p className={`mt-1 max-w-xs text-sm leading-relaxed text-zinc-400${introCls ? " login-intro" : ""}`} style={introStyle(300)}>
           {mode === "login" ? t.login.subtitleLogin : t.login.subtitleRegister}
         </p>
       </div>
@@ -134,32 +139,61 @@ function LoginPageInner() {
       <form
         id="contenido"
         onSubmit={mode === "login" ? onSubmit : onRegister}
-        style={introStyle(330)}
-        className={`relative w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl sm:p-8${introCls ? " login-intro" : ""}`}
+        style={introStyle(420)}
+        className={`relative w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-700/70 bg-zinc-900/80 p-6 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.9)] backdrop-blur-sm sm:p-8${introCls ? " login-intro" : ""}`}
       >
+        {/* Línea de acento superior: detalle premium de la tarjeta. */}
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500/80 to-transparent" />
         <label className="mb-4 block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.userLabel}</span>
-          <input
-            className={inputCls}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            placeholder={t.login.userPlaceholder}
-            required
-          />
+          <span className="relative block">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+            <input
+              className={`${inputCls} pl-11`}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              placeholder={t.login.userPlaceholder}
+              required
+            />
+          </span>
         </label>
         <label className="mb-5 block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.passwordLabel}</span>
-          <input
-            type="password"
-            className={inputCls}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder={t.login.passwordPlaceholder}
-            minLength={mode === "register" ? 12 : 1}
-            required
-          />
+          <span className="relative block">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+            </svg>
+            <input
+              type={showPassword ? "text" : "password"}
+              className={`${inputCls} pl-11 pr-12`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              placeholder={t.login.passwordPlaceholder}
+              minLength={mode === "register" ? 12 : 1}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? t.login.hidePassword : t.login.showPassword}
+              className="absolute right-1.5 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100"
+            >
+              {showPassword ? (
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                </svg>
+              ) : (
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.01 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.01-9.963-7.178Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              )}
+            </button>
+          </span>
           {mode === "register" && (
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.login.passwordMinHint}</p>
           )}
@@ -215,8 +249,14 @@ function LoginPageInner() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-emerald-600 px-3 py-3 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-3 py-3 text-[15px] font-semibold text-white shadow-lg shadow-emerald-950/40 transition hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.99] disabled:opacity-50"
         >
+          {loading && (
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 animate-spin">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+              <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+            </svg>
+          )}
           {loading ? t.login.processing : mode === "login" ? t.login.loginSubmit : t.login.createSubmit}
         </button>
 
@@ -238,6 +278,13 @@ function LoginPageInner() {
           )}
         </p>
       </form>
+
+      <p className={`mt-6 flex items-center justify-center gap-1.5 text-xs text-zinc-500${introCls ? " login-intro" : ""}`} style={introStyle(520)}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-3.5 w-3.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+        </svg>
+        {t.login.secureNote}
+      </p>
 
     </main>
   );
