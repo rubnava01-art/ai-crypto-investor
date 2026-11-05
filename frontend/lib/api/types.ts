@@ -368,6 +368,9 @@ export interface AuditCheck {
   passed: boolean;
   value: string;
   ideal: string;
+  // Opcionales: las auditorías viejas guardadas no los traen.
+  category?: string;
+  severity?: string;
 }
 
 export interface WebAudit {

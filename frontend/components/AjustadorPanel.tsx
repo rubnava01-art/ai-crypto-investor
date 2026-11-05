@@ -60,18 +60,19 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * ([0] login profesional v2, de todo el sitio y sin mapear) — todos
  * los índices anteriores +1. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  ajustador: [6],
-  estudiar: [4, 6, 9, 10],
-  inicio: [7, 15],
-  perfil: [8],
-  talento: [11],
-  riesgos: [11],
-  planillas: [11],
-  crm: [11],
-  analisis: [11],
-  invertir: [12, 14],
-  usuarios: [14, 15],
-  espacio: [15],
+  auditor: [0],
+  ajustador: [7],
+  estudiar: [5, 7, 10, 11],
+  inicio: [8, 16],
+  perfil: [9],
+  talento: [12],
+  riesgos: [12],
+  planillas: [12],
+  crm: [12],
+  analisis: [12],
+  invertir: [13, 15],
+  usuarios: [15, 16],
+  espacio: [16],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

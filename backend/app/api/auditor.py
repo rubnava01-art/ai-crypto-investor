@@ -6,13 +6,18 @@ Enter a URL, get honestly measured numbers for THAT page only:
   page size (KB), HTTPS yes/no.
 - An SEO checklist where every item shows pass/fail WITH the found
   value (title + length, meta description + length, H1 count,
-  canonical, og tags, viewport, html lang, images missing alt, robots
-  noindex warning, internal/external link counts).
+  canonical, og tags, twitter:card, favicon, viewport, html lang,
+  images missing alt, robots noindex warning, robots.txt and
+  sitemap.xml presence, internal/external link counts). Every check
+  carries a Semrush-style category (seo, social, rastreo,
+  rendimiento) and severity (error, advertencia, aviso); the score
+  stays exactly as before (% of checks passed).
 - A transparent score: 0–100 = percentage of checklist items passed,
   always displayed WITH the full checklist. The UI states explicitly
   that this is a basic single-page review, NOT a Lighthouse or
-  PageSpeed score. No crawl, no sitemap check, no Core Web Vitals —
-  nothing is claimed that was not fetched.
+  PageSpeed score. No crawl, no Core Web Vitals — nothing is claimed
+  that was not fetched. robots.txt / sitemap.xml are presence checks
+  only (HTTP 200 on the same host), never a crawl.
 
 SSRF PROTECTION (mandatory, server-side fetch of user-supplied URLs):
 - http(s) only, no credentials in the URL, hostname required.
@@ -138,6 +143,7 @@ class _SEOParser(HTMLParser):
         self._in_title = False
         self.meta: dict[str, str] = {}
         self.canonical = ""
+        self.favicon = ""
         self.lang = ""
         self.h1_count = 0
         self.img_total = 0
@@ -154,8 +160,13 @@ class _SEOParser(HTMLParser):
             if name and "content" in attrs_d:
                 self.meta[name] = attrs_d["content"]
         elif tag == "link":
-            if attrs_d.get("rel", "").lower() == "canonical" and attrs_d.get("href"):
+            rel = attrs_d.get("rel", "").lower()
+            if rel == "canonical" and attrs_d.get("href"):
                 self.canonical = attrs_d["href"]
+            elif "icon" in rel.split() and attrs_d.get("href") and not self.favicon:
+                # rel="icon" o rel="shortcut icon" (rel dividido por
+                # espacios; apple-touch-icon no cuenta como favicon).
+                self.favicon = attrs_d["href"]
         elif tag == "html":
             self.lang = attrs_d.get("lang", "")
         elif tag == "h1":
@@ -184,37 +195,86 @@ class _SEOParser(HTMLParser):
             self.title += data
 
 
-def _check(check_id: str, label: str, passed: bool, value: str, ideal: str) -> dict:
-    return {"id": check_id, "label": label, "passed": passed, "value": value, "ideal": ideal}
+def _check(
+    check_id: str,
+    label: str,
+    passed: bool,
+    value: str,
+    ideal: str,
+    category: str = "seo",
+    severity: str = "advertencia",
+) -> dict:
+    """Un ítem de la lista. Categorías estilo Semrush: seo, social,
+    rastreo, rendimiento. Severidad: error (requerido), advertencia
+    (recomendado), aviso (informativo)."""
+    return {
+        "id": check_id,
+        "label": label,
+        "passed": passed,
+        "value": value,
+        "ideal": ideal,
+        "category": category,
+        "severity": severity,
+    }
 
 
-def extract_seo(html: str, base_url: str) -> list[dict]:
+def extract_seo(
+    html: str,
+    base_url: str,
+    robots_present: bool = False,
+    sitemap_present: bool = False,
+) -> list[dict]:
     """Build the SEO checklist from one page's HTML. Every item shows
     pass/fail WITH the found value — nothing is hidden behind the
-    score."""
+    score. robots_present / sitemap_present come from the presence
+    fetches in fetch_url_audit (mismo host, nunca fallan la auditoría);
+    por defecto False cuando se llama solo con el HTML (tests)."""
     parser = _SEOParser((urlparse(base_url).hostname or "").lower())
     parser.feed(html)
     title = parser.title.strip()
     description = parser.meta.get("description", "").strip()
     robots = parser.meta.get("robots", "").strip()
+    twitter_card = parser.meta.get("twitter:card", "").strip()
     checks = [
-        _check("title_present", "Título presente", bool(title), title or "ausente", "título no vacío"),
-        _check("title_length", "Longitud del título", 30 <= len(title) <= 60, f"{len(title)} caracteres", "30–60 caracteres"),
-        _check("description_present", "Meta descripción presente", bool(description), description or "ausente", "descripción no vacía"),
-        _check("description_length", "Longitud de la descripción", 50 <= len(description) <= 160, f"{len(description)} caracteres", "50–160 caracteres"),
-        _check("h1_one", "Un solo H1", parser.h1_count == 1, f"{parser.h1_count} H1", "exactamente 1"),
-        _check("canonical", "Canonical presente", bool(parser.canonical), parser.canonical or "ausente", "enlace canonical"),
-        _check("og_title", "og:title presente", bool(parser.meta.get("og:title", "").strip()), parser.meta.get("og:title", "").strip() or "ausente", "og:title"),
-        _check("og_description", "og:description presente", bool(parser.meta.get("og:description", "").strip()), parser.meta.get("og:description", "").strip() or "ausente", "og:description"),
-        _check("og_image", "og:image presente", bool(parser.meta.get("og:image", "").strip()), parser.meta.get("og:image", "").strip() or "ausente", "og:image"),
-        _check("viewport", "Meta viewport (móvil)", bool(parser.meta.get("viewport", "").strip()), parser.meta.get("viewport", "").strip() or "ausente", "viewport"),
-        _check("html_lang", "Idioma en <html lang>", bool(parser.lang.strip()), parser.lang.strip() or "ausente", "atributo lang"),
+        _check("title_present", "Título presente", bool(title), title or "ausente", "título no vacío", "seo", "error"),
+        _check("title_length", "Longitud del título", 30 <= len(title) <= 60, f"{len(title)} caracteres", "30–60 caracteres", "seo", "error"),
+        _check("description_present", "Meta descripción presente", bool(description), description or "ausente", "descripción no vacía", "seo", "error"),
+        _check("description_length", "Longitud de la descripción", 50 <= len(description) <= 160, f"{len(description)} caracteres", "50–160 caracteres", "seo", "error"),
+        _check("h1_one", "Un solo H1", parser.h1_count == 1, f"{parser.h1_count} H1", "exactamente 1", "seo", "error"),
+        _check("canonical", "Canonical presente", bool(parser.canonical), parser.canonical or "ausente", "enlace canonical", "seo", "error"),
+        _check("og_title", "og:title presente", bool(parser.meta.get("og:title", "").strip()), parser.meta.get("og:title", "").strip() or "ausente", "og:title", "social", "advertencia"),
+        _check("og_description", "og:description presente", bool(parser.meta.get("og:description", "").strip()), parser.meta.get("og:description", "").strip() or "ausente", "og:description", "social", "advertencia"),
+        _check("og_image", "og:image presente", bool(parser.meta.get("og:image", "").strip()), parser.meta.get("og:image", "").strip() or "ausente", "og:image", "social", "advertencia"),
+        _check("twitter_card", "twitter:card presente", bool(twitter_card), twitter_card or "ausente", "twitter:card", "social", "advertencia"),
+        _check("favicon", "Favicon presente", bool(parser.favicon), parser.favicon or "ausente", "favicon", "seo", "advertencia"),
+        _check("viewport", "Meta viewport (móvil)", bool(parser.meta.get("viewport", "").strip()), parser.meta.get("viewport", "").strip() or "ausente", "viewport", "rendimiento", "advertencia"),
+        _check("html_lang", "Idioma en <html lang>", bool(parser.lang.strip()), parser.lang.strip() or "ausente", "atributo lang", "seo", "advertencia"),
         _check(
             "images_alt",
             "Imágenes con alt",
             parser.img_missing_alt == 0,
             f"{parser.img_missing_alt} de {parser.img_total} sin alt",
             "0 sin alt",
+            "seo",
+            "advertencia",
+        ),
+        _check(
+            "robots_txt",
+            "robots.txt presente",
+            robots_present,
+            "presente (200)" if robots_present else "ausente",
+            "robots.txt en la raíz",
+            "rastreo",
+            "error",
+        ),
+        _check(
+            "sitemap_xml",
+            "sitemap.xml presente",
+            sitemap_present,
+            "presente (200)" if sitemap_present else "ausente",
+            "sitemap.xml en la raíz",
+            "rastreo",
+            "error",
         ),
         _check(
             "robots_noindex",
@@ -222,8 +282,10 @@ def extract_seo(html: str, base_url: str) -> list[dict]:
             "noindex" not in robots.lower(),
             robots or "sin meta robots",
             "sin noindex",
+            "rastreo",
+            "error",
         ),
-        _check("links", "Enlaces internos / externos", True, f"{parser.internal_links} internos / {parser.external_links} externos", "informativo"),
+        _check("links", "Enlaces internos / externos", True, f"{parser.internal_links} internos / {parser.external_links} externos", "informativo", "seo", "aviso"),
     ]
     return checks
 
@@ -242,6 +304,30 @@ def compute_score(checks: list[dict]) -> int:
 # ------------------------------------------------------------------ #
 # Fetch + audit                                                       #
 # ------------------------------------------------------------------ #
+def _fetch_presence(client: httpx.Client, base_url: str, path: str, started: float) -> bool:
+    """Presence check for a same-host file (robots.txt, sitemap.xml):
+    True solo si responde HTTP 200. Reutiliza el presupuesto de tiempo
+    restante (máx. 5s por archivo) y NUNCA levanta excepciones: si
+    algo falla (timeout, DNS, bloqueo SSRF, error de red) el archivo
+    se trata como ausente y la auditoría sigue. El cuerpo no se lee:
+    solo importa el estado."""
+    remaining = TOTAL_TIMEOUT - (time.monotonic() - started)
+    if remaining <= 0:
+        return False
+    target = urljoin(base_url, path)
+    try:
+        check_host_allowed(target)
+        with client.stream(
+            "GET",
+            target,
+            headers={"User-Agent": USER_AGENT},
+            timeout=httpx.Timeout(min(remaining, 5.0)),
+        ) as resp:
+            return resp.status_code == 200
+    except Exception:
+        return False
+
+
 def fetch_url_audit(url: str, transport=None) -> dict:
     """Fetch one page with SSRF checks on every hop and honestly
     measured metrics. Returns a dict ready to store/serialize. Raises
@@ -255,6 +341,8 @@ def fetch_url_audit(url: str, transport=None) -> dict:
     body = b""
     status = 0
     content_type = ""
+    robots_present = False
+    sitemap_present = False
     with httpx.Client(transport=transport, follow_redirects=False, trust_env=False) as client:
         while True:
             check_host_allowed(current)
@@ -294,6 +382,15 @@ def fetch_url_audit(url: str, transport=None) -> dict:
                         chunks.append(chunk)
                     body = b"".join(chunks)
                     final_url = current
+                    # Presencia de robots.txt / sitemap.xml en el mismo
+                    # host: solo si la página es HTML, con el mismo
+                    # cliente y presupuesto restante; nunca falla la
+                    # auditoría (ausente si algo falla).
+                    robots_present = False
+                    sitemap_present = False
+                    if "text/html" in content_type.lower():
+                        robots_present = _fetch_presence(client, final_url, "/robots.txt", started)
+                        sitemap_present = _fetch_presence(client, final_url, "/sitemap.xml", started)
                     break
             except HTTPException:
                 raise
@@ -308,7 +405,7 @@ def fetch_url_audit(url: str, transport=None) -> dict:
             html = body.decode("utf-8", errors="replace")
         except Exception:
             html = ""
-        checks = extract_seo(html, final_url)
+        checks = extract_seo(html, final_url, robots_present, sitemap_present)
         score: int | None = compute_score(checks)
         note = ""
     else:
@@ -343,6 +440,10 @@ class AuditCheckOut(BaseModel):
     passed: bool
     value: str
     ideal: str
+    # Opcionales con default seguro: las filas viejas guardadas en
+    # checks_json no tienen category/severity.
+    category: str = "seo"
+    severity: str = "aviso"
 
 
 class AuditOut(BaseModel):
@@ -374,7 +475,18 @@ def _out(row: WebAudit, users_by_id: dict[int, str]) -> AuditOut:
         size_kb=row.size_kb,
         is_https=row.is_https,
         score=row.score,
-        checks=[AuditCheckOut(**c) for c in (row.checks_json or [])],
+        checks=[
+            AuditCheckOut(
+                id=c.get("id", ""),
+                label=c.get("label", ""),
+                passed=c.get("passed", False),
+                value=c.get("value", ""),
+                ideal=c.get("ideal", ""),
+                category=c.get("category", "seo"),
+                severity=c.get("severity", "aviso"),
+            )
+            for c in (row.checks_json or [])
+        ],
         note=row.note or "",
         owner_username=users_by_id.get(row.user_id) if row.user_id else None,
         created_at=row.created_at.isoformat() if row.created_at else None,

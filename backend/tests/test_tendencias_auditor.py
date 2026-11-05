@@ -147,7 +147,54 @@ def test_extract_seo_sample():
     assert checks["images_alt"]["passed"] is False
     assert checks["images_alt"]["value"] == "2 de 3 sin alt"
     assert checks["robots_noindex"]["passed"] is False
+    assert checks["robots_noindex"]["category"] == "rastreo"
+    assert checks["robots_noindex"]["severity"] == "error"
     assert checks["links"]["value"] == "2 internos / 1 externos"
+    assert checks["links"]["category"] == "seo"
+    assert checks["links"]["severity"] == "aviso"
+    # Nuevos ítems (sin fetch directo: robots/sitemap por defecto ausentes)
+    assert checks["twitter_card"]["passed"] is False  # missing
+    assert checks["twitter_card"]["category"] == "social"
+    assert checks["twitter_card"]["severity"] == "advertencia"
+    assert checks["favicon"]["passed"] is False  # missing
+    assert checks["favicon"]["category"] == "seo"
+    assert checks["favicon"]["severity"] == "advertencia"
+    assert checks["robots_txt"]["passed"] is False
+    assert checks["robots_txt"]["category"] == "rastreo"
+    assert checks["robots_txt"]["severity"] == "error"
+    assert checks["sitemap_xml"]["passed"] is False
+    assert checks["sitemap_xml"]["category"] == "rastreo"
+    assert checks["sitemap_xml"]["severity"] == "error"
+    # Categorías/severidades de los ítems antiguos
+    assert checks["title_present"]["category"] == "seo"
+    assert checks["title_present"]["severity"] == "error"
+    assert checks["og_title"]["category"] == "social"
+    assert checks["og_title"]["severity"] == "advertencia"
+    assert checks["viewport"]["category"] == "rendimiento"
+    assert checks["viewport"]["severity"] == "advertencia"
+    assert len(checks) == 18
+
+
+def test_extract_seo_with_crawl_files_present():
+    checks = _check_map(
+        extract_seo(SAMPLE_HTML, "https://ejemplo.com/guia", robots_present=True, sitemap_present=True)
+    )
+    assert checks["robots_txt"]["passed"] is True
+    assert checks["robots_txt"]["value"] == "presente (200)"
+    assert checks["sitemap_xml"]["passed"] is True
+    assert checks["sitemap_xml"]["value"] == "presente (200)"
+
+
+def test_extract_seo_twitter_card_and_favicon():
+    html = """<!DOCTYPE html><html lang="en"><head><title>Test page title here ok</title>
+<meta name="twitter:card" content="summary_large_image">
+<link rel="shortcut icon" href="/favicon.ico">
+</head><body><h1>Hi</h1></body></html>"""
+    checks = _check_map(extract_seo(html, "https://ejemplo.com/x"))
+    assert checks["twitter_card"]["passed"] is True
+    assert checks["twitter_card"]["value"] == "summary_large_image"
+    assert checks["favicon"]["passed"] is True
+    assert checks["favicon"]["value"] == "/favicon.ico"
 
 
 def test_compute_score():
@@ -329,3 +376,75 @@ def test_fetch_url_audit_rejects_redirect_to_private(monkeypatch):
     # private IP: the per-hop re-validation must reject it (403),
     # before any request to it is made.
     assert getattr(exc.value, "status_code", None) == 403
+
+
+def test_fetch_url_audit_robots_sitemap_presence(monkeypatch):
+    def handler(request):
+        path = request.url.path
+        if path == "/robots.txt":
+            return httpx.Response(200, headers={"content-type": "text/plain"}, text="User-agent: *\nAllow: /")
+        if path == "/sitemap.xml":
+            return httpx.Response(404, headers={"content-type": "text/plain"}, text="nope")
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html; charset=utf-8"},
+            text=SAMPLE_HTML,
+        )
+
+    monkeypatch.setattr(auditor_mod, "resolve_host", lambda host: ["93.184.216.34"])
+    result = fetch_url_audit("https://ejemplo.com/guia", transport=httpx.MockTransport(handler))
+    assert result["status"] == 200
+    checks = _check_map(result["checks"])
+    assert len(result["checks"]) == 18
+    assert checks["robots_txt"]["passed"] is True
+    assert checks["robots_txt"]["category"] == "rastreo"
+    assert checks["sitemap_xml"]["passed"] is False
+    assert checks["sitemap_xml"]["category"] == "rastreo"
+    assert checks["twitter_card"]["passed"] is False
+    assert checks["favicon"]["passed"] is False
+    # Score sigue siendo % de checks aprobados (fórmula sin cambios).
+    passed = sum(1 for c in result["checks"] if c["passed"])
+    assert result["score"] == round(100 * passed / len(result["checks"]))
+
+
+def test_fetch_url_audit_presence_failure_is_absent(monkeypatch):
+    # Si robots.txt/sitemap fallan (error de red, 500...), la auditoría
+    # sigue y esos ítems quedan como ausentes: nunca fallan el total.
+    def handler(request):
+        path = request.url.path
+        if path == "/robots.txt":
+            raise httpx.ConnectError("down", request=request)
+        if path == "/sitemap.xml":
+            return httpx.Response(500, headers={"content-type": "text/plain"}, text="err")
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html; charset=utf-8"},
+            text=SAMPLE_HTML,
+        )
+
+    monkeypatch.setattr(auditor_mod, "resolve_host", lambda host: ["93.184.216.34"])
+    result = fetch_url_audit("https://ejemplo.com/guia", transport=httpx.MockTransport(handler))
+    assert result["status"] == 200
+    checks = _check_map(result["checks"])
+    assert checks["robots_txt"]["passed"] is False
+    assert checks["robots_txt"]["value"] == "ausente"
+    assert checks["sitemap_xml"]["passed"] is False
+
+
+def test_auditor_out_old_rows_without_category_severity(client, admin_headers, monkeypatch):
+    # Filas viejas guardadas en checks_json no tienen category/severity:
+    # la respuesta debe traer defaults seguros, no fallar.
+    def _mock_old(url):
+        return {
+            **_mock_audit(url),
+            "checks": [
+                {"id": "title_present", "label": "Título presente", "passed": True, "value": "T", "ideal": "título"}
+            ],
+        }
+
+    monkeypatch.setattr(auditor_mod, "fetch_url_audit", _mock_old)
+    r = client.post("/api/auditor/audits", json={"url": "https://viejo.ejemplo/x"}, headers=admin_headers)
+    assert r.status_code == 201, r.text
+    c = r.json()["checks"][0]
+    assert c["category"] == "seo"
+    assert c["severity"] == "aviso"

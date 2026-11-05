@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-05",
+    title: "Auditor estilo Semrush: informe de Salud del sitio por categorías",
+    body: "Publicado el 5 de noviembre: el Auditor web ahora informa estilo Semrush — Salud del sitio con el puntaje y el conteo de errores, advertencias y avisos, y las revisiones agrupadas por SEO, Social, Rastreo y Rendimiento, con 4 revisiones nuevas: robots.txt, sitemap.xml, Twitter card y favicon. Es la revisión propia de la app sobre la página, no datos de Semrush ni de Lighthouse. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
     title: "Terminal de pruebas en Sistema: consola simulada para admin",
     body: "Publicado el 5 de noviembre: nuevo módulo Terminal en Sistema, solo para administradores — una consola de pruebas simulada con comandos seguros (help, status, health, modules, about, date, echo, clear), sin ejecución en el servidor. Los comandos status y health informan con honestidad si la API responde o no. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },
