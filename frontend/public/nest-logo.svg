@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -40 1200 830">
+  
+  <!-- Tribar mark: frame + spokes, white strokes -->
+  <g fill="none" stroke="#ffffff" stroke-width="53" stroke-linejoin="miter" stroke-miterlimit="10">
+    <path d="M318 228 L787 16 L771 522 L465 420 Z"/>
+    <path d="M318 228 L669 232 M787 16 L669 232 M465 420 L669 232 M771 522 L669 232"/>
+  </g>
+  <!-- N3ST wordmark: squared tech letterforms, drawn as strokes -->
+  <g fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="square" stroke-linejoin="miter">
+    <!-- N -->
+    <path d="M220 759 V632 L390 759 V632"/>
+    <!-- 3 -->
+    <path d="M419 632 H589 V695 H470 M589 695 V759 H419"/>
+    <!-- S -->
+    <path d="M788 632 H618 V695 H788 V759 H618"/>
+    <!-- T -->
+    <path d="M817 632 H987 M902 632 V759"/>
+  </g>
+    <text x="600" y="889" font-family="Liberation Sans, DejaVu Sans, sans-serif" font-size="51" letter-spacing="16" fill="#ffffff" text-anchor="middle">IDEAS / STRATEGY / IMPACT</text>
+    <text x="600" y="1045" font-family="Noto Sans CJK JP, sans-serif" font-size="68" fill="#ffffff" text-anchor="middle">ネスト</text>
+</svg>

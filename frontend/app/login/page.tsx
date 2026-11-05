@@ -15,6 +15,9 @@ import { SkipLink } from "../../components/ui";
  * movimiento reducido no se anima nada (ver globals.css). Formulario
  * pro: iconos en los campos, mostrar/ocultar contraseña, botón con
  * gradiente y spinner al procesar, línea de acento en la tarjeta.
+ * Metro azul/blanco (2026-11-05, v3): fondo azul fuerte plano con
+ * mosaicos estilo Metro, tarjeta blanca de esquinas rectas, logo NEST
+ * (public/nest-logo.svg: marca + N3ST, trazos blancos) en el encabezado.
  * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
@@ -110,28 +113,35 @@ function LoginPageInner() {
   }
 
   const inputCls =
-    "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition hover:border-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30";
+    "w-full rounded-none border border-zinc-300 bg-white px-3.5 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition hover:border-zinc-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30";
 
   return (
-    <main data-login className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+    <main data-login className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-blue-700 px-4 py-12">
       <SkipLink label={t.shell.skipLink} />
-      {/* Resplandor esmeralda sutil detrás de la tarjeta: decorativo, sin
-       * movimiento ni cambio de layout. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.08),transparent_60%)]"
-      />
-      <div className="relative mb-8 flex flex-col items-center text-center">
-        <span aria-hidden="true" className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-700 text-2xl font-bold text-white shadow-xl shadow-emerald-950/60 ring-1 ring-white/20${reducedMotion ? "" : " login-intro-badge"}`}>
-          G
-        </span>
-        <p className={`text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400${introCls ? " login-intro" : ""}`} style={introStyle(100)}>
-          {t.header.brand}
-        </p>
-        <h1 className={`mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(200)}>
+      {/* Mosaicos estilo Metro: cuadrados planos blancos semitransparentes,
+       * decorativos, sin movimiento. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-10 -top-10 h-44 w-44 bg-white/10" />
+        <div className="absolute right-6 top-16 h-20 w-20 bg-white/10" />
+        <div className="absolute bottom-24 left-8 h-16 w-16 bg-white/[0.07]" />
+        <div className="absolute -bottom-8 -right-8 h-40 w-40 bg-white/[0.07]" />
+        <div className="absolute bottom-10 right-24 h-10 w-10 bg-white/10" />
+      </div>
+      <div className="relative mb-7 flex flex-col items-center text-center">
+        {/* Logo NEST: marca + N3ST en trazos blancos sobre el azul fuerte.
+         * Recorte de presentación del logo original (sin el lema ni el
+         * katakana, que no se leen a este tamaño). */}
+        <img
+          src="/nest-logo.svg"
+          alt="NEST"
+          width={176}
+          height={122}
+          className={`mb-5 h-auto w-44${reducedMotion ? "" : " login-intro-badge"}`}
+        />
+        <h1 className={`text-2xl font-bold tracking-tight text-white sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(150)}>
           {mode === "login" ? t.login.welcome : t.login.createAccount}
         </h1>
-        <p className={`mt-1 max-w-xs text-sm leading-relaxed text-zinc-400${introCls ? " login-intro" : ""}`} style={introStyle(300)}>
+        <p className={`mt-1 max-w-xs text-sm leading-relaxed text-blue-100${introCls ? " login-intro" : ""}`} style={introStyle(250)}>
           {mode === "login" ? t.login.subtitleLogin : t.login.subtitleRegister}
         </p>
       </div>
@@ -139,15 +149,15 @@ function LoginPageInner() {
       <form
         id="contenido"
         onSubmit={mode === "login" ? onSubmit : onRegister}
-        style={introStyle(420)}
-        className={`relative w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-700/70 bg-zinc-900/80 p-6 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.9)] backdrop-blur-sm sm:p-8${introCls ? " login-intro" : ""}`}
+        style={introStyle(350)}
+        className={`relative w-full max-w-sm overflow-hidden rounded-none border-0 bg-white p-6 shadow-2xl shadow-blue-900/40 sm:p-8${introCls ? " login-intro" : ""}`}
       >
-        {/* Línea de acento superior: detalle premium de la tarjeta. */}
-        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-500/80 to-transparent" />
+        {/* Barra superior azul sólida: detalle Metro de la tarjeta. */}
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-blue-600" />
         <label className="mb-4 block">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.userLabel}</span>
+          <span className="mb-1.5 block text-sm font-semibold text-zinc-700">{t.login.userLabel}</span>
           <span className="relative block">
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
             </svg>
             <input
@@ -161,9 +171,9 @@ function LoginPageInner() {
           </span>
         </label>
         <label className="mb-5 block">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.passwordLabel}</span>
+          <span className="mb-1.5 block text-sm font-semibold text-zinc-700">{t.login.passwordLabel}</span>
           <span className="relative block">
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
             </svg>
             <input
@@ -180,7 +190,7 @@ function LoginPageInner() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? t.login.hidePassword : t.login.showPassword}
-              className="absolute right-1.5 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100"
+              className="absolute right-1.5 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-none text-zinc-500 hover:text-blue-700"
             >
               {showPassword ? (
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
@@ -201,10 +211,10 @@ function LoginPageInner() {
 
         {mode === "register" && (
           <div className="mb-5">
-            <span className="mb-1.5 block text-sm font-medium text-zinc-300">
+            <span className="mb-1.5 block text-sm font-semibold text-zinc-700">
               {t.login.verificationLabel}
             </span>
-            <p className="mb-2 text-sm text-zinc-200">
+            <p className="mb-2 text-sm text-zinc-900">
               {challenge ? challenge.question : t.login.verificationLoading}
             </p>
             <div className="flex gap-2">
@@ -220,7 +230,7 @@ function LoginPageInner() {
               <button
                 type="button"
                 onClick={loadChallenge}
-                className="min-h-[44px] shrink-0 rounded-xl border border-zinc-700 px-3 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+                className="min-h-[44px] shrink-0 rounded-none border border-zinc-300 px-3 py-2.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
               >
                 {t.login.anotherQuestion}
               </button>
@@ -229,19 +239,19 @@ function LoginPageInner() {
         )}
 
         {sessionExpired && mode === "login" && (
-          <p role="status" className="mb-5 rounded-xl bg-amber-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-amber-300">
+          <p role="status" className="mb-5 rounded-none bg-amber-50 px-3.5 py-2.5 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-200">
             {t.reliability.sessionExpired}
           </p>
         )}
 
         {notice && (
-          <p role="status" className="mb-5 rounded-xl bg-emerald-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-emerald-300">
+          <p role="status" className="mb-5 rounded-none bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-emerald-700 ring-1 ring-emerald-200">
             {notice}
           </p>
         )}
 
         {error && (
-          <p role="alert" className="mb-5 rounded-xl bg-red-500/10 px-3.5 py-2.5 text-sm leading-relaxed text-red-400">
+          <p role="alert" className="mb-5 rounded-none bg-red-50 px-3.5 py-2.5 text-sm leading-relaxed text-red-700 ring-1 ring-red-200">
             {error}
           </p>
         )}
@@ -249,7 +259,7 @@ function LoginPageInner() {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-3 py-3 text-[15px] font-semibold text-white shadow-lg shadow-emerald-950/40 transition hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.99] disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-none bg-blue-600 px-3 py-3 text-[15px] font-bold uppercase tracking-wide text-white transition hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50"
         >
           {loading && (
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 animate-spin">
@@ -264,14 +274,14 @@ function LoginPageInner() {
           {mode === "login" ? (
             <>
               {t.login.noAccount}{" "}
-              <button type="button" onClick={() => switchMode("register")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-emerald-400 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => switchMode("register")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-blue-700 underline-offset-4 hover:underline">
                 {t.login.registerLink}
               </button>
             </>
           ) : (
             <>
               {t.login.hasAccount}{" "}
-              <button type="button" onClick={() => switchMode("login")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-emerald-400 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => switchMode("login")} className="inline-block min-h-[44px] px-2 py-2.5 font-semibold text-blue-700 underline-offset-4 hover:underline">
                 {t.login.loginSubmit}
               </button>
             </>
@@ -279,11 +289,11 @@ function LoginPageInner() {
         </p>
       </form>
 
-      <p className={`mt-6 flex items-center justify-center gap-1.5 text-xs text-zinc-500${introCls ? " login-intro" : ""}`} style={introStyle(520)}>
+      <p className={`mt-6 flex items-center justify-center gap-1.5 text-xs font-medium text-blue-100${introCls ? " login-intro" : ""}`} style={introStyle(450)}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-3.5 w-3.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
         </svg>
-        {t.login.secureNote}
+        {t.header.brand} · {t.login.secureNote}
       </p>
 
     </main>

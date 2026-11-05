@@ -57,14 +57,15 @@ input[type="file"]::file-selector-button:hover {
   display: none;
 }
 
-/* Intro login (2026-11-05, v2 más visible): entrada escalonada solo en
- * la pantalla de login/registro — el logo, la marca, el título, el
- * subtítulo y el formulario aparecen en cascada con un fade + subida
- * marcada (24px) y leve escala, para que la animación se note al entrar.
- * CSS puro, sin assets ni peticiones externas, y sin cambio de layout
- * al terminar (el estado final es el estado normal). Con movimiento
- * reducido la animación se apaga por completo y el contenido se muestra
- * directo; el diseño del formulario se ve igual sin animación. */
+/* Intro login (2026-11-05, v2 más visible; colores Metro azul/blanco
+ * desde v3 en page.tsx): entrada escalonada solo en la pantalla de
+ * login/registro — el logo, el título, el subtítulo y el formulario
+ * aparecen en cascada con un fade + subida marcada (24px) y leve escala,
+ * para que la animación se note al entrar. CSS puro, sin assets ni
+ * peticiones externas, y sin cambio de layout al terminar (el estado
+ * final es el estado normal). Con movimiento reducido la animación se
+ * apaga por completo y el contenido se muestra directo; el diseño del
+ * formulario se ve igual sin animación. */
 [data-login] .login-intro {
   opacity: 0;
   animation: login-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
