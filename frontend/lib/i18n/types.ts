@@ -29,7 +29,8 @@ export type NavKey =
   | "privacidad"
   | "inventario"
   | "perfil"
-  | "usuarios";
+  | "usuarios"
+  | "ajustador";
 
 export type Dictionary = {
   header: {
@@ -94,5 +95,8 @@ export type Dictionary = {
   // Manuales de Estudiar: mismo patrón Record.
   manuales: Record<string, string>;
   juego: Record<string, string>;
+  // Ajustador (tablero de mejora) y videos educativos: mismo patrón.
+  ajustador: Record<string, string>;
+  videos: Record<string, string>;
   reliability: Record<string, string>;
 };

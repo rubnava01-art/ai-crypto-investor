@@ -9,7 +9,9 @@ network call), and health carries the build git_sha + timestamp so a
 stale Render deploy is visible instead of guessed.
 """
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 
+from app import database
 from app.config import build_git_sha, build_timestamp_utc, settings
 from app.core.security import get_current_user
 from app.core.state import state
@@ -20,6 +22,20 @@ from app.schemas.api import HealthResponse, SystemStatus, utc_now_iso
 router = APIRouter(tags=["system"])
 
 
+def _database_status() -> str:
+    """Ping ligero a la BD (SELECT 1). "ok" si responde, "error" si no.
+
+    2026-11-05: la caída de la API del 3–4 de noviembre no dejaba saber
+    si la base de datos estaba implicada; health ahora lo dice en claro.
+    """
+    try:
+        with database.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return "ok"
+    except Exception:
+        return "error"
+
+
 @router.get("/api/health", response_model=HealthResponse)
 def health():
     return HealthResponse(
@@ -28,6 +44,7 @@ def health():
         timestamp_utc=utc_now_iso(),
         git_sha=build_git_sha(),
         built_utc=build_timestamp_utc(),
+        database=_database_status(),
     )
 
 

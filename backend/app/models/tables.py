@@ -435,7 +435,6 @@ class Contact(Base):
     )
 
 
-
 class CopyDraft(Base):
     """A generated social-media copy kept in the Crear module (Fase 3).
 
@@ -1154,3 +1153,48 @@ class InventoryItem(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class Ajuste(Base):
+    """Ajustador (2026-11-05): proposed tweaks per section.
+
+    Proposals only — a row is never "done work" by itself; estado moves
+    propuesta -> en_curso -> aplicada only when the work is verified.
+    The board lists the 24 optimizable sections (all routes except
+    /ajustador itself) and assigns each one an agent of the 3-agent
+    system. Lists start EMPTY; no seeded proposals.
+    """
+
+    __tablename__ = "ajustes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seccion: Mapped[str] = mapped_column(String(64), nullable=False)
+    agente: Mapped[str] = mapped_column(String(32), default="agente1", nullable=False)
+    propuesta: Mapped[str] = mapped_column(Text, nullable=False)
+    estado: Mapped[str] = mapped_column(String(16), default="propuesta", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class VideoEducativo(Base):
+    """Videos de YouTube en Estudiar (2026-11-05).
+
+    Admin-managed list: url + title only. The platform never fetches
+    video metadata and never invents thumbnails; the frontend embeds
+    the privacy-enhanced player (youtube-nocookie). Lists start EMPTY.
+    """
+
+    __tablename__ = "videos_educativos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    titulo: Mapped[str] = mapped_column(String(200), nullable=False)
+    added_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+

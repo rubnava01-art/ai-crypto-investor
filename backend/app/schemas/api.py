@@ -48,6 +48,12 @@ class HealthResponse(BaseModel):
     # guessing. "unknown" when the deploy pipeline provides no SHA.
     git_sha: str = "unknown"
     built_utc: str | None = None
+    # 2026-11-05: conectividad real con la base de datos ("ok" / "error",
+    # "unknown" solo si el ping no se pudo ejecutar). El endpoint sigue
+    # devolviendo HTTP 200 aunque la BD falle: Render usa /api/health
+    # como health check y un reinicio por un fallo transitorio de la BD
+    # empeoraría la caída en vez de diagnosticarla.
+    database: str = "unknown"
 
 
 class SystemStatus(BaseModel):

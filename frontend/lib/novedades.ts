@@ -26,6 +26,16 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-05",
+    title: "Ajustador: tablero de mejora continua y videos de YouTube en Estudiar",
+    body: "Publicado el 5 de noviembre: nuevo módulo Ajustador en Sistema — tablero con las secciones del menú, su agente optimizador y su última mejora real, más propuestas de mejora (solo admin, empiezan vacías) —; y sección Videos en Estudiar con videos de YouTube agregados por el administrador (empieza vacía, sin videos inventados). Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
+    title: "Diaria 5-nov: /api/health informa la base de datos y el Dashboard la muestra",
+    body: "Publicado el 5 de noviembre: /api/health ya informa el estado de la base de datos y el Dashboard de Inicio muestra una fila de Base de datos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-04",
     title: "Análisis personal en Mi perfil: Lean Startup, encuesta de 12 y estrés+enfoque",
     body: "Publicado el 4 de noviembre: sección Análisis personal en Mi perfil con el modelo Lean Startup (crear-medir-aprender), una encuesta rápida de 12 preguntas (fortalezas vs áreas a mejorar) y un autochequeo de estrés y enfoque de 5+5 preguntas, solo en el navegador. El autochequeo es solo reflexión, no un diagnóstico.",

@@ -75,6 +75,10 @@ export default function DashboardPage() {
   const [confirmKill, setConfirmKill] = useState(false);
 
   const [system, setSystem] = useState<SystemStatus | null>(null);
+  // 2026-11-05: estado de la BD según /api/health ("ok" | "error"), null
+  // mientras no llega la respuesta — se consulta sin auth, a mejor
+  // esfuerzo, sin marcar el dashboard como offline si falla.
+  const [dbStatus, setDbStatus] = useState<string | null>(null);
   const [balances, setBalances] = useState<BalancesResponse | null>(null);
   const [performance, setPerformance] = useState<PerformanceResponse | null>(null);
   const [signals, setSignals] = useState<SignalsResponse | null>(null);
@@ -108,6 +112,9 @@ export default function DashboardPage() {
         setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
         setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
         setOffline(false);
+        api.health()
+          .then((h) => { if (!loadCancelledRef.current) setDbStatus(h.database ?? null); })
+          .catch(() => { if (!loadCancelledRef.current) setDbStatus(null); });
         // Tolerancia parcial del backend: una sección nula significa que esa
         // sección falló, no que todo el dashboard esté caído. Avisar sin
         // esconder el resto de los datos.
@@ -304,6 +311,9 @@ export default function DashboardPage() {
                 [t.dashboard.simulationMode, <span key="m" className="font-mono">{system.simulation_mode}</span>],
                 [t.dashboard.killSwitch, <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? t.dashboard.killOn : t.dashboard.killOff}</span>],
                 [t.dashboard.dataSource, <span key="d" className="font-mono">{system.data_source}</span>],
+                [t.dashboard.database, dbStatus == null
+                  ? <span key="db" className="font-mono text-xs">—</span>
+                  : <StatusDot key="db" on={dbStatus === "ok"} />],
                 [t.dashboard.lastUpdate, <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex items-center justify-between gap-2">

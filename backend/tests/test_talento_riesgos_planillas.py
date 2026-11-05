@@ -286,8 +286,8 @@ def test_migration_single_head_and_new_tables(tmp_path):
     heads = script.get_heads()
     assert len(heads) == 1, heads
     head_rev = script.get_revision(heads[0])
-    assert head_rev.revision == "a918a20d8191"
-    assert head_rev.down_revision == "f3a2c91d7b4e"
+    assert head_rev.revision == "f1ec8b9c5bf4"
+    assert head_rev.down_revision == "a918a20d8191"
 
     # Fresh DB: upgrade head creates the three tables with model columns.
     db_file = tmp_path / "fresh.db"
@@ -300,15 +300,17 @@ def test_migration_single_head_and_new_tables(tmp_path):
         assert "empleados" in insp.get_table_names()
         assert "riesgos" in insp.get_table_names()
         assert "planillas" in insp.get_table_names()
+        assert "ajustes" in insp.get_table_names()
+        assert "videos_educativos" in insp.get_table_names()
         from app.models.tables import Base
 
-        for name in ("empleados", "riesgos", "planillas"):
+        for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos"):
             got = {c["name"] for c in insp.get_columns(name)}
             want = set(Base.metadata.tables[name].columns.keys())
             assert got == want, name
         # New tables start EMPTY (no seed rows).
         with engine.connect() as conn:
-            for name in ("empleados", "riesgos", "planillas"):
+            for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos"):
                 assert conn.execute(sa.text(f"SELECT COUNT(*) FROM {name}")).scalar() == 0
         # Existing tables untouched: CRM contacts still have their columns.
         contact_cols = {c["name"] for c in insp.get_columns("crm_contacts")}
@@ -339,7 +341,7 @@ def test_migration_single_head_and_new_tables(tmp_path):
         import sqlalchemy as sa
 
         insp = sa.inspect(engine2)
-        for name in ("empleados", "riesgos", "planillas"):
+        for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos"):
             assert name in insp.get_table_names()
         with engine2.connect() as conn:
             rows = conn.execute(sa.text("SELECT name FROM crm_contacts")).fetchall()

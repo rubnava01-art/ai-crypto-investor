@@ -8,6 +8,8 @@ export interface HealthResponse {
   version: string;
   mode: string;
   timestamp_utc: string;
+  // 2026-11-05: "ok" | "error" (ausente en APIs viejas).
+  database?: string;
 }
 export interface TokenResponse {
   access_token: string;

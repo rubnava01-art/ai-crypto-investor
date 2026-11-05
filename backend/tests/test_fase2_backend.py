@@ -576,6 +576,26 @@ def test_health_carries_git_sha(client):
     assert isinstance(body["git_sha"], str) and body["git_sha"]
 
 
+# ---------- 2026-11-05: health informa la conectividad real con la BD ----------
+
+def test_health_reports_database_ok(client):
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json()["database"] == "ok"
+
+
+def test_health_reports_database_error_but_stays_200(client, monkeypatch):
+    from sqlalchemy import create_engine
+
+    import app.database
+
+    broken = create_engine("sqlite:////nonexistent-dir-xyz/health.db")
+    monkeypatch.setattr(app.database, "engine", broken)
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json()["database"] == "error"
+
+
 # ---------- 3.1: migraciones == modelos (fresco y producción simulada) ----------
 
 def _schema_map(engine):

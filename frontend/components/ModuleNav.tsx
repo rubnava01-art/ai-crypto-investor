@@ -215,6 +215,17 @@ const MODULES = [
       </Icon>
     ),
   },
+  {
+    href: "/ajustador",
+    label: "Ajustador",
+    hint: "Mejora continua · agentes",
+    adminOnly: true,
+    icon: (
+      <Icon>
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+      </Icon>
+    ),
+  },
 ];
 
 // Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
@@ -245,9 +256,10 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/inventario": "inventario",
   "/perfil": "perfil",
   "/usuarios": "usuarios",
+  "/ajustador": "ajustador",
 };
 
-/** Familias de navegación (Fase 5, F1): las 24 rutas, sin borrar ni
+/** Familias de navegación (Fase 5, F1): las 25 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
  * que la propuesta no nombraba se ubican por afinidad y se reportan:
  * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
@@ -266,7 +278,7 @@ const GROUPS: { key: string; hrefs: string[] }[] = [
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
   { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
-  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios"] },
+  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador"] },
 ];
 
 /** Acentos por familia (F13, decisión de Rubén 2026-11-02): UN acento por
@@ -377,7 +389,7 @@ export function ModuleNav() {
 
   return (
     <nav aria-label={t.header.navAria}>
-      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 24 ítems. */}
+      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
       <div className="space-y-2 sm:hidden">
         {GROUPS.map((g) => {
           const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
