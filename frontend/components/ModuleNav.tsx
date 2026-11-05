@@ -226,6 +226,18 @@ const MODULES = [
       </Icon>
     ),
   },
+  {
+    href: "/terminal",
+    label: "Terminal",
+    hint: "Consola de pruebas",
+    adminOnly: true,
+    icon: (
+      <Icon>
+        <path d="M4 17l6-6-6-6" />
+        <path d="M12 19h8" />
+      </Icon>
+    ),
+  },
 ];
 
 // Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
@@ -278,7 +290,7 @@ const GROUPS: { key: string; hrefs: string[] }[] = [
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
   { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
-  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador"] },
+  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal"] },
 ];
 
 /** Acentos por familia (F13, decisión de Rubén 2026-11-02): UN acento por
