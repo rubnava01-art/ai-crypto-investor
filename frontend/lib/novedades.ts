@@ -27,6 +27,21 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-05",
+    title: "Login con intro animado profesional",
+    body: "Publicado el 5 de noviembre: el inicio de sesión ahora tiene una entrada animada profesional — la marca, el lema y el formulario entran de forma escalonada con una animación sobria, solo con CSS y respetando el movimiento reducido. El funcionamiento del login sigue igual. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
+    title: "Gestos en Estudiar: desliza entre secciones y manuales",
+    body: "Publicado el 5 de noviembre: Estudiar ahora se navega con gestos en el móvil — desliza entre Manuales, Juego, Videos, Academia y Clases, y entre los 3 manuales; el quiz avanza deslizando con barra de progreso, y los botones responden al toque. Cada gesto tiene su alternativa visible y se respeta el movimiento reducido. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
+    title: "Nuevo nombre: Grow Business Platform — gestor de negocios",
+    body: "Publicado el 5 de noviembre: la plataforma ahora se llama Grow Business Platform — ya es un gestor de negocios y una mega plataforma: invierte, estudia, crea y gestiona tu negocio en un solo lugar. Solo cambia el nombre: los módulos, las rutas y el funcionamiento siguen iguales. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
     title: "Ajustador: tablero de mejora continua y videos de YouTube en Estudiar",
     body: "Publicado el 5 de noviembre: nuevo módulo Ajustador en Sistema — tablero con las secciones del menú, su agente optimizador y su última mejora real, más propuestas de mejora (solo admin, empiezan vacías) —; y sección Videos en Estudiar con videos de YouTube agregados por el administrador (empieza vacía, sin videos inventados). Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

@@ -10,15 +10,15 @@ const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://crypto-investor-web.onrender.com"),
-  title: "Plataforma Unificada — Invertir en cripto (simulación), Estudiar, Crear y CRM",
+  title: "Grow Business Platform — Invierte, estudia, crea y gestiona tu negocio en un solo lugar",
   description:
-    "Plataforma unificada: inversión en criptomonedas en simulación (señales BTC/ETH), academia, creación de logos y mockups, CRM, facturas e inventario.",
+    "Grow Business Platform: gestor de negocios — inversión en cripto en simulación (BTC/ETH), academia, creación de logos y mockups, CRM, facturas e inventario.",
   openGraph: {
-    title: "Plataforma Unificada — Invertir en cripto (simulación), Estudiar, Crear y CRM",
+    title: "Grow Business Platform — Invierte, estudia, crea y gestiona tu negocio en un solo lugar",
     description:
-      "Plataforma unificada: inversión en criptomonedas en simulación (señales BTC/ETH), academia, creación de logos y mockups, CRM, facturas e inventario.",
+      "Grow Business Platform: gestor de negocios — inversión en cripto en simulación (BTC/ETH), academia, creación de logos y mockups, CRM, facturas e inventario.",
     url: "https://crypto-investor-web.onrender.com",
-    siteName: "Plataforma Unificada",
+    siteName: "Grow Business Platform",
     locale: "es_ES",
     type: "website",
   },

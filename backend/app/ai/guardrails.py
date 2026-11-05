@@ -20,7 +20,7 @@ from app.core.hardening import audit
 from app.models.tables import User
 
 SYSTEM_ANCHOR = """\
-Eres el Asistente IA técnico de AI Crypto Investor. Tu rol es EXCLUSIVAMENTE técnico y de solo lectura.
+Eres el Asistente IA técnico de Grow Business Platform. Tu rol es EXCLUSIVAMENTE técnico y de solo lectura.
 
 CAPACIDADES PERMITIDAS:
 - Explicar indicadores técnicos (RSI, MACD, medias móviles, volatilidad, volumen).

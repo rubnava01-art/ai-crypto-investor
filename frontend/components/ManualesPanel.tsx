@@ -24,7 +24,7 @@ export function ManualesPanel() {
             key={c.href}
             href={c.href}
             aria-label={c.aria}
-            className="flex min-h-[44px] flex-col justify-center gap-0.5 rounded-xl border border-zinc-700 bg-zinc-900/70 px-4 py-3 transition-colors hover:border-sky-500 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            className="flex min-h-[44px] flex-col justify-center gap-0.5 rounded-xl border border-zinc-700 bg-zinc-900/70 px-4 py-3 transition-colors hover:border-sky-500 hover:bg-zinc-800 active:bg-zinc-700 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
           >
             <span className="text-sm font-semibold text-zinc-100">{c.title}</span>
             <span className="text-xs leading-relaxed text-zinc-400">{c.desc}</span>

@@ -1,4 +1,4 @@
-"""Crear tests (Plataforma Unificada — Fase 3): generador de copies con la
+"""Crear tests (Grow Business Platform — Fase 3): generador de copies con la
 capa IA existente (en tests corre el stub -> demo=True) y panel de
 tendencias sembrado solo con temas reales ya publicados en Threads.
 

@@ -39,3 +39,64 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover {
   background: #3f3f46;
 }
+
+/* Gestos Estudiar (2026-11-05): el contenedor [data-estudiar] recibe
+ * el swipe horizontal; el scroll vertical sigue siendo nativo. */
+[data-estudiar] {
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+[data-estudiar] .estudiar-tabs-scroll {
+  scrollbar-width: none;
+  /* La fila de pestañas se desplaza horizontalmente por sí misma: su
+   * touch-action propio permite pan-x además de pan-y, o el pan-y del
+   * contenedor bloquearía su scroll en pantallas estrechas. */
+  touch-action: pan-x pan-y;
+}
+[data-estudiar] .estudiar-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Intro login (2026-11-05): entrada escalonada solo en la pantalla de
+ * login/registro — el logo, la marca, el título, el subtítulo y el
+ * formulario aparecen en cascada con un fade + subida suave. CSS puro,
+ * sin assets ni peticiones externas, y sin cambio de layout al terminar
+ * (el estado final es el estado normal). Con movimiento reducido la
+ * animación se apaga por completo y el contenido se muestra directo. */
+[data-login] .login-intro {
+  opacity: 0;
+  animation: login-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--login-delay, 0ms);
+}
+[data-login] .login-intro-badge {
+  opacity: 0;
+  animation: login-badge-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes login-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-login] .login-intro,
+  [data-login] .login-intro-badge {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

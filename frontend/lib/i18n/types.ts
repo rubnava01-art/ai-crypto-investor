@@ -98,5 +98,7 @@ export type Dictionary = {
   // Ajustador (tablero de mejora) y videos educativos: mismo patrón.
   ajustador: Record<string, string>;
   videos: Record<string, string>;
+  // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
+  estudiarGestos: Record<string, string>;
   reliability: Record<string, string>;
 };

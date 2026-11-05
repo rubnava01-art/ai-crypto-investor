@@ -1,4 +1,4 @@
-"""Business module tests (Plataforma Unificada — módulo Business):
+"""Business module tests (Grow Business Platform — módulo Business):
 admin has full CRUD on notes/tasks per area; 'prueba' reads only
 (403 on writes); no token -> 401; notes/tasks are strictly scoped
 per area and never leak across areas.

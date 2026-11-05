@@ -1,4 +1,4 @@
-"""CRM contacts — Plataforma Unificada, Fase 1.
+"""CRM contacts — Grow Business Platform, Fase 1.
 
 The CRM is the connective tissue between modules (Estudiar / Invertir /
 Crear): leads and customers from the Academy, Cohley brand work, RIV Goods

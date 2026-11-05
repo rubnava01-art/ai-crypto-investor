@@ -1,4 +1,4 @@
-"""Referral campaigns tests (Plataforma Unificada — módulo Referidos):
+"""Referral campaigns tests (Grow Business Platform — módulo Referidos):
 admin manages campaigns/referrals; 'prueba' reads only (403 on writes);
 referral status moves forward-only pending -> confirmed -> rewarded;
 referrals only register on active campaigns; rewards are tracked, never paid.

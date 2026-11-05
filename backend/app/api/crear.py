@@ -1,4 +1,4 @@
-"""Crear — Plataforma Unificada, Fase 3.
+"""Crear — Grow Business Platform, Fase 3.
 
 Two pieces:
 1. Generador de copies: generates a social-media copy through the shared

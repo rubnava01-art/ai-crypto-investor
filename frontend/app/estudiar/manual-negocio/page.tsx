@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { ManualSections } from "../../../components/ManualSections";
+import { ManualPager } from "../../../components/ManualPager";
 import { ModuleShell } from "../../../components/ModuleShell";
 import { useLanguage } from "../../../lib/i18n";
+import { useSwipeNav } from "../../../lib/useSwipeNav";
 
 export default function ManualNegocioPage() {
   const { t } = useLanguage();
+  const router = useRouter();
   const m = t.manuales;
   const sections = [
     { title: m.p3s1Title, body: m.p3s1Body },
@@ -17,9 +21,15 @@ export default function ManualNegocioPage() {
     { title: m.p3s7Title, body: m.p3s7Body },
     { title: m.p3s8Title, body: m.p3s8Body },
   ];
+  // Swipe derecha → Manual 2. Swipe izquierda: sin destino en el
+  // Manual 3 (no hay siguiente); el pager tampoco muestra ese botón.
+  const swipeHandlers = useSwipeNav({ onSwipeRight: () => router.push("/estudiar/manual-invertir") });
   return (
     <ModuleShell moduleTitle={m.p3Title} subtitle={m.p3Subtitle}>
-      <ManualSections sections={sections} />
+      <div data-estudiar {...swipeHandlers}>
+        <ManualSections sections={sections} />
+        <ManualPager prevHref="/estudiar/manual-invertir" />
+      </div>
     </ModuleShell>
   );
 }

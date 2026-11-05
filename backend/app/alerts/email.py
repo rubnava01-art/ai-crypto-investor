@@ -18,7 +18,7 @@ def is_configured() -> bool:
 
 def send_alert(subject: str, body: str) -> bool:
     """Return True if sent (or would-be-sent logged when unconfigured)."""
-    full_subject = f"[AI Crypto Investor] {subject}"
+    full_subject = f"[Grow Business Platform] {subject}"
     if not is_configured():
         log.warning("alert not configured, dropping: %s", full_subject)
         return False

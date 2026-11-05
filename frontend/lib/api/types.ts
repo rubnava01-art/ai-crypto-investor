@@ -425,7 +425,7 @@ export interface DashboardResponse {
   logs: LogEntry[] | null;
 }
 
-// ---------- CRM (Plataforma Unificada — Fase 1) ----------
+// ---------- CRM (Grow Business Platform — Fase 1) ----------
 
 export type CrmSource = "manual" | "academia" | "cohley" | "rivgoods" | "otro";
 export type CrmStatus = "nuevo" | "contactado" | "interesado" | "cliente" | "inactivo";
@@ -453,7 +453,7 @@ export interface CrmContactInput {
   notes?: string;
 }
 
-// ---------- Academia (Plataforma Unificada — Fase 2, módulo Estudiar) ----------
+// ---------- Academia (Grow Business Platform — Fase 2, módulo Estudiar) ----------
 
 export type CourseKind = "ebook" | "pack" | "academia";
 
@@ -495,7 +495,7 @@ export interface AcademyEnrollment {
   updated_at: string | null;
 }
 
-// ---------- Crear (Plataforma Unificada — Fase 3) ----------
+// ---------- Crear (Grow Business Platform — Fase 3) ----------
 
 export type CopyPlatform = "instagram" | "threads" | "facebook";
 export type CopyTone = "directo" | "educativo" | "divertido" | "profesional";
@@ -598,7 +598,7 @@ export interface Invoice {
   created_at: string | null;
 }
 
-// ---------- Referidos (Plataforma Unificada — módulo Referidos) ----------
+// ---------- Referidos (Grow Business Platform — módulo Referidos) ----------
 // Las recompensas solo se REGISTRAN (pendiente/confirmada/recompensada):
 // v1 no procesa pagos ni mueve dinero.
 
@@ -655,7 +655,7 @@ export interface ReferralInput {
   notes?: string;
 }
 
-// ---------- Business (Plataforma Unificada — módulo Business) ----------
+// ---------- Business (Grow Business Platform — módulo Business) ----------
 // Cada área (Marketing, Ventas, Legal, Administrativo) tiene sus PROPIAS
 // notas y tareas: el backend las filtra por área y nunca las mezcla.
 

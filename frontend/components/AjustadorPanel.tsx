@@ -59,18 +59,18 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * se desplazan; este mapa se actualizó con las 2 entradas del
  * 2026-11-05 ([0] Ajustador+Videos, [1] diaria salud de la BD). */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  ajustador: [0],
-  estudiar: [0, 3, 4],
-  inicio: [1, 9],
-  perfil: [2],
-  talento: [5],
-  riesgos: [5],
-  planillas: [5],
-  crm: [5],
-  analisis: [5],
-  invertir: [6, 8],
-  usuarios: [8, 9],
-  espacio: [9],
+  ajustador: [3],
+  estudiar: [1, 3, 6, 7],
+  inicio: [4, 12],
+  perfil: [5],
+  talento: [8],
+  riesgos: [8],
+  planillas: [8],
+  crm: [8],
+  analisis: [8],
+  invertir: [9, 11],
+  usuarios: [11, 12],
+  espacio: [12],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

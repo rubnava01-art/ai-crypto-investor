@@ -1,4 +1,4 @@
-"""AI Crypto Investor — Phase 1 API skeleton (+ Phase 2 market data)."""
+"""Grow Business Platform — Phase 1 API skeleton (+ Phase 2 market data)."""
 import asyncio
 import datetime as dt
 import logging
@@ -115,12 +115,12 @@ def seed_demo_data() -> None:
                     message="Phase 1 skeleton initialized. All data shown is DEMO.",
                 )
             )
-        # Plataforma Unificada — Fase 2: seed the REAL Academia catalog
+        # Grow Business Platform — Fase 2: seed the REAL Academia catalog
         # (Hotmart ebooks + Pack + Academy) into the Estudiar module.
         from app.api.academy import seed_academy_catalog
 
         seed_academy_catalog(db)
-        # Plataforma Unificada — Fase 3: seed the trends panel with the
+        # Grow Business Platform — Fase 3: seed the trends panel with the
         # topics Rubén actually published on Threads (vía @tecnologia).
         from app.api.crear import seed_trend_notes
 

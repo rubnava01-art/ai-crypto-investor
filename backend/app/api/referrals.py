@@ -1,4 +1,4 @@
-"""Referral campaigns — Plataforma Unificada, módulo Referidos.
+"""Referral campaigns — Grow Business Platform, módulo Referidos.
 
 Helps a business get new clients through referral campaigns with
 rewards: the business (admin) creates a campaign, existing customers

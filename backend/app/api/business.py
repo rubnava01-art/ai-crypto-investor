@@ -1,4 +1,4 @@
-"""Business areas — Plataforma Unificada, módulo Business.
+"""Business areas — Grow Business Platform, módulo Business.
 
 Four areas (Marketing, Ventas, Legal, Administrativo), each with its
 OWN notes and tasks, scoped per area and never mixed: every endpoint

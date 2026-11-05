@@ -1,4 +1,4 @@
-"""Academia — Plataforma Unificada, Fase 2 (módulo Estudiar).
+"""Academia — Grow Business Platform, Fase 2 (módulo Estudiar).
 
 Catalog of Rubén's REAL digital products, seeded from documented records
 (MEMORY.md + academia-campaign): the 6 Hotmart ebooks at $19.99, the Pack

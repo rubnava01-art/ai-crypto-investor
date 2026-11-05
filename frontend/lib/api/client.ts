@@ -4,7 +4,7 @@ import type { MeResponse } from "./types";
 // de comportamiento). Único punto de fetch con timeout: request() (JSON)
 // y downloadCoursePdf (blob).
 
-// Typed API client for the AI CRYPTO INVESTOR FastAPI backend.
+// Typed API client for the Grow Business Platform FastAPI backend.
 // Contract: all JSON; money as strings; times ISO UTC.
 // Money stays a string end-to-end; parsing/formatting happens at render time only.
 

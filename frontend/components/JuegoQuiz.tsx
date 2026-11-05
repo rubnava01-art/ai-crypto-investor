@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLanguage } from "../lib/i18n";
+import { useSwipeNav } from "../lib/useSwipeNav";
 
 /** Interactive platform quiz, client-side only: no backend, no fetch, no
  * new dependency. One question at a time, instant feedback per answer,
@@ -53,6 +54,12 @@ export function JuegoQuiz() {
     }
   };
 
+  const answered = picked !== null;
+  // Swipe izquierda para avanzar, solo con la pregunta respondida.
+  // Swipe derecha: sin acción — el quiz es de avance único, no hay
+  // pregunta anterior. El botón Siguiente es la alternativa visible.
+  const quizSwipe = useSwipeNav({ onSwipeLeft: answered ? next : undefined });
+
   if (done) {
     const tier = score === total ? j.tier10 : score >= 7 ? j.tier79 : score >= 4 ? j.tier46 : j.tier03;
     return (
@@ -63,7 +70,7 @@ export function JuegoQuiz() {
         <button
           type="button"
           onClick={restart}
-          className="mt-4 flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+          className="mt-4 flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
         >
           {j.quizRestart}
         </button>
@@ -72,13 +79,27 @@ export function JuegoQuiz() {
   }
 
   const q = questions[index];
-  const answered = picked !== null;
   const isCorrect = picked === q.correct;
+  const g = t.estudiarGestos;
   return (
-    <section aria-label={j.quizTitle} className="rounded-2xl border-2 border-sky-500/60 bg-sky-500/10 px-4 py-4 sm:px-5">
+    <section aria-label={j.quizTitle} data-estudiar {...quizSwipe} className="rounded-2xl border-2 border-sky-500/60 bg-sky-500/10 px-4 py-4 sm:px-5">
       <h2 className="text-base font-bold text-zinc-100">{j.quizTitle}</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-300">{j.quizIntro}</p>
       <p className="mt-3 text-xs font-semibold text-zinc-400">{j.quizProgress.replace("{n}", String(index + 1)).replace("{total}", String(total))}</p>
+      <div
+        role="progressbar"
+        aria-valuenow={index + 1}
+        aria-valuemin={1}
+        aria-valuemax={total}
+        aria-label={g.quizProgressAria.replace("{n}", String(index + 1)).replace("{total}", String(total))}
+        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+      >
+        <div
+          className="h-full rounded-full bg-sky-500 motion-safe:transition-[width]"
+          style={{ width: `${((index + 1) / total) * 100}%` }}
+        />
+      </div>
+      {answered && <p className="mt-1 text-xs text-zinc-400">{g.quizSwipeHint}</p>}
       <p className="mt-2 text-base font-semibold leading-relaxed text-zinc-100">{q.text}</p>
       <div className="mt-3 space-y-2">
         {q.options.map((opt, i) => {
@@ -98,7 +119,7 @@ export function JuegoQuiz() {
               onClick={() => pick(i)}
               disabled={answered}
               aria-pressed={isPicked}
-              className={`flex min-h-[44px] w-full items-center rounded-xl border px-4 py-3 text-left text-sm font-semibold text-zinc-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${cls}`}
+              className={`flex min-h-[44px] w-full items-center rounded-xl border px-4 py-3 text-left text-sm font-semibold text-zinc-100 transition-colors motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${cls}`}
             >
               {opt}
             </button>
@@ -114,7 +135,7 @@ export function JuegoQuiz() {
           <button
             type="button"
             onClick={next}
-            className="flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            className="flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
           >
             {index + 1 >= total ? j.quizFinish : j.quizNext}
           </button>

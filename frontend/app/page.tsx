@@ -213,7 +213,7 @@ export default function DashboardPage() {
           </p>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t.dashboard.title}</h1>
           <p className="text-sm text-zinc-400">
-            AI Crypto Investor — {system ? <>{t.dashboard.modeLabel} <span className="font-mono">{system.mode}</span></> : t.dashboard.loading}
+            Grow Business Platform — {system ? <>{t.dashboard.modeLabel} <span className="font-mono">{system.mode}</span></> : t.dashboard.loading}
           </p>
         </div>
         <div className="flex items-center gap-2">

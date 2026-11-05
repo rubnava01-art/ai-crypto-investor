@@ -1,4 +1,4 @@
-"""Copy generation for the Crear module (Plataforma Unificada — Fase 3).
+"""Copy generation for the Crear module (Grow Business Platform — Fase 3).
 
 Reuses the platform's existing AI layer (app.ai.models.get_model): the
 same provider selection (stub by default, openai-compatible / anthropic

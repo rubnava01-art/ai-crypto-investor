@@ -110,7 +110,7 @@ export function VideosPanel() {
         ) : rows.length === 0 ? (
           <p className="py-4 text-center text-sm text-zinc-400">{t.videos.empty}</p>
         ) : (
-          <ul className="space-y-4">
+          <ul data-no-swipe className="space-y-4">
             {rows.map((v) => {
               const videoId = youtubeVideoId(v.url);
               return (
@@ -120,7 +120,7 @@ export function VideosPanel() {
                     {isAdmin && (
                       <button
                         onClick={() => remove(v)}
-                        className="min-h-[44px] shrink-0 rounded-lg border border-red-900/60 px-3 py-2.5 text-xs text-red-400 hover:bg-red-950/50"
+                        className="min-h-[44px] shrink-0 rounded-lg border border-red-900/60 px-3 py-2.5 text-xs text-red-400 hover:bg-red-950/50 active:bg-red-950/70 motion-safe:active:scale-[0.98]"
                       >
                         {t.videos.delete}
                       </button>
@@ -145,7 +145,7 @@ export function VideosPanel() {
           </ul>
         )}
         {isAdmin && (
-          <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+          <form data-no-swipe onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
             <p className="text-sm font-semibold text-zinc-200">{t.videos.addTitle}</p>
             <p className="text-xs text-zinc-400">{t.videos.adminHint}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -176,7 +176,7 @@ export function VideosPanel() {
               </Field>
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50">
+              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 active:bg-sky-500 motion-safe:active:scale-[0.98] disabled:opacity-50">
                 {busy ? t.videos.saving : t.videos.create}
               </button>
             </div>

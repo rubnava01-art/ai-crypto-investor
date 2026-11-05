@@ -1,13 +1,17 @@
 "use client";
 
 import { Suspense, useCallback, useState } from "react";
+import type { CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken, ApiError } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
+import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
 import { SkipLink } from "../../components/ui";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
  * claude.ai — one centered card, generous spacing, no clutter.
+ * Intro animado (2026-11-05): entrada escalonada de marca, título y
+ * formulario; con movimiento reducido no se anima nada (ver globals.css).
  * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
@@ -23,6 +27,12 @@ function LoginPageInner() {
     nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
   const sessionExpired = searchParams.get("expired") === "1";
   const { t } = useLanguage();
+  // Intro animado: con movimiento reducido no se aplica ninguna clase de
+  // animación; la media query de globals.css es la red de seguridad.
+  const reducedMotion = usePrefersReducedMotion();
+  const introCls = reducedMotion ? undefined : "login-intro";
+  const introStyle = (delayMs: number): CSSProperties | undefined =>
+    reducedMotion ? undefined : ({ "--login-delay": `${delayMs}ms` } as CSSProperties);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -98,19 +108,25 @@ function LoginPageInner() {
     "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-3 text-[15px] text-zinc-100 placeholder-zinc-500 outline-none transition-colors hover:border-zinc-600 focus:border-emerald-500";
 
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+    <main data-login className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-12">
       <SkipLink label={t.shell.skipLink} />
-      <div className="mb-8 flex flex-col items-center text-center">
-        <span aria-hidden="true" className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50">
-          P
+      {/* Resplandor esmeralda sutil detrás de la tarjeta: decorativo, sin
+       * movimiento ni cambio de layout. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.08),transparent_60%)]"
+      />
+      <div className="relative mb-8 flex flex-col items-center text-center">
+        <span aria-hidden="true" className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-xl font-bold text-white shadow-lg shadow-emerald-950/50${reducedMotion ? "" : " login-intro-badge"}`}>
+          G
         </span>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400">
+        <p className={`text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400${introCls ? " login-intro" : ""}`} style={introStyle(90)}>
           {t.header.brand}
         </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
+        <h1 className={`mt-2 text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(170)}>
           {mode === "login" ? t.login.welcome : t.login.createAccount}
         </h1>
-        <p className="mt-1 max-w-xs text-sm leading-relaxed text-zinc-400">
+        <p className={`mt-1 max-w-xs text-sm leading-relaxed text-zinc-400${introCls ? " login-intro" : ""}`} style={introStyle(250)}>
           {mode === "login" ? t.login.subtitleLogin : t.login.subtitleRegister}
         </p>
       </div>
@@ -118,7 +134,8 @@ function LoginPageInner() {
       <form
         id="contenido"
         onSubmit={mode === "login" ? onSubmit : onRegister}
-        className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl sm:p-8"
+        style={introStyle(330)}
+        className={`relative w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl sm:p-8${introCls ? " login-intro" : ""}`}
       >
         <label className="mb-4 block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-300">{t.login.userLabel}</span>

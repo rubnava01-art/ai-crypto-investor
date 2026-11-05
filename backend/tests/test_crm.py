@@ -1,4 +1,4 @@
-"""CRM tests (Plataforma Unificada — Fase 1): admin CRUD completo;
+"""CRM tests (Grow Business Platform — Fase 1): admin CRUD completo;
 el rol 'prueba' solo puede leer (403 en POST/PUT/DELETE).
 
 Logins come from the shared session fixtures in conftest (admin_headers /

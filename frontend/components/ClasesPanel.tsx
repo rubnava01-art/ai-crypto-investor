@@ -11,7 +11,7 @@ import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
 
 const fmtDateTime = (iso: string | null, locale: string) =>
   iso
@@ -132,7 +132,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-indigo-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="w-full rounded-lg bg-indigo-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 active:bg-indigo-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.clases.saveBusy : isLive ? t.clases.saveLive : t.clases.saveRecorded}
           </button>
@@ -164,7 +164,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                         href={c.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-white ${isLive ? "bg-red-600 hover:bg-red-500" : "bg-indigo-600 hover:bg-indigo-500"}`}
+                        className={`inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-white motion-safe:active:scale-[0.98] ${isLive ? "bg-red-600 hover:bg-red-500 active:bg-red-500" : "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-500"}`}
                       >
                         {isLive ? t.clases.joinLive : t.clases.watchRecorded}
                       </a>
@@ -172,7 +172,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                     {isAdmin && (
                       <button
                         onClick={() => remove(c)}
-                        className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                        className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 active:bg-red-950/70 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         {t.clases.deleteBtn}
                       </button>

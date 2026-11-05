@@ -405,7 +405,7 @@ class AILesson(Base):
 
 
 class Contact(Base):
-    """CRM contact (Plataforma Unificada — Fase 1).
+    """CRM contact (Grow Business Platform — Fase 1).
 
     The connective tissue between modules: leads and customers from the
     Academy (Estudiar), Cohley brand work, RIV Goods and manual entry.
@@ -616,7 +616,7 @@ class EmailLog(Base):
 
 
 class Course(Base):
-    """Academia catalog item (Plataforma Unificada — Fase 2, módulo Estudiar).
+    """Academia catalog item (Grow Business Platform — Fase 2, módulo Estudiar).
 
     Seeded with Rubén's REAL catalog: the 6 Hotmart ebooks ($19.99), the
     Pack Creador Completo ($59.99) and the $400 Academy. Prices/URLs come
@@ -685,7 +685,7 @@ class CourseEnrollment(Base):
 
 
 class ReferralCampaign(Base):
-    """Referral campaign (Plataforma Unificada — módulo Referidos).
+    """Referral campaign (Grow Business Platform — módulo Referidos).
 
     A business (optionally an existing CRM contact) runs a campaign:
     existing customers share the campaign's share_code, and when a
@@ -763,7 +763,7 @@ class Referral(Base):
 
 
 class BusinessNote(Base):
-    """A note inside one Business area (Plataforma Unificada — módulo Business).
+    """A note inside one Business area (Grow Business Platform — módulo Business).
 
     Notes are scoped per area and never mixed: each row belongs to
     exactly one area (marketing|ventas|legal|administrativo) and the
@@ -785,7 +785,7 @@ class BusinessNote(Base):
 
 
 class BusinessTask(Base):
-    """A task inside one Business area (Plataforma Unificada — módulo Business).
+    """A task inside one Business area (Grow Business Platform — módulo Business).
 
     Same per-area scoping as BusinessNote. `done` toggles without
     deleting the row so completed work stays visible in its area.

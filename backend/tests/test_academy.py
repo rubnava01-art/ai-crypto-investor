@@ -1,4 +1,4 @@
-"""Academia tests (Plataforma Unificada — Fase 2, módulo Estudiar):
+"""Academia tests (Grow Business Platform — Fase 2, módulo Estudiar):
 catálogo real sembrado, permisos RBAC (prueba lee, admin escribe) y
 registro de entrega contacto↔curso.
 
@@ -203,3 +203,29 @@ def test_academy_pdf_download_404s(client, admin_headers):
     # Unknown course -> 404.
     r = client.get("/api/academy/courses/999999/download", headers=admin_headers)
     assert r.status_code == 404, r.text
+
+
+def test_academy_pdf_materializes_from_base64(client, admin_headers, tmp_path, monkeypatch):
+    # Production scenario: only the .b64 text survived the deploy, the .pdf
+    # binary is missing. The download must decode it on demand and serve it.
+    import shutil
+
+    from app.api import academy as academy_mod
+
+    real_dir = academy_mod.PDF_DIR
+    for name in ("manual-claude.pdf",):
+        shutil.copy(real_dir / f"{name}.b64", tmp_path / f"{name}.b64")
+    assert not (tmp_path / "manual-claude.pdf").exists()
+    monkeypatch.setattr(academy_mod, "PDF_DIR", tmp_path)
+
+    ebook = _course_by_slug(client, admin_headers, "manual-claude")
+    r = client.get(f"/api/academy/courses/{ebook['id']}/download", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("application/pdf")
+    assert r.content[:4] == b"%PDF"
+    # The file was materialized on disk and the bytes match the real PDF.
+    assert (tmp_path / "manual-claude.pdf").is_file()
+    assert r.content == (real_dir / "manual-claude.pdf").read_bytes()
+    # Idempotent: a second download serves the now-existing file.
+    r2 = client.get(f"/api/academy/courses/{ebook['id']}/download", headers=admin_headers)
+    assert r2.status_code == 200 and r2.content == r.content
