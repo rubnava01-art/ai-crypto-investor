@@ -14,19 +14,19 @@ export function downloadSvg(svgEl: SVGSVGElement | null, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadSvgAsPng(svgEl: SVGSVGElement | null, filename: string, size = 1024) {
+export function downloadSvgAsPng(svgEl: SVGSVGElement | null, filename: string, size = 1024, height = size) {
   if (!svgEl) return;
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", String(size));
-  clone.setAttribute("height", String(size));
+  clone.setAttribute("height", String(height));
   const text = new XMLSerializer().serializeToString(clone);
   const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml;charset=utf-8" }));
   const img = new Image();
   img.onload = () => {
     const canvas = document.createElement("canvas");
     canvas.width = size;
-    canvas.height = size;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(img, 0, 0, size, size);

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-05",
+    title: "Tech Pack en Crear: formato de hoja de especificaciones para camisetas",
+    body: "Publicado el 5 de noviembre: el generador de mockups de camisetas en Crear ahora tiene el formato Tech Pack — una hoja de especificaciones en blanco con cabecera editable (cliente, diseño, prenda y color), barra TECH PACK, vistas de frente y espalda con guías de colocación, y cinco cajas (FRONT, BACK, RIGHT SLEEVE, LEFT SLEEVE, LABEL) con tamaño de impresión, embellishment, tinta y Pantones con muestras de color; descarga en SVG o PNG. Los campos empiezan vacíos, sin datos de ejemplo. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-05",
     title: "Auditor estilo Semrush: informe de Salud del sitio por categorías",
     body: "Publicado el 5 de noviembre: el Auditor web ahora informa estilo Semrush — Salud del sitio con el puntaje y el conteo de errores, advertencias y avisos, y las revisiones agrupadas por SEO, Social, Rastreo y Rendimiento, con 4 revisiones nuevas: robots.txt, sitemap.xml, Twitter card y favicon. Es la revisión propia de la app sobre la página, no datos de Semrush ni de Lighthouse. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },
