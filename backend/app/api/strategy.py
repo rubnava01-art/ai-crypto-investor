@@ -1,4 +1,6 @@
 """Strategy endpoints (Phase 3): evaluate trend+momentum and run the risk guard."""
+import datetime as dt
+import re
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,6 +16,33 @@ from app.indicators import technical as ind
 from app.models.tables import User
 from app.risk import guard
 from app.strategy import engine
+
+# 2026-11-06: una evaluación sobre velas viejas es peor que ninguna —
+# el escáner puede llevar horas caído y la señal saldría con datos
+# muertos y quedaría persistida como si fuera actual. El umbral es 2
+# velas: da margen a un ciclo de ingesta perdido sin aceptar datos
+# de hace medio día en 1h.
+_TIMEFRAME_RE = re.compile(r"^(\d+)([mhdw])$")
+_TIMEFRAME_SECONDS = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+_STALE_CANDLES = 2
+
+
+def _timeframe_seconds(timeframe: str) -> int:
+    """Segundos de una vela ('15m', '1h', '4h', '1d'...). Formato
+    desconocido -> 1h: nunca bloquear la evaluación por no entender
+    el timeframe, el guarda de antigüedad sigue aplicando con 2h."""
+    m = _TIMEFRAME_RE.match(timeframe.strip().lower())
+    if not m:
+        return 3600
+    return int(m.group(1)) * _TIMEFRAME_SECONDS[m.group(2)]
+
+
+def _as_utc(moment: dt.datetime) -> dt.datetime:
+    """SQLite devuelve los DateTime(timezone=True) sin tzinfo: se
+    asume UTC, que es como se guardaron."""
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=dt.timezone.utc)
+    return moment
 
 router = APIRouter(prefix="/api/strategy", tags=["strategy"])
 
@@ -54,6 +83,21 @@ def evaluate(
         )
     # Use only CLOSED candles: drop the last (still forming) one.
     closed = candles[:-1]
+    # Sin datos frescos no hay señal: si la última vela cerrada es
+    # más vieja que 2 timeframes, el escáner lleva caído un rato y
+    # evaluar persistiría una señal con datos muertos.
+    newest_closed = _as_utc(closed[-1].open_time_utc)
+    age_s = (dt.datetime.now(dt.timezone.utc) - newest_closed).total_seconds()
+    max_age_s = _STALE_CANDLES * _timeframe_seconds(timeframe)
+    if age_s > max_age_s:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                f"Stale candles for {symbol} {timeframe}: newest closed "
+                f"candle is {age_s / 3600:.1f}h old (max {max_age_s / 3600:.1f}h). "
+                "Run the scanner or ingest first."
+            ),
+        )
     closes = [float(c.close) for c in closed]
     volumes = [float(c.volume) for c in closed]
     snapshot = ind.summarize(closes, volumes)

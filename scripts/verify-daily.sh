@@ -8,6 +8,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# 2026-11-06: errores de espacios en blanco (trailing whitespace,
+# tabs) del cambio del día, antes de correr la suite: un diff sucio
+# con esos errores no debería llegar al commit.
+echo "== git: diff --check =="
+(cd "$ROOT" && git diff --check && git diff --cached --check)
+
 echo "== backend: pytest =="
 (cd "$ROOT/backend" && .venv/bin/python -m pytest tests -q)
 

@@ -56,23 +56,24 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * son de todo el sitio y no se asignan a ninguna sección. Las
  * secciones sin entrada muestran "Sin mejoras registradas".
  * OJO: al anteponer entradas nuevas, todos los índices existentes
- * se desplazan; este mapa se actualizó con la entrada del 2026-11-05
- * (Tech Pack en Crear, [0]) — todos los índices anteriores +1. */
+ * se desplazan; este mapa se actualizó con la entrada del 2026-11-06
+ * (Invertir: el evaluador ya no usa velas obsoletas, [0]) — todos los
+ * índices anteriores +1. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  auditor: [1],
-  ajustador: [8],
-  crear: [0],
-  estudiar: [6, 8, 11, 12],
-  inicio: [9, 17],
-  perfil: [10],
-  talento: [13],
-  riesgos: [13],
-  planillas: [13],
-  crm: [13],
-  analisis: [13],
-  invertir: [14, 16],
-  usuarios: [16, 17],
-  espacio: [17],
+  auditor: [2],
+  ajustador: [9],
+  crear: [1],
+  estudiar: [7, 9, 12, 13],
+  inicio: [10, 18],
+  perfil: [11],
+  talento: [14],
+  riesgos: [14],
+  planillas: [14],
+  crm: [14],
+  analisis: [14],
+  invertir: [0, 15, 17],
+  usuarios: [17, 18],
+  espacio: [18],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,
