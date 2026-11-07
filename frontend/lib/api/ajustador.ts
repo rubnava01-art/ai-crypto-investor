@@ -40,7 +40,7 @@ export interface VideoInput {
   titulo: string;
 }
 
-// Las 24 secciones optimizables: todas las rutas del menú menos
+// Las 27 secciones optimizables: todas las rutas del menú menos
 // /ajustador (el tablero gestiona las secciones, no es una de ellas).
 export const SECCIONES_AJUSTADOR: string[] = [
   "inicio",
@@ -67,6 +67,9 @@ export const SECCIONES_AJUSTADOR: string[] = [
   "inventario",
   "perfil",
   "usuarios",
+  "terminal",
+  "flujos",
+  "planes",
 ];
 
 // Extrae el id de video con la misma regla que valida el backend:

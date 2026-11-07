@@ -73,9 +73,10 @@ def test_analizador_fetch_mock_ok():
         return _respuesta_html("Hola mundo. Este es un texto corto y variado.")
 
     transport = httpx.MockTransport(handler)
-    final_url, titulo, texto = fetch_texto(f"{HOST_PUBLICO}/nota", transport=transport)
+    final_url, titulo, texto, estructura = fetch_texto(f"{HOST_PUBLICO}/nota", transport=transport)
     assert titulo == "Nota de prueba"
     assert "Hola mundo" in texto
+    assert estructura is not None and estructura["titulo_len"] == len("Nota de prueba")
 
 
 def test_analizador_fetch_redireccion_a_privada_bloqueada():
@@ -134,7 +135,7 @@ def test_analizador_endpoint_descargo(client, admin_headers, monkeypatch):
     monkeypatch.setattr(
         analizador_mod,
         "fetch_texto",
-        lambda url: ("https://ejemplo.com/nota", "Nota", TEXTO_MEDIO),
+        lambda url: ("https://ejemplo.com/nota", "Nota", TEXTO_MEDIO, None),
     )
     r = client.post(
         "/api/analizador/analizar",
@@ -154,7 +155,7 @@ def test_analizador_rate_limit(client, viewer_headers, monkeypatch):
     monkeypatch.setattr(
         analizador_mod,
         "fetch_texto",
-        lambda url: ("https://ejemplo.com/nota", "Nota", TEXTO_BAJO),
+        lambda url: ("https://ejemplo.com/nota", "Nota", TEXTO_BAJO, None),
     )
     ultimo = None
     for _ in range(31):

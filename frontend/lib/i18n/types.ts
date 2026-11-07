@@ -30,7 +30,9 @@ export type NavKey =
   | "inventario"
   | "perfil"
   | "usuarios"
-  | "ajustador";
+  | "ajustador"
+  | "flujos"
+  | "planes";
 
 export type Dictionary = {
   header: {
@@ -77,6 +79,7 @@ export type Dictionary = {
   academy: Record<string, string>;
   clases: Record<string, string>;
   analizador: Record<string, string>;
+  social: Record<string, string>;
   tendencias: Record<string, string>;
   auditor: Record<string, string>;
   desarrollo: Record<string, string>;
@@ -98,7 +101,13 @@ export type Dictionary = {
   // Ajustador (tablero de mejora) y videos educativos: mismo patrón.
   ajustador: Record<string, string>;
   videos: Record<string, string>;
+  // Flujos (constructor visual de automatizaciones, solo localStorage).
+  flujos: Record<string, string>;
+  // Planes (precios de suscripción, aprobados por Rubén 2026-11-06).
+  planes: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
   estudiarGestos: Record<string, string>;
   reliability: Record<string, string>;
+  // Terminal (consola simulada, solo admin): mismo patrón.
+  terminal: Record<string, string>;
 };

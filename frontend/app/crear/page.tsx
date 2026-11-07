@@ -1,9 +1,28 @@
 "use client";
 
-import { CrearPanel } from "../../components/CrearPanel";
+import dynamic from "next/dynamic";
 import { useLanguage } from "../../lib/i18n";
 import { ModuleShell } from "../../components/ModuleShell";
 import { Panel } from "../../components/Panel";
+
+// Carga diferida (optimización 2026-11-06): CrearPanel arrastra
+// LogoGenerator + ShirtMockupGenerator; la tarjeta de Forge (arriba)
+// se queda en el chunk inicial y el panel se descarga al renderizar.
+function PanelLoading() {
+  const { t } = useLanguage();
+  return (
+    <div
+      role="status"
+      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500"
+    >
+      {t.dashboard.panelLoading}
+    </div>
+  );
+}
+const CrearPanel = dynamic(
+  () => import("../../components/CrearPanel").then((m) => m.CrearPanel),
+  { ssr: false, loading: PanelLoading },
+);
 
 const FORGE_URL = process.env.NEXT_PUBLIC_FORGE_URL ?? "https://rubnava01-art.github.io/New/";
 

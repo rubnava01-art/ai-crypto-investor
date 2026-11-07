@@ -231,6 +231,20 @@ export interface AnalizadorIndicador {
   valor: string;
   detalle: string;
   punto: boolean;
+  // "contenido" (indicadores de texto, los únicos que puntúan) o
+  // "estructura" (revisiones de la página, solo contexto).
+  categoria: string;
+  // Seriedad del hallazgo: "error" | "advertencia" | "aviso".
+  severidad: string;
+  // True si la revisión está bien (o es solo informativa).
+  pasa: boolean;
+}
+
+export interface AnalizadorDesglose {
+  nombre: string;
+  puntos: number;
+  maximo: number;
+  detalle: string;
 }
 
 export interface AnalizarResponse {
@@ -240,6 +254,9 @@ export interface AnalizarResponse {
   palabras: number;
   indicadores: AnalizadorIndicador[];
   puntaje: number;
+  puntaje_maximo: number;
+  desglose: AnalizadorDesglose[];
+  siguientes_pasos: string[];
   banda: "bajo" | "medio" | "alto";
   etiqueta_banda: string;
   regla: string;

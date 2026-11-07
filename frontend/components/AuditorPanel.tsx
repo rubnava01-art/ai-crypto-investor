@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type WebAudit } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
@@ -8,6 +8,104 @@ import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+
+/** Forma EXACTA que escribe el Analizador de redes sociales en
+ * localStorage ("grow-social-analyses"). Se valida defensivamente:
+ * solo entran filas con network (texto) y score (0-100); el resto
+ * se ignora sin romper el panel. */
+type SocialAnalysis = {
+  id: string | number;
+  network: string;
+  handle: string;
+  url: string;
+  analyzedAt: string;
+  followers: number | null;
+  engagement: number | null;
+  score: number;
+  level: "low" | "medium" | "high";
+  notes: string;
+};
+
+const CAT_COLORS: Record<string, string> = {
+  seo: "#34d399",
+  social: "#38bdf8",
+  rastreo: "#a78bfa",
+  rendimiento: "#fbbf24",
+};
+
+type BarRow = { label: string; value: number; max: number; display: string; color: string };
+
+/** Barras horizontales en SVG puro (sin dependencias). */
+function HBarChart({ rows, ariaLabel }: { rows: BarRow[]; ariaLabel: string }) {
+  const W = 560;
+  const ROW_H = 30;
+  const LABEL_W = 120;
+  const VAL_W = 96;
+  const barMaxW = W - LABEL_W - VAL_W;
+  const H = rows.length * ROW_H + 8;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={ariaLabel} className="block">
+      {rows.map((r, i) => {
+        const y = 8 + i * ROW_H;
+        const w = r.max > 0 && r.value > 0 ? Math.max(4, (r.value / r.max) * barMaxW) : 0;
+        const label = r.label.length > 16 ? `${r.label.slice(0, 15)}…` : r.label;
+        return (
+          <g key={`${r.label}-${i}`}>
+            <text x={0} y={y + 14} fontSize={12} fill="#d4d4d8">{label}</text>
+            <rect x={LABEL_W} y={y} width={barMaxW} height={18} rx={4} fill="#27272a" />
+            <rect x={LABEL_W} y={y} width={w} height={18} rx={4} fill={r.color} />
+            <text x={LABEL_W + barMaxW + 8} y={y + 14} fontSize={12} fill="#e4e4e7">{r.display}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Línea de puntaje en el tiempo en SVG puro (sin dependencias). */
+function ScoreLineChart({ points, locale }: { points: { date: Date; score: number }[]; locale: string }) {
+  const W = 560;
+  const H = 180;
+  const PAD_L = 36;
+  const PAD_R = 12;
+  const PAD_T = 16;
+  const PAD_B = 28;
+  const iw = W - PAD_L - PAD_R;
+  const ih = H - PAD_T - PAD_B;
+  const xs = points.map((_, i) => (points.length === 1 ? PAD_L + iw / 2 : PAD_L + (i / (points.length - 1)) * iw));
+  const ys = points.map((p) => PAD_T + (1 - p.score / 100) * ih);
+  const line = points.map((_, i) => `${xs[i].toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  const fmt = (d: Date) => d.toLocaleDateString(locale, { day: "numeric", month: "short" });
+  const xLabels = points.length <= 2 ? points : [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Score history: ${points.map((p) => `${fmt(p.date)} ${p.score}`).join(", ")}`} className="block">
+      {[0, 50, 100].map((v) => {
+        const y = PAD_T + (1 - v / 100) * ih;
+        return (
+          <g key={v}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={y} y2={y} stroke="#27272a" strokeWidth={1} />
+            <text x={PAD_L - 6} y={y + 4} fontSize={11} fill="#a1a1aa" textAnchor="end">{v}</text>
+          </g>
+        );
+      })}
+      <polyline points={line} fill="none" stroke="#34d399" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((p, i) => (
+        <g key={i}>
+          <circle cx={xs[i]} cy={ys[i]} r={4} fill="#34d399" stroke="#09090b" strokeWidth={1} />
+          {points.length <= 12 && (
+            <text x={xs[i]} y={ys[i] - 8} fontSize={11} fill="#e4e4e7" textAnchor="middle">{p.score}</text>
+          )}
+        </g>
+      ))}
+      {xLabels.map((p) => {
+        const i = points.indexOf(p);
+        return (
+          <text key={i} x={xs[i]} y={H - 8} fontSize={11} fill="#a1a1aa" textAnchor="middle">{fmt(p.date)}</text>
+        );
+      })}
+    </svg>
+  );
+}
 
 /** Auditor web: revisa UNA página (velocidad medida + SEO básico).
  * El puntaje es transparente: % de la lista de verificación aprobado,
@@ -26,6 +124,7 @@ export function AuditorPanel() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<WebAudit | null>(null);
   const [recent, setRecent] = useState<WebAudit[]>([]);
+  const [social, setSocial] = useState<SocialAnalysis[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +141,50 @@ export function AuditorPanel() {
   useEffect(() => {
     loadRecent();
   }, [loadRecent]);
+
+  // Resumen social: lee lo que guardó el Analizador de redes en
+  // este navegador (localStorage "grow-social-analyses"). Se relee
+  // al enfocar la pestaña y cuando otra pestaña lo cambia; las filas
+  // malformadas se ignoran sin romper el panel.
+  const loadSocial = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem("grow-social-analyses");
+      if (!raw) {
+        setSocial([]);
+        return;
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setSocial([]);
+        return;
+      }
+      const valid = parsed.filter((e): e is SocialAnalysis => {
+        if (!e || typeof e !== "object") return false;
+        const r = e as Record<string, unknown>;
+        return (
+          typeof r.network === "string" &&
+          r.network.trim().length > 0 &&
+          typeof r.score === "number" &&
+          Number.isFinite(r.score) &&
+          r.score >= 0 &&
+          r.score <= 100
+        );
+      });
+      setSocial(valid);
+    } catch {
+      setSocial([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSocial();
+    window.addEventListener("storage", loadSocial);
+    window.addEventListener("focus", loadSocial);
+    return () => {
+      window.removeEventListener("storage", loadSocial);
+      window.removeEventListener("focus", loadSocial);
+    };
+  }, [loadSocial]);
 
   const run = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,6 +260,47 @@ export function AuditorPanel() {
     advertencia: t.auditor.severityWarning,
     aviso: t.auditor.severityNotice,
   };
+
+  // Informe gráfico: todo calculado del resultado actual, nada inventado.
+  const catScores = CATEGORY_ORDER.map((cat) => {
+    const checks = result?.checks.filter((c) => catOf(c) === cat) ?? [];
+    const passed = checks.filter((c) => c.passed).length;
+    return {
+      cat,
+      total: checks.length,
+      passed,
+      pct: checks.length > 0 ? Math.round((passed / checks.length) * 100) : 0,
+    };
+  }).filter((s) => s.total > 0);
+  const sevMax = Math.max(1, errCount, warnCount, noteCount);
+
+  // Historial: la API SÍ expone auditorías pasadas (listWebAudits).
+  // Solo puntos reales con puntaje y fecha, ordenados en el tiempo.
+  const historyPoints = useMemo(() => {
+    const byId = new Map<number, { date: Date; score: number }>();
+    for (const a of recent) {
+      if (a.score === null || !a.created_at) continue;
+      const date = new Date(a.created_at);
+      if (Number.isNaN(date.getTime())) continue;
+      byId.set(a.id, { date, score: a.score });
+    }
+    return [...byId.values()].sort((x, y) => x.date.getTime() - y.date.getTime());
+  }, [recent]);
+
+  // Redes: conteo + puntaje heurístico promedio por red.
+  const socialByNetwork = useMemo(() => {
+    const map = new Map<string, { network: string; count: number; total: number }>();
+    for (const s of social) {
+      const key = s.network.trim().toLowerCase();
+      const cur = map.get(key) ?? { network: s.network.trim(), count: 0, total: 0 };
+      cur.count += 1;
+      cur.total += s.score;
+      map.set(key, cur);
+    }
+    return [...map.values()]
+      .map((g) => ({ network: g.network, count: g.count, avg: Math.round(g.total / g.count) }))
+      .sort((a, b) => b.avg - a.avg);
+  }, [social]);
 
   return (
     <div className="space-y-4">
@@ -234,8 +418,62 @@ export function AuditorPanel() {
               })}
             </div>
           )}
+
+          {/* Informe gráfico: barras por categoría y por severidad,
+              calculadas del resultado actual. */}
+          <section aria-label={t.auditor.reportTitle} className="mt-6 border-t border-zinc-800 pt-4">
+            <h3 className="mb-3 text-sm font-bold text-zinc-100">{t.auditor.reportTitle}</h3>
+            <h4 className="mb-1 text-xs font-semibold text-zinc-300">{t.auditor.reportCatTitle}</h4>
+            <HBarChart
+              ariaLabel={`${t.auditor.reportCatTitle}: ${catScores.map((s) => `${catName[s.cat] ?? s.cat} ${s.pct}%`).join(", ")}`}
+              rows={catScores.map((s) => ({
+                label: catName[s.cat] ?? s.cat,
+                value: s.pct,
+                max: 100,
+                display: `${s.passed}/${s.total} · ${s.pct}%`,
+                color: CAT_COLORS[s.cat] ?? "#34d399",
+              }))}
+            />
+            <h4 className="mb-1 mt-4 text-xs font-semibold text-zinc-300">{t.auditor.reportSevTitle}</h4>
+            <HBarChart
+              ariaLabel={`${t.auditor.reportSevTitle}: ${errCount} ${t.auditor.errorsWord}, ${warnCount} ${t.auditor.warningsWord}, ${noteCount} ${t.auditor.noticesWord}`}
+              rows={[
+                { label: t.auditor.errorsWord, value: errCount, max: sevMax, display: String(errCount), color: "#f87171" },
+                { label: t.auditor.warningsWord, value: warnCount, max: sevMax, display: String(warnCount), color: "#fbbf24" },
+                { label: t.auditor.noticesWord, value: noteCount, max: sevMax, display: String(noteCount), color: "#a1a1aa" },
+              ]}
+            />
+          </section>
         </Panel>
       )}
+
+      <Panel title={t.auditor.historyTitle}>
+        {historyPoints.length >= 2 ? (
+          <ScoreLineChart points={historyPoints} locale={locale} />
+        ) : (
+          <p className="text-sm text-zinc-400">
+            {historyPoints.length === 0 ? t.auditor.historyEmpty : t.auditor.historyFew}
+          </p>
+        )}
+      </Panel>
+
+      <Panel title={t.auditor.socialTitle}>
+        <p className="mb-3 text-xs leading-relaxed text-zinc-400">{t.auditor.socialIntro}</p>
+        {socialByNetwork.length === 0 ? (
+          <p className="text-sm text-zinc-400">{t.auditor.socialEmpty}</p>
+        ) : (
+          <HBarChart
+            ariaLabel={`${t.auditor.socialTitle}: ${socialByNetwork.map((g) => `${g.network} ${g.avg}/100 (${g.count})`).join(", ")}`}
+            rows={socialByNetwork.map((g) => ({
+              label: g.network,
+              value: g.avg,
+              max: 100,
+              display: `${g.avg}/100 · ${g.count} ${t.auditor.socialAnalyses}`,
+              color: "#38bdf8",
+            }))}
+          />
+        )}
+      </Panel>
 
       <Panel title={t.auditor.recentTitle}>
         {recent.length === 0 ? (

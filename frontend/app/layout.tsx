@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LanguageProvider } from "../lib/i18n";
 import { Analytics } from "../lib/analytics";
@@ -25,6 +25,13 @@ export const metadata: Metadata = {
   // Verificación de Search Console: solo se emite si el dueño define
   // NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION con el código de Google.
   ...(googleVerification ? { verification: { google: googleVerification } } : {}),
+};
+
+export const viewport: Viewport = {
+  // Color de la barra del navegador móvil: mismo zinc-950 del fondo,
+  // para que la app no parpadee en blanco al abrirla (optimización
+  // 2026-11-06; sin cambios de UI ni textos nuevos).
+  themeColor: "#09090b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

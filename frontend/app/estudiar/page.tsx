@@ -1,15 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AcademyPanel } from "../../components/AcademyPanel";
-import { ClasesPanel } from "../../components/ClasesPanel";
-import { JuegoPanel } from "../../components/JuegoPanel";
-import { VideosPanel } from "../../components/VideosPanel";
+import dynamic from "next/dynamic";
 import { ManualesPanel } from "../../components/ManualesPanel";
 import { EstudiarTabs, type EstudiarSection } from "../../components/EstudiarTabs";
 import { ModuleShell } from "../../components/ModuleShell";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion, useSwipeNav } from "../../lib/useSwipeNav";
+
+// Carga diferida (optimización 2026-11-06): solo la primera sección
+// (Manuales) va en el chunk inicial; las otras 4 se descargan al
+// renderizar. Los <section id="..."> se quedan en el DOM desde el
+// primer render para que el IntersectionObserver del montaje y el
+// swipe los encuentren igual que antes.
+function PanelLoading() {
+  const { t } = useLanguage();
+  return (
+    <div
+      role="status"
+      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500"
+    >
+      {t.dashboard.panelLoading}
+    </div>
+  );
+}
+const JuegoPanel = dynamic(
+  () => import("../../components/JuegoPanel").then((m) => m.JuegoPanel),
+  { ssr: false, loading: PanelLoading },
+);
+const VideosPanel = dynamic(
+  () => import("../../components/VideosPanel").then((m) => m.VideosPanel),
+  { ssr: false, loading: PanelLoading },
+);
+const AcademyPanel = dynamic(
+  () => import("../../components/AcademyPanel").then((m) => m.AcademyPanel),
+  { ssr: false, loading: PanelLoading },
+);
+const ClasesPanel = dynamic(
+  () => import("../../components/ClasesPanel").then((m) => m.ClasesPanel),
+  { ssr: false, loading: PanelLoading },
+);
 
 /** Estudiar con gestos (2026-11-05): las 5 secciones siguen apiladas
  * verticalmente y todo el contenido sigue visible con scroll — el swipe

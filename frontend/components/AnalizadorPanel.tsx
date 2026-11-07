@@ -15,6 +15,12 @@ function bandaCls(banda: AnalizarResponse["banda"]) {
   return "bg-emerald-500/15 text-emerald-300 ring-emerald-500/40";
 }
 
+function sevBadgeCls(severidad: string) {
+  if (severidad === "error") return "bg-red-500/10 text-red-400 ring-red-500/30";
+  if (severidad === "advertencia") return "bg-amber-500/10 text-amber-300 ring-amber-500/30";
+  return "bg-zinc-500/10 text-zinc-300 ring-zinc-500/30";
+}
+
 /** Analizador IA: pega un link y revisa si el contenido parece creado con
  * IA. El resultado es una ESTIMACIÓN POR INDICIOS (bajo/medio/alto), nunca
  * un veredicto: ningún detector puede afirmar con certeza el origen de un
@@ -41,6 +47,18 @@ export function AnalizadorPanel() {
       setBusy(false);
     }
   };
+
+  const sevName: Record<string, string> = {
+    error: t.analizador.severityError,
+    advertencia: t.analizador.severityWarning,
+    aviso: t.analizador.severityNotice,
+  };
+  // Grupos del informe: primero el contenido (lo único que puntúa) y
+  // luego la estructura de la página (solo contexto).
+  const grupos: { id: string; titulo: string }[] = [
+    { id: "contenido", titulo: t.analizador.groupContenido },
+    { id: "estructura", titulo: t.analizador.groupEstructura },
+  ];
 
   return (
     <Panel
@@ -92,27 +110,84 @@ export function AnalizadorPanel() {
                   {resultado.etiqueta_banda}
                 </span>
                 <span className="text-xs text-zinc-400">
-                  {t.analizador.scoreLine.replace("{puntaje}", String(resultado.puntaje)).replace("{palabras}", String(resultado.palabras))}
+                  {t.analizador.scoreLine.replace("{puntaje}", String(resultado.puntaje)).replace("{maximo}", String(resultado.puntaje_maximo)).replace("{palabras}", String(resultado.palabras))}
                 </span>
               </p>
             </div>
 
-            <ul className="space-y-3">
-              {resultado.indicadores.map((ind) => (
-                <li key={ind.nombre} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-200">{ind.nombre}</span>
-                    <span className="text-sm text-zinc-100">{ind.valor}</span>
-                    {ind.punto && (
-                      <span className="ml-auto shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-300">
-                        {t.analizador.pointBadge}
+            {grupos.map((grupo) => {
+              const items = resultado.indicadores.filter(
+                (ind) => (ind.categoria ?? "contenido") === grupo.id,
+              );
+              if (items.length === 0) return null;
+              return (
+                <div key={grupo.id}>
+                  <p className="mb-2 text-sm font-semibold text-zinc-100">{grupo.titulo}</p>
+                  <ul className="space-y-3">
+                    {items.map((ind) => (
+                      <li key={ind.nombre} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-zinc-200">{ind.nombre}</span>
+                          <span className="text-sm text-zinc-100">{ind.valor}</span>
+                          <span className="ml-auto flex shrink-0 items-center gap-2">
+                            {ind.punto && (
+                              <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-300">
+                                {t.analizador.pointBadge}
+                              </span>
+                            )}
+                            {ind.pasa ? (
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+                                ✓ {t.analizador.okLabel}
+                              </span>
+                            ) : (
+                              <span className={`rounded-full px-2 py-1 text-xs font-semibold ring-1 ring-inset ${sevBadgeCls(ind.severidad)}`}>
+                                {sevName[ind.severidad] ?? t.analizador.severityNotice}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-400">{ind.detalle}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+
+            {resultado.desglose.length > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-semibold text-zinc-100">{t.analizador.breakdownTitle}</p>
+                <ul className="space-y-2 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                  {resultado.desglose.map((fila) => (
+                    <li key={fila.nombre} className="flex items-start justify-between gap-3 text-xs">
+                      <span className="text-zinc-300">
+                        {fila.nombre}
+                        <span className="block text-zinc-500">{fila.detalle}</span>
                       </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-zinc-400">{ind.detalle}</p>
-                </li>
-              ))}
-            </ul>
+                      <span className="shrink-0 font-semibold text-zinc-100">
+                        {fila.puntos} / {fila.maximo}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs font-semibold text-zinc-200">
+                  {t.analizador.breakdownTotal.replace("{puntaje}", String(resultado.puntaje)).replace("{maximo}", String(resultado.puntaje_maximo))}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-2 text-sm font-semibold text-zinc-100">{t.analizador.nextStepsTitle}</p>
+              {resultado.siguientes_pasos.length === 0 ? (
+                <p className="text-xs leading-relaxed text-zinc-400">{t.analizador.noSteps}</p>
+              ) : (
+                <ol className="list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-zinc-300">
+                  {resultado.siguientes_pasos.map((paso) => (
+                    <li key={paso}>{paso}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
 
             <p className="text-xs leading-relaxed text-zinc-400">
               <span className="font-semibold text-zinc-300">{t.analizador.ruleLabel}</span>

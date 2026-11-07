@@ -136,6 +136,7 @@ function LoginPageInner() {
           alt="NEST"
           width={176}
           height={122}
+          fetchPriority="high"
           className={`mb-5 h-auto w-44${reducedMotion ? "" : " login-intro-badge"}`}
         />
         <h1 className={`text-2xl font-bold tracking-tight text-white sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(150)}>

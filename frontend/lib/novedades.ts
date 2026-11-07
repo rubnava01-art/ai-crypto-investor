@@ -27,6 +27,16 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-06",
+    title: "Planes de suscripción: Esencial $19, Crecimiento $49 y Negocio Total $99",
+    body: "Publicado el 6 de noviembre: nuevo módulo Planes en Negocio con los precios de suscripción de Grow Business Platform — Esencial $19, Crecimiento $49 y Negocio Total $99 al mes — y lo que incluye cada uno. Todos los planes incluyen 14 días de prueba gratis. Todavía no hay cobro en línea: la prueba y la suscripción se activan con el administrador. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-06",
+    title: "Mejoras del sistema: Terminal, videos, analizadores, Flujos y botón Inicio",
+    body: "Publicado el 6 de noviembre: la Terminal ahora guarda historial y suma comandos nuevos; Estudiar tiene reproductor de videos con búsqueda y orden; el Analizador suma revisiones de estructura y un analizador de redes con estimaciones honestas; el Auditor muestra un informe gráfico; nuevo constructor visual Flujos en simulación; y el botón Inicio ya está siempre visible arriba del menú. Cada módulo con fallo muestra su propio error sin tumbar la web. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-06",
     title: "Invertir: el evaluador ya no usa velas obsoletas",
     body: "Publicado el 6 de noviembre: /api/strategy/evaluate ya no genera señales con velas obsoletas — si la última vela cerrada es más vieja que 2 timeframes, responde 503 y no persiste ninguna señal. Antes evaluaba con datos muertos si el escáner llevaba caído. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

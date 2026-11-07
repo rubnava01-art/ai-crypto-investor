@@ -9,8 +9,6 @@ import type React from "react";
  * El hook NO anima nada: el desplazamiento lo controla el llamador
  * según `usePrefersReducedMotion()`. */
 
-export type SwipeDirection = "left" | "right";
-
 export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {

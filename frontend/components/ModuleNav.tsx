@@ -238,6 +238,30 @@ const MODULES = [
       </Icon>
     ),
   },
+  {
+    href: "/flujos",
+    label: "Flujos",
+    hint: "Automatizaciones",
+    icon: (
+      <Icon>
+        <circle cx="6" cy="6" r="2.5" />
+        <circle cx="18" cy="6" r="2.5" />
+        <circle cx="12" cy="18" r="2.5" />
+        <path d="M8.2 7.2l2.4 8.4M15.8 7.2l-2.4 8.4M8.5 6h7" />
+      </Icon>
+    ),
+  },
+  {
+    href: "/planes",
+    label: "Planes",
+    hint: "Precios y prueba gratis",
+    icon: (
+      <Icon>
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <circle cx="7" cy="7" r="1.5" />
+      </Icon>
+    ),
+  },
 ];
 
 // Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
@@ -269,14 +293,19 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/perfil": "perfil",
   "/usuarios": "usuarios",
   "/ajustador": "ajustador",
+  "/flujos": "flujos",
+  "/planes": "planes",
 };
 
-/** Familias de navegación (Fase 5, F1): las 25 rutas, sin borrar ni
+/** Familias de navegación (Fase 5, F1): las 26 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
  * que la propuesta no nombraba se ubican por afinidad y se reportan:
  * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
- * digital (adaptación para empresas) en Negocio, e Inicio junto a
- * Invertir como punto de entrada. Las 4 rutas nuevas de Negocio
+ * digital (adaptación para empresas) en Negocio. Inicio (2026-11-06)
+ * ya no está dentro de Invertir: es un botón independiente siempre
+ * visible encima de los grupos y conserva el acento Invertir por
+ * afinidad (familyForHref cae en «invertir» si no hay grupo). Las 4
+ * rutas nuevas de Negocio
  * (Talento humano, Gestión de Riesgos, Planillas, Análisis de datos)
  * enlazan a páginas que crea el agente Frontend; hasta entonces el
  * enlace existe en el menú pero la página aún no está servida. Las 3
@@ -285,12 +314,12 @@ const KEY_BY_HREF: Record<string, NavKey> = {
  * familia abierta en móvil, y el menú las filtra porque no están en
  * MODULES. */
 const GROUPS: { key: string; hrefs: string[] }[] = [
-  { key: "invertir", hrefs: ["/inicio", "/"] },
+  { key: "invertir", hrefs: ["/"] },
   { key: "estudiar", hrefs: ["/estudiar", "/estudiar/manual-plataforma", "/estudiar/manual-invertir", "/estudiar/manual-negocio", "/estudiar/juego", "/recomendaciones"] },
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
-  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis"] },
+  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis", "/planes"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
-  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal"] },
+  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal", "/flujos"] },
 ];
 
 /** Acentos por familia (F13, decisión de Rubén 2026-11-02): UN acento por
@@ -372,6 +401,8 @@ export function ModuleNav() {
 
   const visible = MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin);
   const byHref = new Map(visible.map((m) => [m.href, m]));
+  // Inicio es un botón independiente, no parte de ninguna familia.
+  const inicio = byHref.get("/inicio");
 
   const link = (m: (typeof MODULES)[number]) => {
     const navText = t.nav[KEY_BY_HREF[m.href]];
@@ -401,6 +432,9 @@ export function ModuleNav() {
 
   return (
     <nav aria-label={t.header.navAria}>
+      {/* Inicio: botón independiente siempre visible (móvil y escritorio),
+          encima de las familias — nunca dentro de un grupo colapsable. */}
+      {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
       {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
       <div className="space-y-2 sm:hidden">
         {GROUPS.map((g) => {

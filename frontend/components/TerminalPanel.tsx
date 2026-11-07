@@ -1,20 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { API_URL } from "../lib/api/client";
+import { API_URL, fetchMe } from "../lib/api/client";
+import { useLanguage } from "../lib/i18n";
+import { novedadesSistema } from "../lib/novedades";
 
-/** Terminal de pruebas (2026-11-05): consola SIMULADA dentro de la web,
- * solo con comandos integrados seguros. No ejecuta nada en el servidor:
- * no hay endpoint de ejecución ni shell real. Los comandos `status` y
- * `health` consultan de verdad /api/health con un timeout corto y
- * reportan "API no responde" cuando la API está caída, sin inventar
- * nada. Solo administradores (entrada adminOnly en el menú). */
+/** Terminal de pruebas (2026-11-05, mejoras 2026-11-06): consola SIMULADA
+ * dentro de la web, solo con comandos integrados seguros. No ejecuta nada
+ * en el servidor: no hay endpoint de ejecución ni shell real. Los comandos
+ * `status`, `health` y `version` consultan de verdad /api/health con un
+ * timeout corto y reportan "API no responde" cuando la API está caída, sin
+ * inventar nada. `whoami` lee la sesión con /api/auth/me. `novedades`
+ * lista los títulos de frontend/lib/novedades.ts (sin red). El historial
+ * vive solo en la sesión (memoria del componente, sin localStorage ni
+ * cookies): al cerrar la página se pierde. Solo administradores (entrada
+ * adminOnly en el menú). */
 
-type LineKind = "out" | "cmd" | "err" | "ok";
+type LineKind = "out" | "cmd" | "err" | "ok" | "head";
 type Line = { text: string; kind: LineKind };
 
 const PROMPT = "nest@grow:~$";
 const HEALTH_TIMEOUT_MS = 8000;
+const NOVEDADES_LIMIT = 5;
 
 /** Rutas reales de la plataforma (copia exacta de MODULES en
  * components/ModuleNav.tsx, incluida /terminal). */
@@ -47,42 +54,51 @@ const MODULES: { href: string; label: string }[] = [
   { href: "/terminal", label: "Terminal" },
 ];
 
-const HELP_LINES = [
-  "Comandos disponibles:",
-  "  help     — muestra esta lista",
-  "  status   — estado de la web y de la API (en vivo)",
-  "  health   — consulta /api/health y muestra el resultado",
-  "  modules  — lista las rutas de la plataforma",
-  "  about    — qué es esta terminal",
-  "  date     — fecha y hora actual",
-  "  echo …   — repite el texto",
-  "  clear    — limpia la pantalla",
-];
+/** Sustituye {clave} en una cadena del diccionario. */
+function fmt(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? "?"));
+}
 
-const WELCOME: Line[] = [
-  { text: "Grow Business Platform — Terminal de pruebas", kind: "out" },
-  { text: "Consola simulada con comandos seguros integrados. Escribe help para ver la lista.", kind: "out" },
-];
+type HealthInfo = {
+  ok: boolean;
+  httpStatus?: number;
+  mode?: string;
+  version?: string;
+  database?: string;
+  gitSha?: string;
+  builtUtc?: string;
+  timestampUtc?: string;
+};
 
 /** Consulta real a /api/health con timeout corto. Nunca inventa el
- * resultado: si la API no responde, lo dice tal cual. */
-async function checkHealth(): Promise<{ ok: boolean; detail: string }> {
+ * resultado: si la API no responde, ok=false y el llamador lo dice tal
+ * cual. Devuelve los campos tal como vienen (sin rellenar valores). */
+async function checkHealth(): Promise<HealthInfo> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), HEALTH_TIMEOUT_MS);
   try {
     const res = await fetch(`${API_URL}/api/health`, { signal: ctrl.signal });
-    if (!res.ok) return { ok: false, detail: `API responde con HTTP ${res.status}` };
+    if (!res.ok) return { ok: false, httpStatus: res.status };
     const j = (await res.json().catch(() => null)) as {
       mode?: unknown;
       version?: unknown;
       database?: unknown;
+      git_sha?: unknown;
+      built_utc?: unknown;
+      timestamp_utc?: unknown;
     } | null;
-    const mode = typeof j?.mode === "string" ? j.mode : "?";
-    const version = typeof j?.version === "string" ? j.version : "?";
-    const db = typeof j?.database === "string" ? ` · base de datos: ${j.database}` : "";
-    return { ok: true, detail: `API responde (ok) — modo ${mode} · versión ${version}${db}` };
+    const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+    return {
+      ok: true,
+      mode: str(j?.mode),
+      version: str(j?.version),
+      database: str(j?.database),
+      gitSha: str(j?.git_sha),
+      builtUtc: str(j?.built_utc),
+      timestampUtc: str(j?.timestamp_utc),
+    };
   } catch {
-    return { ok: false, detail: `API no responde (${API_URL})` };
+    return { ok: false };
   } finally {
     clearTimeout(timer);
   }
@@ -93,14 +109,29 @@ const LINE_CLASS: Record<LineKind, string> = {
   cmd: "text-zinc-100",
   err: "text-red-400",
   ok: "text-emerald-400",
+  head: "font-semibold text-zinc-100",
 };
 
 export function TerminalPanel() {
-  const [lines, setLines] = useState<Line[]>(WELCOME);
+  const { t } = useLanguage();
+  const tt = t.terminal;
+
+  const welcomeLines = (): Line[] => [
+    { text: tt.welcomeTitle, kind: "out" },
+    { text: tt.welcomeSub, kind: "out" },
+  ];
+
+  const [lines, setLines] = useState<Line[]>(welcomeLines);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Historial de la sesión (solo memoria): nunca se persiste. */
+  const historyRef = useRef<string[]>([]);
+  /** Índice en el historial al navegar con ↑/↓; null = escribiendo. */
+  const [histIdx, setHistIdx] = useState<number | null>(null);
+  /** Texto que se estaba escribiendo antes de navegar por el historial. */
+  const draftRef = useRef("");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -108,6 +139,24 @@ export function TerminalPanel() {
 
   function push(text: string, kind: LineKind = "out") {
     setLines((prev) => [...prev, { text, kind }]);
+  }
+
+  /** Líneas agrupadas de /api/health: estado, modo, versión, base de
+   * datos, git sha, compilación y hora. Sin inventar: lo que falta se
+   * muestra como "?"; si la API no responde, error honesto en rojo. */
+  function pushHealth(info: HealthInfo) {
+    if (!info.ok) {
+      if (info.httpStatus) push(fmt(tt.statusApiHttp, { status: info.httpStatus }), "err");
+      else push(fmt(tt.statusApiDown, { url: API_URL }), "err");
+      return;
+    }
+    push(tt.statusApiOk, "ok");
+    push(fmt(tt.statusMode, { mode: info.mode ?? "?" }));
+    push(fmt(tt.statusVersion, { version: info.version ?? "?" }));
+    push(fmt(tt.statusDb, { db: info.database ?? "?" }));
+    push(fmt(tt.statusSha, { sha: info.gitSha ?? "?" }));
+    if (info.builtUtc) push(fmt(tt.statusBuilt, { built: info.builtUtc }));
+    if (info.timestampUtc) push(fmt(tt.statusTime, { time: info.timestampUtc }));
   }
 
   async function run(raw: string) {
@@ -118,13 +167,18 @@ export function TerminalPanel() {
     const arg = rest.join(" ");
     switch (cmd.toLowerCase()) {
       case "help":
-        HELP_LINES.forEach((l) => push(l));
+        push(tt.helpTitle, "head");
+        [
+          tt.helpHelp, tt.helpStatus, tt.helpHealth, tt.helpModules, tt.helpRoutes,
+          tt.helpWhoami, tt.helpVersion, tt.helpNovedades, tt.helpHistory, tt.helpBanner,
+          tt.helpAbout, tt.helpDate, tt.helpEcho, tt.helpClear,
+        ].forEach((l) => push(l));
         break;
       case "clear":
         setLines([]);
         break;
       case "about":
-        push("Grow Business Platform — terminal de pruebas con comandos seguros integrados.");
+        push(tt.about);
         break;
       case "date":
         push(new Date().toLocaleString());
@@ -133,26 +187,82 @@ export function TerminalPanel() {
         push(arg);
         break;
       case "modules":
-        push(`Módulos de la plataforma (${MODULES.length}):`);
+        push(fmt(tt.modulesTitle, { n: MODULES.length }), "head");
         MODULES.forEach((m) => push(`  ${m.href} — ${m.label}`));
         break;
-      case "health": {
+      case "routes":
+        push(fmt(tt.routesTitle, { n: MODULES.length }), "head");
+        MODULES.forEach((m) => push(`  ${m.href} — ${m.label}`));
+        break;
+      case "banner":
+        welcomeLines().forEach((l) => push(l.text, l.kind));
+        break;
+      case "history": {
+        // El propio "history" acaba de entrar al historial: no se lista.
+        const entries = historyRef.current.filter(
+          (h, i, arr) => !(i === arr.length - 1 && h === "history"),
+        );
+        if (entries.length === 0) {
+          push(tt.historyEmpty);
+          break;
+        }
+        push(fmt(tt.historyTitle, { n: entries.length }), "head");
+        entries.forEach((h, i) => push(`  ${i + 1}. ${h}`));
+        break;
+      }
+      case "novedades":
+        push(tt.novedadesTitle, "head");
+        if (novedadesSistema.length === 0) {
+          push(tt.novedadesEmpty);
+          break;
+        }
+        novedadesSistema.slice(0, NOVEDADES_LIMIT).forEach((n) => {
+          push(`  ${n.date} — ${n.title}`);
+        });
+        break;
+      case "whoami": {
         setBusy(true);
-        const r = await checkHealth();
-        push(r.detail, r.ok ? "ok" : "err");
+        try {
+          const me = await fetchMe();
+          push(tt.whoamiTitle, "head");
+          push(fmt(tt.whoamiUser, { name: me.display_name || me.username }));
+          push(fmt(tt.whoamiRole, { role: me.role }));
+        } catch {
+          push(tt.whoamiError, "err");
+        }
+        setBusy(false);
+        break;
+      }
+      case "version": {
+        setBusy(true);
+        const info = await checkHealth();
+        if (!info.ok) {
+          push(fmt(tt.versionError, { url: API_URL }), "err");
+        } else {
+          push(tt.versionTitle, "head");
+          push(fmt(tt.versionApp, { version: info.version ?? "?" }));
+          push(fmt(tt.versionSha, { sha: info.gitSha ?? "?" }));
+        }
+        setBusy(false);
+        break;
+      }
+      case "health": {
+        push(tt.healthTitle, "head");
+        setBusy(true);
+        pushHealth(await checkHealth());
         setBusy(false);
         break;
       }
       case "status": {
-        push("Web: OK (esta página cargó)");
+        push(tt.statusTitle, "head");
+        push(tt.statusWeb, "ok");
         setBusy(true);
-        const r = await checkHealth();
-        push(r.detail, r.ok ? "ok" : "err");
+        pushHealth(await checkHealth());
         setBusy(false);
         break;
       }
       default:
-        push("Comando no reconocido. Escribe help para ver la lista.", "err");
+        push(tt.unknown, "err");
     }
   }
 
@@ -161,8 +271,43 @@ export function TerminalPanel() {
     if (busy) return;
     const v = value;
     setValue("");
+    setHistIdx(null);
+    draftRef.current = "";
+    const trimmed = v.trim();
+    if (trimmed) {
+      // Sin duplicados seguidos; el historial vive solo en la sesión.
+      const last = historyRef.current[historyRef.current.length - 1];
+      if (last !== trimmed) historyRef.current.push(trimmed);
+    }
     await run(v);
     inputRef.current?.focus();
+  }
+
+  /** ↑/↓ recorre el historial de la sesión; al salir por abajo se
+   * restaura el texto que se estaba escribiendo. */
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const h = historyRef.current;
+    if (h.length === 0) return;
+    e.preventDefault();
+    if (e.key === "ArrowUp") {
+      if (histIdx === null) {
+        draftRef.current = value;
+        setHistIdx(h.length - 1);
+        setValue(h[h.length - 1]);
+      } else if (histIdx > 0) {
+        setHistIdx(histIdx - 1);
+        setValue(h[histIdx - 1]);
+      }
+    } else if (histIdx !== null) {
+      if (histIdx < h.length - 1) {
+        setHistIdx(histIdx + 1);
+        setValue(h[histIdx + 1]);
+      } else {
+        setHistIdx(null);
+        setValue(draftRef.current);
+      }
+    }
   }
 
   return (
@@ -172,7 +317,7 @@ export function TerminalPanel() {
         <span aria-hidden="true" className="h-3 w-3 rounded-full bg-red-500/80" />
         <span aria-hidden="true" className="h-3 w-3 rounded-full bg-amber-400/80" />
         <span aria-hidden="true" className="h-3 w-3 rounded-full bg-emerald-500/80" />
-        <span className="ml-2 font-mono text-xs text-zinc-400">terminal — Grow Business Platform</span>
+        <span className="ml-2 font-mono text-xs text-zinc-400">{tt.windowTitle}</span>
       </div>
       <div
         ref={scrollRef}
@@ -194,19 +339,20 @@ export function TerminalPanel() {
             ref={inputRef}
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            onKeyDown={onKeyDown}
             disabled={busy}
             autoComplete="off"
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="escribe help"
-            aria-label="Comando de terminal"
+            placeholder={tt.inputPlaceholder}
+            aria-label={tt.inputAria}
             className="min-w-0 flex-1 bg-transparent font-mono text-sm text-zinc-100 placeholder-zinc-600 caret-emerald-400 outline-none disabled:opacity-50"
           />
         </form>
       </div>
       <p className="border-t border-zinc-800 bg-zinc-900/70 px-4 py-2 text-xs leading-relaxed text-zinc-500">
-        Consola simulada: solo comandos integrados seguros, sin ejecución en el servidor. Escribe help para ver la lista.
+        {tt.footer}
       </p>
     </section>
   );
