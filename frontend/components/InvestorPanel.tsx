@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api, ApiError } from "../lib/api";
 import { Panel } from "./Panel";
 import { newId } from "./ui";
@@ -27,38 +27,71 @@ export function InvestorPanel({
   const [amount, setAmount] = useState("");
   const [price, setPrice] = useState<number | null>(null);
   const [priceUpdatedAt, setPriceUpdatedAt] = useState<Date | null>(null);
+  // 2026-11-07: si la carga del precio falla, antes el panel se quedaba
+  // en "cargando…" para siempre con VALIDAR deshabilitado y sin decir por
+  // qué. Ahora avisa y ofrece reintentar.
+  const [priceError, setPriceError] = useState(false);
+  // 2026-11-08: marketPrices() marca stale=true cuando el exchange no
+  // responde y el servidor sirve su caché: ese precio no es en vivo y
+  // la cantidad estimada de la orden se calcula con él, así que el
+  // panel debe decirlo en vez de mostrarlo como actual.
+  const [priceStale, setPriceStale] = useState(false);
+  const priceRef = useRef<number | null>(null);
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
-  const { t } = useLanguage();
+
+  // Precio con guarda de cancelación: una carga en vuelo de un símbolo
+  // anterior (o de un panel ya desmontado) no debe escribir su precio.
+  const loadPrice = useCallback(
+    async (cancelled: () => boolean) => {
+      try {
+        const res = await api.marketPrices();
+        if (cancelled()) return;
+        const coin = res.prices.find((p) => p.pair === symbol);
+        if (coin?.price_usd) {
+          priceRef.current = coin.price_usd;
+          setPrice(coin.price_usd);
+          setPriceUpdatedAt(new Date());
+          setPriceStale(res.stale === true);
+          setPriceError(false);
+        }
+      } catch {
+        if (cancelled()) return;
+        // Con precio previo se conserva y su hora ya marca la
+        // antigüedad; sin precio, avisar en vez de dejar "cargando…".
+        if (priceRef.current == null) setPriceError(true);
+      }
+    },
+    [symbol],
+  );
+
+  // Al cambiar de símbolo el precio anterior ya no vale: limpiarlo evita
+  // mostrar el precio de BTC como si fuera el de ETH si la carga falla.
+  useEffect(() => {
+    priceRef.current = null;
+    setPrice(null);
+    setPriceUpdatedAt(null);
+    setPriceStale(false);
+    setPriceError(false);
+  }, [symbol]);
 
   useEffect(() => {
     let cancelled = false;
-    const loadPrice = async () => {
-      try {
-        const res = await api.marketPrices();
-        const coin = res.prices.find((p) => p.pair === symbol);
-        if (!cancelled && coin?.price_usd) {
-          setPrice(coin.price_usd);
-          setPriceUpdatedAt(new Date());
-        }
-      } catch {
-        /* el precio se reintenta en el siguiente ciclo */
-      }
-    };
-    loadPrice();
+    loadPrice(() => cancelled);
     // Como el Chat y el Mercado: con la pestaña oculta el sondeo de
     // precio no aporta nada (al volver se recarga) y solo gasta peticiones.
     const t = setInterval(() => {
       if (document.hidden) return;
-      loadPrice();
+      loadPrice(() => cancelled);
     }, 15_000);
     return () => {
       cancelled = true;
       clearInterval(t);
     };
-  }, [symbol]);
+  }, [loadPrice]);
 
   const amountNum = parseFloat(amount);
   const validAmount = Number.isFinite(amountNum) && amountNum > 0;
@@ -146,7 +179,10 @@ export function InvestorPanel({
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.currentPrice}</dt>
-              <dd className="text-right font-mono tabular-nums">
+              <dd
+                className={`text-right font-mono tabular-nums ${priceStale ? "text-zinc-400 opacity-70" : ""}`}
+                title={priceStale ? t.reliability.stalePrice : undefined}
+              >
                 ${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}
                 {priceUpdatedAt && (
                   <span className="block text-xs font-sans text-zinc-400">
@@ -175,6 +211,11 @@ export function InvestorPanel({
               </dd>
             </div>
           </dl>
+          {priceStale && (
+            <p role="status" className="mt-3 text-xs leading-relaxed text-amber-400">
+              {t.reliability.stalePrice}
+            </p>
+          )}
           {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
           <div className="mt-5 flex gap-2">
             <button
@@ -238,9 +279,29 @@ export function InvestorPanel({
           </div>
           <p className="mt-3 text-xs leading-relaxed text-zinc-400">
             {t.invertir.price} {symbol}:{" "}
-            {price
-              ? `$${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`
-              : t.invertir.loadingPrice}
+            {price ? (
+              <span
+                className={priceStale ? "font-semibold text-zinc-400 opacity-70" : "font-semibold text-zinc-100"}
+                title={priceStale ? t.reliability.stalePrice : undefined}
+              >
+                ${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+              </span>
+            ) : priceError ? (
+              <>
+                <span role="alert" className="font-semibold text-red-400">
+                  {t.invertir.priceLoadFailed}
+                </span>{" "}
+                <button
+                  type="button"
+                  onClick={() => loadPrice(() => false)}
+                  className="font-semibold text-zinc-100 underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                >
+                  {t.invertir.retry}
+                </button>
+              </>
+            ) : (
+              t.invertir.loadingPrice
+            )}
             {priceUpdatedAt && (
               <>
                 {" "}· {t.invertir.updatedAt}{" "}
@@ -253,6 +314,11 @@ export function InvestorPanel({
             )}{" "}
             · {t.invertir.capital} {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
           </p>
+          {priceStale && price && (
+            <p role="status" className="mt-2 text-xs leading-relaxed text-amber-400">
+              {t.reliability.stalePrice}
+            </p>
+          )}
           {error && <p role="alert" className="mt-3 text-sm leading-relaxed text-red-400">{error}</p>}
           <button
             onClick={() => {

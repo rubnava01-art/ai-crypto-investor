@@ -21,14 +21,17 @@ export default function ManualNegocioPage() {
     { title: m.p3s7Title, body: m.p3s7Body },
     { title: m.p3s8Title, body: m.p3s8Body },
   ];
-  // Swipe derecha → Manual 2. Swipe izquierda: sin destino en el
-  // Manual 3 (no hay siguiente); el pager tampoco muestra ese botón.
-  const swipeHandlers = useSwipeNav({ onSwipeRight: () => router.push("/estudiar/manual-invertir") });
+  // Swipe derecha → Manual 2. Swipe izquierda → Manual 4 (nuevo);
+  // el pager también muestra el botón siguiente.
+  const swipeHandlers = useSwipeNav({
+    onSwipeLeft: () => router.push("/estudiar/manual-influencer"),
+    onSwipeRight: () => router.push("/estudiar/manual-invertir"),
+  });
   return (
     <ModuleShell moduleTitle={m.p3Title} subtitle={m.p3Subtitle}>
       <div data-estudiar {...swipeHandlers}>
         <ManualSections sections={sections} />
-        <ManualPager prevHref="/estudiar/manual-invertir" />
+        <ManualPager prevHref="/estudiar/manual-invertir" nextHref="/estudiar/manual-influencer" />
       </div>
     </ModuleShell>
   );

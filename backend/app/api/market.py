@@ -16,6 +16,10 @@ from app.core.security import get_current_user, require_admin
 from app.data import exchanges, ingest
 from app.database import get_db
 from app.indicators import technical as ind
+# 2026-11-08: la regla de antigüedad de velas vive en strategy (guarda
+# 2026-11-06): /candles e /indicators la reutilizan para marcar sus
+# datos como stale en vez de presentarlos como actuales.
+from app.api.strategy import _STALE_CANDLES, _as_utc, _timeframe_seconds
 from app.models.tables import User
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -35,6 +39,25 @@ _PRICES_TTL_S = 60.0
 # (corrida 3 agentes): antes cada llamada pegaba al exchange sin caché.
 _TICKER_CACHE: dict[tuple, dict] = {}
 _TICKER_TTL_S = 60.0
+# 2026-11-09: la caché es por (exchange, símbolo) y el símbolo lo escribe
+# el usuario en el query param, sin validar: cada símbolo distinto era una
+# entrada nueva que nunca se eliminaba (solo se sobrescribía al repetirse
+# con éxito). Un bucle de símbolos inventados crecía la memoria del
+# proceso sin límite. Tope generoso (128 pares) con desalojo FIFO: el
+# dict conserva el orden de inserción, así que la entrada más vieja sale
+# primero. El uso normal (BTC/ETH y poco más) nunca llega al tope.
+_TICKER_CACHE_MAX_ENTRIES = 128
+
+
+def _ticker_cache_put(key: tuple, entry: dict) -> None:
+    """Guarda una entrada de ticker con tope: si la caché está llena,
+    desaloja la más antigua (FIFO) antes de insertar."""
+    if key in _TICKER_CACHE:
+        _TICKER_CACHE[key] = entry
+        return
+    while len(_TICKER_CACHE) >= _TICKER_CACHE_MAX_ENTRIES:
+        _TICKER_CACHE.pop(next(iter(_TICKER_CACHE)))
+    _TICKER_CACHE[key] = entry
 
 # Executor COMPARTIDO (Fase 3, B5-style): un pool por proceso para el
 # fetch paralelo de /prices, no uno por request (el patrón viejo de
@@ -78,6 +101,13 @@ class CandlesResponse(BaseModel):
     timeframe: str
     source: str
     updated_utc: str
+    # 2026-11-08: antes updated_utc era "ahora" aunque la vela más
+    # reciente tuviera horas o días: el mismo dato muerto que el guarda
+    # de estrategia (2026-11-06) rechaza para evaluar. Ahora la
+    # respuesta dice si las velas están desactualizadas y de cuándo es
+    # la más reciente, con la misma regla de 2 timeframes.
+    stale: bool = False
+    newest_candle_utc: str
     candles: list[CandleOut]
 
 
@@ -94,6 +124,11 @@ class IndicatorsResponse(BaseModel):
     timeframe: str
     source: str
     updated_utc: str
+    # 2026-11-08: igual que /candles — los indicadores se calculan
+    # sobre las velas guardadas, y si esas velas son viejas el resumen
+    # también lo es. Misma regla de 2 timeframes.
+    stale: bool = False
+    newest_candle_utc: str
     indicators: dict
 
 
@@ -117,6 +152,18 @@ def _utcnow() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def _candles_freshness(candles, timeframe: str) -> tuple[bool, str]:
+    """(stale, newest_candle_utc) de una lista ascendente de velas.
+
+    Misma regla que el guarda de /strategy/evaluate (2026-11-06): la
+    vela cerrada más reciente más vieja que 2 timeframes es dato muerto.
+    """
+    newest = _as_utc(candles[-1].open_time_utc)
+    max_age_s = _STALE_CANDLES * _timeframe_seconds(timeframe)
+    age_s = (dt.datetime.now(dt.timezone.utc) - newest).total_seconds()
+    return age_s > max_age_s, newest.isoformat()
+
+
 @router.get("/candles", response_model=CandlesResponse)
 def get_candles(
     symbol: str = Query("BTC/USD"),
@@ -134,11 +181,14 @@ def get_candles(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"No candle data for {symbol} {timeframe}. Run the scanner or ingest first.",
         )
+    stale, newest_candle_utc = _candles_freshness(candles, timeframe)
     return CandlesResponse(
         symbol=symbol,
         timeframe=timeframe,
         source=candles[-1].source,
         updated_utc=_utcnow(),
+        stale=stale,
+        newest_candle_utc=newest_candle_utc,
         candles=[
             CandleOut(
                 open_time_utc=c.open_time_utc.isoformat(),
@@ -184,7 +234,7 @@ def get_ticker(
         "updated_utc": _utcnow(),
         "stale": False,
     }
-    _TICKER_CACHE[key] = {"at": now, "payload": payload}
+    _ticker_cache_put(key, {"at": now, "payload": payload})
     return TickerResponse(**payload)
 
 
@@ -206,11 +256,14 @@ def get_indicators(
         )
     closes = [float(c.close) for c in candles]
     volumes = [float(c.volume) for c in candles]
+    stale, newest_candle_utc = _candles_freshness(candles, timeframe)
     return IndicatorsResponse(
         symbol=symbol,
         timeframe=timeframe,
         source=candles[-1].source,
         updated_utc=_utcnow(),
+        stale=stale,
+        newest_candle_utc=newest_candle_utc,
         indicators=ind.summarize(closes, volumes),
     )
 

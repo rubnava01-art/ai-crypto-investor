@@ -26,6 +26,36 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-10",
+    title: "Flujos, Correos, Acceso y menús más fluidos",
+    body: "Publicado el 10 de noviembre: Flujos ya no re-renderiza todo el panel al arrastrar un nodo, con puertos táctiles más grandes para el celular; Correos carga las listas bajo demanda y guarda el borrador aunque expire la sesión; Acceso precarga el reto anti-bots con spinner; y cambiar de módulo ya no recarga el menú completo. En el servidor, la primera petición tras la inactividad ya no falla y Correos tiene límite de 30 por minuto. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-10",
+    title: "Usuarios: el panel ya no muestra dos mensajes a la vez al fallar la carga",
+    body: "Publicado el 10 de noviembre: si la carga de usuarios falla, el panel de usuarios ahora muestra solo el error con botón de reintentar, sin el mensaje de 'Sin usuarios todavía' a la vez; y /api/system/metrics incluye las 10 rutas con mayor latencia media para ver qué endpoint va lento. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-10",
+    title: "Caché de cotizaciones con tope y respaldos verificados",
+    body: "Publicado el 10 de noviembre: el caché de cotizaciones ahora tiene tope de 128 entradas por símbolo para no crecer sin límite, y el script de respaldo verifica la integridad del archivo y lo borra si está roto. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-10",
+    title: "Invertir: velas e indicadores marcan datos obsoletos",
+    body: "Publicado el 10 de noviembre: en Invertir, las velas y los indicadores ahora marcan si los datos están obsoletos, y el panel avisa cuando el precio viene de caché para no operar con datos viejos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-10",
+    title: "Invertir: aviso si el precio no carga y paridad de idiomas",
+    body: "Publicado el 10 de noviembre: en Invertir, el panel ahora avisa si el precio no carga (con reintento) y limpia el precio al cambiar de símbolo; y un chequeo automático verifica que los textos en español e inglés estén parejos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-10",
+    title: "Estudiar: nuevo manual — qué declarar como influencer en EE. UU. (guía FTC)",
+    body: "Publicado el 10 de noviembre: en Estudiar, nuevo Manual 4 con la guía de la FTC para influencers en redes sociales, en español e inglés: qué declarar, cómo y cuándo, fiel al documento oficial. Es una página de la plataforma, no un PDF. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-06",
     title: "Planes de suscripción: Esencial $19, Crecimiento $49 y Negocio Total $99",
     body: "Publicado el 6 de noviembre: nuevo módulo Planes en Negocio con los precios de suscripción de Grow Business Platform — Esencial $19, Crecimiento $49 y Negocio Total $99 al mes — y lo que incluye cada uno. Todos los planes incluyen 14 días de prueba gratis. Todavía no hay cobro en línea: la prueba y la suscripción se activan con el administrador. Trading real sigue apagado y las etiquetas de simulación intactas.",

@@ -211,15 +211,26 @@ export function UsersPanel() {
       </p>
 
       {loadError && (
-        <p role="alert" className="mb-2 text-sm text-red-400">
-          {loadError}
-        </p>
+        <div role="alert" className="mb-2 flex flex-wrap items-center gap-3">
+          <p className="text-sm text-red-400">{loadError}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="min-h-[36px] rounded-lg border border-zinc-600 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          >
+            {t.misc.retry}
+          </button>
+        </div>
       )}
 
       {users === null ? (
         <p className="py-4 text-center text-sm text-zinc-400">{t.usuarios.loadingUsers}</p>
       ) : users.length === 0 ? (
-        <p className="py-4 text-center text-sm text-zinc-400">{t.usuarios.emptyUsers}</p>
+        // A5 (2026-11-10): con error de carga no se muestra el vacío: el
+        // fallo ya está anunciado arriba y "Sin usuarios todavía." mentiría.
+        loadError ? null : (
+          <p className="py-4 text-center text-sm text-zinc-400">{t.usuarios.emptyUsers}</p>
+        )
       ) : (
         <ul className="divide-y divide-zinc-800/70">
           {users.map((u) => (

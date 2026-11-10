@@ -134,11 +134,14 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 @router.get("/me")
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # H-5 (corrida 2026-11-10): is_super_admin se calcula UNA vez y se
+    # reutiliza en effective_role; antes se consultaba dos veces.
+    super_flag = is_super_admin(user, db)
     return {
         "username": user.username,
         "is_admin": user.is_admin,
-        "is_super_admin": is_super_admin(user, db),
-        "role": effective_role(user, db),
+        "is_super_admin": super_flag,
+        "role": effective_role(user, db, super_flag=super_flag),
     }
 
 

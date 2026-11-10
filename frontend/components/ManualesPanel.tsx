@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
 
 /** Manuales section, FIRST in Study and visually highlighted (sky accent,
- * the Study family color). Links to the three manual pages; it adds no
+ * the Study family color). Links to the four manual pages; it adds no
  * top-level nav entry — the manuals live under /estudiar/. */
 export function ManualesPanel() {
   const { t } = useLanguage();
@@ -13,12 +13,13 @@ export function ManualesPanel() {
     { href: "/estudiar/manual-plataforma", title: m.cardPlataformaTitle, desc: m.cardPlataformaDesc, aria: m.cardPlataformaAria },
     { href: "/estudiar/manual-invertir", title: m.cardInvertirTitle, desc: m.cardInvertirDesc, aria: m.cardInvertirAria },
     { href: "/estudiar/manual-negocio", title: m.cardNegocioTitle, desc: m.cardNegocioDesc, aria: m.cardNegocioAria },
+    { href: "/estudiar/manual-influencer", title: m.cardInfluencerTitle, desc: m.cardInfluencerDesc, aria: m.cardInfluencerAria },
   ];
   return (
     <section aria-label={m.sectionTitle} className="rounded-2xl border-2 border-sky-500/60 bg-sky-500/10 px-4 py-4 sm:px-5">
       <h2 className="text-base font-bold text-zinc-100">{m.sectionTitle}</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-300">{m.sectionIntro}</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link
             key={c.href}

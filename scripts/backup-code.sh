@@ -16,4 +16,15 @@ tar \
   --exclude='*.pyc' \
   -czf "$DEST" -C "$(dirname "$ROOT")" "$(basename "$ROOT")"
 
-echo "Respaldo creado: $DEST"
+# 2026-11-09: un respaldo que no se verifica es solo un archivo con
+# buen nombre: si el tarball sale corrupto (disco lleno, corte a mitad
+# de escritura) el fallo debe verse AHORA, no el día que haga falta
+# restaurar. Se lista el contenido y, si falla, se borra el archivo
+# corrupto para que nadie lo confunda con un respaldo válido.
+if ! tar -tzf "$DEST" >/dev/null; then
+  echo "Respaldo CORRUPTO (verificación falló): $DEST" >&2
+  rm -f "$DEST"
+  exit 1
+fi
+
+echo "Respaldo creado y verificado: $DEST"

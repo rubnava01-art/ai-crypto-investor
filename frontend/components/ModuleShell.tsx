@@ -25,7 +25,13 @@ export function ModuleShell({
   const pathname = usePathname();
   // No renderizar el contenido protegido hasta confirmar sesión: antes, los
   // paneles se montaban y disparaban llamadas sin token (flash de UI privada).
-  const [checked, setChecked] = useState(false);
+  // El token se lee de forma síncrona en el inicializador de estado (no en
+  // useEffect) para no mostrar el skeleton en cada navegación: si ya hay
+  // sesión, el shell arranca directamente con el contenido.
+  // Nota: en SSR getToken() devuelve null (sin window), así que el primer
+  // render del servidor sigue siendo el skeleton y el cliente lo sustituye
+  // al hidratar; es el coste aceptado de esta versión ligera de C-1.
+  const [checked, setChecked] = useState(() => !!getToken());
   const { t } = useLanguage();
   // Punto de familia (F13): el texto de marca queda emerald (marca), el
   // punto toma el acento de la familia de la ruta actual.
@@ -33,9 +39,9 @@ export function ModuleShell({
 
   useEffect(() => {
     // Fase 4 (FE7): preservar el destino (?next=) para volver tras el login,
-    // igual que el 401 centralizado del cliente API.
+    // igual que el 401 centralizado del cliente API. El token ya se leyó en
+    // el inicializador de estado; aquí solo queda redirigir si no hay sesión.
     if (!getToken()) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-    else setChecked(true);
   }, [router, pathname]);
 
   if (!checked) {

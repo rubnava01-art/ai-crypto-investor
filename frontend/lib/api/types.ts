@@ -609,6 +609,9 @@ export interface Invoice {
   id: number;
   number: string;
   client_name: string;
+  /** Contacto del CRM asociado, cuando el backend lo envía (v1 no lo hace:
+   * las facturas solo traen client_name y se casan por nombre). */
+  contact_id?: number | null;
   client_email: string;
   client_phone: string;
   items: InvoiceItem[];

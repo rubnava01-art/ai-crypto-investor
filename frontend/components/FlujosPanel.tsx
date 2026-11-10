@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type MeResponse } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+import { useConfirm } from "./ui";
 
 /** Flujos (2026-11-06): constructor visual de automatizaciones estilo
  * Make.com, 100 % en el navegador. Los flujos se guardan en
@@ -126,7 +127,16 @@ const TYPE_DOT: Record<FlowNodeType, string> = {
   delay: "bg-violet-400",
 };
 
-const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+/** crypto.randomUUID() con respaldo local: los IDs de nodo/arista deben ser
+ * únicos entre duplicados (M-9); Date.now()+Math.random podía colisionar. */
+const uid = () => {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch {
+    // Sin contexto seguro: cae al generador local.
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
 
 const fill = (tpl: string, vars: Record<string, string>) =>
   Object.entries(vars).reduce((s, [k, v]) => s.split(`{${k}}`).join(v), tpl);
@@ -141,6 +151,120 @@ const btnCls =
 
 const primaryBtnCls =
   "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 disabled:cursor-not-allowed disabled:opacity-50";
+
+/** Límites del validador de `grow-flows` (A-3): un volcado corrupto o
+ * manipulado no debe romper el lienzo ni colgar la UI. */
+const MAX_FLOWS = 50;
+const MAX_NODES_PER_FLOW = 200;
+const MAX_EDGES_PER_FLOW = 200;
+const MAX_TEXT_LEN = 200;
+const MAX_VALUE_LEN = 500;
+const MAX_STORAGE_BYTES = 1_000_000;
+
+const NODE_TYPES: FlowNodeType[] = ["trigger", "action", "condition", "delay"];
+
+const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isShortStr = (v: unknown, max = MAX_TEXT_LEN): v is string => typeof v === "string" && v.length <= max;
+
+/** Valida un nodo guardado: type/module/event en los vocabularios conocidos,
+ * x/y/seconds finitos y en rango (se sujetan con clamp), textos acotados.
+ * Lo inválido se descarta (devuelve null). */
+function validateNode(raw: unknown): FlowNode | null {
+  if (!raw || typeof raw !== "object") return null;
+  const n = raw as Record<string, unknown>;
+  if (!isShortStr(n.id) || n.id.trim() === "") return null;
+  if (typeof n.type !== "string" || !(NODE_TYPES as string[]).includes(n.type)) return null;
+  const type = n.type as FlowNodeType;
+  if (!isFiniteNum(n.x) || !isFiniteNum(n.y) || !isFiniteNum(n.seconds)) return null;
+  if (typeof n.module !== "string" || !(MODULE_IDS as readonly string[]).includes(n.module)) return null;
+  const module = n.module as string;
+  if (typeof n.event !== "string" || !isShortStr(n.event)) return null;
+  if (type === "trigger" && !(TRIGGER_EVENTS[module] ?? []).includes(n.event)) return null;
+  if (type === "action" && !(MODULE_ACTIONS[module] ?? []).includes(n.event)) return null;
+  if (!isShortStr(n.label) || !isShortStr(n.value, MAX_VALUE_LEN)) return null;
+  if (typeof n.field !== "string" || !CONDITION_FIELDS.includes(n.field)) return null;
+  if (typeof n.operator !== "string" || !OPERATORS.includes(n.operator)) return null;
+  return {
+    id: n.id,
+    type,
+    x: clamp(n.x, 0, CANVAS_W - NODE_W),
+    y: clamp(n.y, 0, CANVAS_H - 110),
+    module,
+    event: n.event,
+    label: n.label,
+    field: n.field,
+    operator: n.operator,
+    value: n.value,
+    seconds: clamp(n.seconds, 0, 86400),
+  };
+}
+
+function validateEdge(raw: unknown, nodeIds: Set<string>): FlowEdge | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  if (!isShortStr(e.id) || e.id.trim() === "") return null;
+  if (typeof e.from !== "string" || typeof e.to !== "string") return null;
+  if (!nodeIds.has(e.from) || !nodeIds.has(e.to)) return null;
+  return { id: e.id, from: e.from, to: e.to };
+}
+
+/** Valida la lista completa de `grow-flows`; devuelve los flujos válidos y
+ * cuántos elementos (flujos/nodos/aristas) se descartaron por inválidos. */
+function validateSavedFlows(parsed: unknown): { flows: SavedFlow[]; discarded: number } {
+  let discarded = 0;
+  // Corrección QA 2026-11-10 nº 3: si lo guardado no es un array (p. ej.
+  // `{}` o `"null"`), también cuenta como descartado para que aparezca el
+  // aviso ámbar en vez de un lienzo vacío silencioso. `null` es
+  // localStorage vacío (sin nada que avisar).
+  if (!Array.isArray(parsed)) return { flows: [], discarded: parsed === null ? 0 : 1 };
+  const flows: SavedFlow[] = [];
+  for (const raw of parsed.slice(0, MAX_FLOWS)) {
+    if (!raw || typeof raw !== "object") {
+      discarded++;
+      continue;
+    }
+    const f = raw as Record<string, unknown>;
+    if (
+      !isShortStr(f.id) ||
+      (f.id as string).trim() === "" ||
+      !isShortStr(f.name) ||
+      typeof f.updatedAt !== "string" ||
+      !Array.isArray(f.nodes) ||
+      !Array.isArray(f.edges)
+    ) {
+      discarded++;
+      continue;
+    }
+    const nodes: FlowNode[] = [];
+    const seenNodeIds = new Set<string>();
+    for (const rn of (f.nodes as unknown[]).slice(0, MAX_NODES_PER_FLOW)) {
+      const n = validateNode(rn);
+      if (!n || seenNodeIds.has(n.id)) {
+        discarded++;
+        continue;
+      }
+      seenNodeIds.add(n.id);
+      nodes.push(n);
+    }
+    if (f.nodes.length > MAX_NODES_PER_FLOW) discarded += f.nodes.length - MAX_NODES_PER_FLOW;
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const edges: FlowEdge[] = [];
+    const seenEdgeIds = new Set<string>();
+    for (const re of (f.edges as unknown[]).slice(0, MAX_EDGES_PER_FLOW)) {
+      const e = validateEdge(re, nodeIds);
+      if (!e || seenEdgeIds.has(e.id)) {
+        discarded++;
+        continue;
+      }
+      seenEdgeIds.add(e.id);
+      edges.push(e);
+    }
+    if (f.edges.length > MAX_EDGES_PER_FLOW) discarded += f.edges.length - MAX_EDGES_PER_FLOW;
+    flows.push({ id: f.id as string, name: f.name as string, nodes, edges, updatedAt: f.updatedAt as string });
+  }
+  if (parsed.length > MAX_FLOWS) discarded += parsed.length - MAX_FLOWS;
+  return { flows, discarded };
+}
 
 export function FlujosPanel() {
   const isCancelled = useCancelled();
@@ -158,7 +282,10 @@ export function FlujosPanel() {
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [simLog, setSimLog] = useState<string[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const { confirm, dialog } = useConfirm(t);
 
   const dragRef = useRef<{
     id: string;
@@ -167,6 +294,9 @@ export function FlujosPanel() {
     dy: number;
     moved: boolean;
   } | null>(null);
+  // Throttle de arrastre (C-2 ligera): como mucho 1 setNodes por frame.
+  const rafRef = useRef<number | null>(null);
+  const pendingDragRef = useRef<{ id: string; x: number; y: number } | null>(null);
 
   const typeLabel = (type: FlowNodeType) =>
     type === "trigger"
@@ -222,20 +352,26 @@ export function FlujosPanel() {
   }, [isCancelled]);
 
   // Carga inicial desde localStorage (solo navegador, sin servidor).
+  // Validación estricta (A-3): lo inválido se descarta y se avisa.
   useEffect(() => {
     let saved: SavedFlow[] = [];
+    let discarded = 0;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : null;
-      if (Array.isArray(parsed)) {
-        saved = parsed.filter(
-          (f): f is SavedFlow =>
-            !!f && typeof f === "object" && typeof (f as SavedFlow).id === "string" && Array.isArray((f as SavedFlow).nodes) && Array.isArray((f as SavedFlow).edges),
-        );
+      if (raw && raw.length > MAX_STORAGE_BYTES) {
+        // Volcado gigante o corrupto: no se intenta ni parsear.
+        discarded = 1;
+      } else {
+        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        const v = validateSavedFlows(parsed);
+        saved = v.flows;
+        discarded = v.discarded;
       }
     } catch {
       saved = [];
+      discarded = 1;
     }
+    if (discarded > 0) setLoadWarning(fill(t.flujos.invalidDiscarded, { n: String(discarded) }));
     setFlows(saved);
     if (saved.length > 0) {
       const latest = [...saved].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
@@ -253,12 +389,16 @@ export function FlujosPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const persist = (next: SavedFlow[]) => {
+  /** Devuelve false si el guardado falló (M-4): el llamador debe avisar,
+   * nunca anunciar éxito. */
+  const persist = (next: SavedFlow[]): boolean => {
     setFlows(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return true;
     } catch {
-      // Almacenamiento lleno o bloqueado: el flujo queda en memoria.
+      // Almacenamiento lleno o bloqueado: el flujo queda solo en memoria.
+      return false;
     }
   };
 
@@ -301,21 +441,23 @@ export function FlujosPanel() {
     setMsg(null);
   };
 
-  const updateNode = (id: string, patch: Partial<FlowNode>) =>
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
-
-  const deleteNode = (id: string) => {
+  const updateNode = (id: string, patch: Partial<FlowNode>) => {
     if (!isAdmin) return;
-    if (!window.confirm(t.flujos.confirmDeleteNode)) return;
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
+  };
+
+  const deleteNode = async (id: string) => {
+    if (!isAdmin) return;
+    if (!(await confirm(t.flujos.confirmDeleteNode))) return;
     setNodes((prev) => prev.filter((n) => n.id !== id));
     setEdges((prev) => prev.filter((e) => e.from !== id && e.to !== id));
     if (selectedId === id) setSelectedId(null);
     if (pendingFrom === id) setPendingFrom(null);
   };
 
-  const deleteEdge = (id: string) => {
+  const deleteEdge = async (id: string) => {
     if (!isAdmin) return;
-    if (!window.confirm(t.flujos.confirmDeleteEdge)) return;
+    if (!(await confirm(t.flujos.confirmDeleteEdge))) return;
     setEdges((prev) => prev.filter((e) => e.id !== id));
   };
 
@@ -349,16 +491,47 @@ export function FlujosPanel() {
     const nx = clamp(e.clientX - d.dx, 0, CANVAS_W - NODE_W);
     const ny = clamp(e.clientY - d.dy, 0, CANVAS_H - 110);
     if (Math.abs(nx - node.x) + Math.abs(ny - node.y) > 4) d.moved = true;
-    if (d.moved) updateNode(node.id, { x: nx, y: ny });
+    if (!d.moved) return;
+    // Throttle con requestAnimationFrame: guardar la última posición y
+    // aplicar como mucho 1 setNodes por frame, no 1 por evento.
+    pendingDragRef.current = { id: node.id, x: nx, y: ny };
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const p = pendingDragRef.current;
+      pendingDragRef.current = null;
+      if (p) updateNode(p.id, { x: p.x, y: p.y });
+    });
+  };
+
+  // Al soltar, aplicar la última posición pendiente para no perder el
+  // tramo final del arrastre (el frame siguiente no llegaría).
+  const flushPendingDrag = () => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    const p = pendingDragRef.current;
+    pendingDragRef.current = null;
+    if (p) updateNode(p.id, { x: p.x, y: p.y });
   };
 
   const onNodePointerUp = (e: React.PointerEvent<HTMLDivElement>, node: FlowNode) => {
     const d = dragRef.current;
     if (d && d.id === node.id && d.pointerId === e.pointerId) {
       if (!d.moved) setSelectedId(node.id);
+      else flushPendingDrag();
       dragRef.current = null;
     }
   };
+
+  // Si el panel se desmonta a mitad de arrastre, no dejar un frame vivo.
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
 
   const edgePath = (a: FlowNode, b: FlowNode) => {
     const x1 = a.x + NODE_W;
@@ -368,6 +541,22 @@ export function FlujosPanel() {
     const dx = Math.max(40, Math.abs(x2 - x1) / 2);
     return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   };
+
+  // Mapa id→nodo y trazado de cada arista, memoizados: el render del lienzo
+  // ya no hace find() lineal ni recalcula el `d` dos veces por arista.
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const edgePaths = useMemo(
+    () =>
+      edges
+        .map((e) => {
+          const a = nodeById.get(e.from);
+          const b = nodeById.get(e.to);
+          return a && b ? { id: e.id, d: edgePath(a, b) } : null;
+        })
+        .filter((x): x is { id: string; d: string } => x !== null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges, nodeById],
+  );
 
   const newFlow = () => {
     if (!isAdmin) return;
@@ -380,6 +569,7 @@ export function FlujosPanel() {
     setPendingFrom(null);
     setSimLog([]);
     setMsg(null);
+    setSaveError(null);
   };
 
   const saveFlow = () => {
@@ -389,7 +579,11 @@ export function FlujosPanel() {
     const id = currentId ?? uid();
     const flow: SavedFlow = { id, name, nodes, edges, updatedAt: now };
     const next = currentId ? flows.map((f) => (f.id === currentId ? flow : f)) : [...flows, flow];
-    persist(next);
+    if (!persist(next)) {
+      setSaveError(t.flujos.msgSaveFailed);
+      return;
+    }
+    setSaveError(null);
     setCurrentId(id);
     setFlowName(name);
     setMsg(fill(t.flujos.msgSaved, { nombre: name }));
@@ -404,20 +598,43 @@ export function FlujosPanel() {
     setPendingFrom(null);
     setSimLog([]);
     setMsg(null);
+    setSaveError(null);
   };
 
   const duplicateFlow = (f: SavedFlow) => {
     if (!isAdmin) return;
     const name = `${f.name}${t.flujos.copySuffix}`;
-    const copy: SavedFlow = { id: uid(), name, nodes: f.nodes, edges: f.edges, updatedAt: new Date().toISOString() };
-    persist([...flows, copy]);
+    // Clonación profunda con IDs nuevos (M-9): la copia no comparte nodos
+    // ni aristas con el original; se remapean from/to a los nuevos IDs.
+    const idMap = new Map<string, string>();
+    const nodes = f.nodes.map((n) => {
+      const id = uid();
+      idMap.set(n.id, id);
+      return { ...n, id };
+    });
+    const edges = f.edges.map((e) => ({
+      ...e,
+      id: uid(),
+      from: idMap.get(e.from) ?? e.from,
+      to: idMap.get(e.to) ?? e.to,
+    }));
+    const copy: SavedFlow = { id: uid(), name, nodes, edges, updatedAt: new Date().toISOString() };
+    if (!persist([...flows, copy])) {
+      setSaveError(t.flujos.msgSaveFailed);
+      return;
+    }
+    setSaveError(null);
     setMsg(fill(t.flujos.msgDuplicated, { nombre: name }));
   };
 
-  const removeFlow = (f: SavedFlow) => {
+  const removeFlow = async (f: SavedFlow) => {
     if (!isAdmin) return;
-    if (!window.confirm(fill(t.flujos.confirmDeleteFlow, { nombre: f.name }))) return;
-    persist(flows.filter((x) => x.id !== f.id));
+    if (!(await confirm(fill(t.flujos.confirmDeleteFlow, { nombre: f.name })))) return;
+    if (!persist(flows.filter((x) => x.id !== f.id))) {
+      setSaveError(t.flujos.msgSaveFailed);
+      return;
+    }
+    setSaveError(null);
     if (currentId === f.id) newFlow();
     setMsg(fill(t.flujos.msgDeleted, { nombre: f.name }));
   };
@@ -480,6 +697,7 @@ export function FlujosPanel() {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <Panel title={t.flujos.panelTitle}>
         <p className="text-sm leading-relaxed text-zinc-400">
           {t.flujos.intro}
@@ -513,6 +731,16 @@ export function FlujosPanel() {
         {msg && (
           <p role="status" className="mt-3 text-sm text-emerald-400">
             {msg}
+          </p>
+        )}
+        {saveError && (
+          <p role="alert" className="mt-3 text-sm text-red-400">
+            {saveError}
+          </p>
+        )}
+        {loadWarning && (
+          <p role="alert" className="mt-3 rounded-lg border border-amber-800/60 bg-amber-500/10 px-3 py-2.5 text-sm font-semibold text-amber-300">
+            {loadWarning}
           </p>
         )}
         {!loaded ? (
@@ -597,26 +825,21 @@ export function FlujosPanel() {
                     <path d="M0 0L10 5L0 10z" fill="#71717a" />
                   </marker>
                 </defs>
-                {edges.map((e) => {
-                  const a = nodes.find((n) => n.id === e.from);
-                  const b = nodes.find((n) => n.id === e.to);
-                  if (!a || !b) return null;
-                  return (
-                    <g key={e.id}>
-                      <path d={edgePath(a, b)} fill="none" stroke="#52525b" strokeWidth={2} markerEnd="url(#flujos-arrow)" />
-                      <path
-                        d={edgePath(a, b)}
-                        fill="none"
-                        stroke="transparent"
-                        strokeWidth={14}
-                        className="pointer-events-auto cursor-pointer"
-                        onClick={() => deleteEdge(e.id)}
-                      >
-                        <title>{t.flujos.edgeDeleteTitle}</title>
-                      </path>
-                    </g>
-                  );
-                })}
+                {edgePaths.map((ep) => (
+                  <g key={ep.id}>
+                    <path d={ep.d} fill="none" stroke="#52525b" strokeWidth={2} markerEnd="url(#flujos-arrow)" />
+                    <path
+                      d={ep.d}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={14}
+                      className="pointer-events-auto cursor-pointer"
+                      onClick={() => deleteEdge(ep.id)}
+                    >
+                      <title>{t.flujos.edgeDeleteTitle}</title>
+                    </path>
+                  </g>
+                ))}
               </svg>
 
               {nodes.map((node) => (
@@ -658,30 +881,37 @@ export function FlujosPanel() {
                   </div>
                   <p className="mt-2 truncate text-sm font-semibold text-zinc-100">{node.label}</p>
                   <p className="mt-0.5 break-words text-xs leading-snug text-zinc-400">{nodeSubtitle(node)}</p>
+                  {/* Puerto de entrada: zona táctil de 44 px (hit-area
+                      invisible mayor); el punto visible sigue en 14 px,
+                      centrado en el mismo punto (x=0, y=34). */}
                   <button
                     type="button"
                     aria-label={t.flujos.portInAria}
                     title={t.flujos.portInAria}
-                    className={`absolute -left-[7px] top-[27px] h-3.5 w-3.5 rounded-full border-2 border-zinc-950 ${pendingFrom ? "bg-sky-400" : "bg-zinc-400"} hover:bg-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed`}
+                    className="group absolute -left-[22px] top-[12px] flex h-11 w-11 items-center justify-center rounded-full bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       onInPort(node);
                     }}
                     disabled={!isAdmin}
-                  />
+                  >
+                    <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-full border-2 border-zinc-950 ${pendingFrom ? "bg-sky-400" : "bg-zinc-400"} group-hover:bg-sky-300`} />
+                  </button>
                   <button
                     type="button"
                     aria-label={t.flujos.portOutAria}
                     title={t.flujos.portOutAria}
-                    className={`absolute -right-[7px] top-[27px] h-3.5 w-3.5 rounded-full border-2 border-zinc-950 ${pendingFrom === node.id ? "bg-amber-400" : "bg-zinc-400"} hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 disabled:cursor-not-allowed`}
+                    className="group absolute -right-[22px] top-[12px] flex h-11 w-11 items-center justify-center rounded-full bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 disabled:cursor-not-allowed"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       onOutPort(node);
                     }}
                     disabled={!isAdmin}
-                  />
+                  >
+                    <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-full border-2 border-zinc-950 ${pendingFrom === node.id ? "bg-amber-400" : "bg-zinc-400"} group-hover:bg-amber-300`} />
+                  </button>
                 </div>
               ))}
             </div>

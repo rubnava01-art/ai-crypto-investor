@@ -36,6 +36,11 @@ class RateLimiter:
         q.append(now)
         return True
 
+    def clear(self) -> None:
+        """Vaciar todos los contadores (solo para tests: la suite comparte
+        un único proceso y un test de ráfaga no debe bloquear los demás)."""
+        self._hits.clear()
+
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
@@ -52,6 +57,12 @@ auditor_limiter = RateLimiter(max_requests=60, window_seconds=60)
 strategy_limiter = RateLimiter(max_requests=60, window_seconds=60)
 tendencias_limiter = RateLimiter(max_requests=60, window_seconds=60)
 market_limiter = RateLimiter(max_requests=60, window_seconds=60)
+
+# Corrida 2026-11-10 (M-1, Agente 3): Correos no tenía límite ni en
+# escrituras ni en lecturas; un bucle con cuerpos de 20 KB llenaba la
+# BD sin freno. 30/min por usuario, como backtest (generoso para el uso
+# normal de un solo dueño).
+correos_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
 
 class LoginLockout:

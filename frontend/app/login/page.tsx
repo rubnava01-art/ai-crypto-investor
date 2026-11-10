@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken, ApiError } from "../../lib/api";
@@ -56,6 +56,15 @@ function LoginPageInner() {
       setChallenge(null);
     }
   }, []);
+
+  // Precargar el reto anti-bots al montar la página, no solo al cambiar a
+  // "registro": así el primer clic en "Crear cuenta" ya tiene la pregunta
+  // (o un spinner) en vez de texto plano. El reto NO se cachea en cliente:
+  // cada llamada pide uno nuevo al servidor (B3) y un registro fallido lo
+  // renueva.
+  useEffect(() => {
+    loadChallenge();
+  }, [loadChallenge]);
 
   function switchMode(m: "login" | "register") {
     setMode(m);
@@ -215,9 +224,17 @@ function LoginPageInner() {
             <span className="mb-1.5 block text-sm font-semibold text-zinc-700">
               {t.login.verificationLabel}
             </span>
-            <p className="mb-2 text-sm text-zinc-900">
-              {challenge ? challenge.question : t.login.verificationLoading}
-            </p>
+            {challenge ? (
+              <p className="mb-2 text-sm text-zinc-900">{challenge.question}</p>
+            ) : (
+              <p role="status" className="mb-2 flex items-center gap-2 text-sm text-zinc-500">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                  <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+                </svg>
+                {t.login.verificationLoading}
+              </p>
+            )}
             <div className="flex gap-2">
               <input aria-label={t.login.answerPlaceholder}
                 className={inputCls}
@@ -259,7 +276,7 @@ function LoginPageInner() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (mode === "register" && !challenge)}
           className="flex w-full items-center justify-center gap-2 rounded-none bg-blue-600 px-3 py-3 text-[15px] font-bold uppercase tracking-wide text-white transition hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50"
         >
           {loading && (

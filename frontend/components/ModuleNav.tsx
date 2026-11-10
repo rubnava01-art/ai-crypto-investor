@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { useLanguage, type NavKey } from "../lib/i18n";
 
@@ -293,6 +293,7 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/perfil": "perfil",
   "/usuarios": "usuarios",
   "/ajustador": "ajustador",
+  "/terminal": "terminal",
   "/flujos": "flujos",
   "/planes": "planes",
 };
@@ -382,8 +383,13 @@ export function familyForHref(href: string): string {
 export function ModuleNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  // La entrada de Control de usuarios solo se muestra a administradores.
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Rol tri-estado (corrección QA 2026-11-10 nº 1, fail-closed): mientras
+  // /me resuelve, el rol es "loading" y las entradas adminOnly NO se
+  // muestran — solo aparecen cuando /me confirma "admin". Un usuario
+  // "prueba" no ve las entradas admin ni un instante durante la carga. Si
+  // /me falla, se asume "prueba" (tampoco se muestra lo admin).
+  const [role, setRole] = useState<"loading" | "admin" | "prueba">("loading");
+  const isAdmin = role === "admin";
   // Móvil: solo la familia de la ruta actual empieza abierta.
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const o: Record<string, boolean> = {};
@@ -392,49 +398,74 @@ export function ModuleNav() {
     });
     return o;
   });
+  // Sincronizar los grupos colapsables con la ruta: al navegar, abrir la
+  // familia destino sin cerrar las que el usuario abrió a mano.
+  useEffect(() => {
+    setOpen((prev) => {
+      const next = { ...prev };
+      GROUPS.forEach((g) => {
+        if (g.hrefs.includes(pathname)) next[g.key] = true;
+      });
+      return next;
+    });
+  }, [pathname]);
   useEffect(() => {
     api
       .me()
-      .then((m) => setIsAdmin(m.is_admin))
-      .catch(() => setIsAdmin(false));
+      .then((m) => setRole(m.is_admin ? "admin" : "prueba"))
+      .catch(() => setRole("prueba"));
   }, []);
 
-  const visible = MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin);
-  const byHref = new Map(visible.map((m) => [m.href, m]));
+  const visible = useMemo(
+    () => MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin),
+    [isAdmin],
+  );
+  const byHref = useMemo(() => new Map(visible.map((m) => [m.href, m])), [visible]);
   // Inicio es un botón independiente, no parte de ninguna familia.
   const inicio = byHref.get("/inicio");
 
-  const link = (m: (typeof MODULES)[number]) => {
-    const navText = t.nav[KEY_BY_HREF[m.href]];
-    const label = navText?.label ?? m.label;
-    const hint = navText?.hint ?? m.hint;
-    const active = pathname === m.href;
-    const accent = FAMILY_ACCENT[familyForHref(m.href)] ?? FAMILY_ACCENT.invertir;
-    return (
-      <Link
-        key={m.href}
-        href={m.href}
-        aria-current={active ? "page" : undefined}
-        className={
-          active
-            ? `flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg ${accent.active} px-4 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-inset transition-colors`
-            : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
-        }
-      >
-        {m.icon}
-        {label}
-        <span className={`hidden text-xs font-normal sm:inline ${active ? accent.hint : "text-zinc-400"}`}>
-          {hint}
-        </span>
-      </Link>
-    );
-  };
+  const link = useCallback(
+    (m: (typeof MODULES)[number]) => {
+      const navText = t.nav[KEY_BY_HREF[m.href]];
+      const label = navText?.label ?? m.label;
+      const hint = navText?.hint ?? m.hint;
+      const active = pathname === m.href;
+      const accent = FAMILY_ACCENT[familyForHref(m.href)] ?? FAMILY_ACCENT.invertir;
+      return (
+        <Link
+          key={m.href}
+          href={m.href}
+          aria-current={active ? "page" : undefined}
+          className={
+            active
+              ? `flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg ${accent.active} px-4 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-inset transition-colors`
+              : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
+          }
+        >
+          {m.icon}
+          {label}
+          <span className={`hidden text-xs font-normal sm:inline ${active ? accent.hint : "text-zinc-400"}`}>
+            {hint}
+          </span>
+        </Link>
+      );
+    },
+    [pathname, t],
+  );
 
   return (
     <nav aria-label={t.header.navAria}>
       {/* Inicio: botón independiente siempre visible (móvil y escritorio),
           encima de las familias — nunca dentro de un grupo colapsable. */}
       {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
+      {/* Mientras /me resuelve, indicador neutro (fail-closed): no se
+          listan entradas admin ni se habla de "solo lectura"; las entradas
+          adminOnly aparecen solo cuando /me confirma admin. */}
+      {role === "loading" && (
+        <p role="status" className="px-1 py-2 text-xs text-zinc-500">
+          {t.nav.checkingRole}
+        </p>
+      )}
       {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
       <div className="space-y-2 sm:hidden">
         {GROUPS.map((g) => {

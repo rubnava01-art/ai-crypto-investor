@@ -13,17 +13,34 @@ Two pieces, both admin-written:
 Permissions: any authenticated user reads; only admins write/delete
 (require_admin -> 403 for prueba), mirroring the other modules.
 """
+import re
+
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import correos_limiter
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
-from app.models.tables import EmailLog, EmailTemplate, User
+from app.models.tables import Contact, EmailLog, EmailTemplate, User
 
 router = APIRouter(prefix="/api/correos", tags=["correos"])
 
 LOG_STATUSES = ("preparado", "enviado")
+
+# M-2 (corrida 2026-11-10): formato de email cuando no está vacío.
+# Regex simple (sin dependencia email-validator): local@domino.tld.
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def _check_correos_limit(user: User) -> None:
+    """M-1 (corrida 2026-11-10): limiter por USUARIO en Correos
+    (30/min), mismo patrón que market/strategy/backtest."""
+    if not correos_limiter.allow(f"correos:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas consultas de Correos. Espera un minuto.",
+        )
 
 
 class EmailTemplateOut(BaseModel):
@@ -59,6 +76,23 @@ class EmailLogCreate(BaseModel):
     template_name: str = Field(default="", max_length=200)
     subject: str = Field(default="", max_length=300)
     body: str = Field(default="", max_length=20000)
+
+    @field_validator("contact_email")
+    @classmethod
+    def _valid_email(cls, v: str) -> str:
+        # M-2: formato válido cuando no está vacío (vacío = sin email).
+        v = (v or "").strip()
+        if v and not _EMAIL_RE.match(v):
+            raise ValueError("contact_email no tiene un formato de email válido.")
+        return v
+
+    @field_validator("subject", "body")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        # M-2: asunto y cuerpo no vacíos, igual que exige el frontend.
+        if not (v or "").strip():
+            raise ValueError("no puede estar vacío.")
+        return v
 
 
 class EmailLogStatusUpdate(BaseModel):
@@ -98,6 +132,7 @@ def list_templates(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(user)
     rows = db.query(EmailTemplate).order_by(EmailTemplate.id.desc()).offset(offset).limit(limit).all()
     return [_tpl_out(r) for r in rows]
 
@@ -108,6 +143,7 @@ def create_template(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(admin)
     row = EmailTemplate(
         name=payload.name.strip(), subject=payload.subject, body=payload.body
     )
@@ -123,6 +159,7 @@ def delete_template(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(admin)
     row = db.get(EmailTemplate, tpl_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -140,6 +177,7 @@ def list_logs(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(user)
     rows = db.query(EmailLog).order_by(EmailLog.id.desc()).offset(offset).limit(limit).all()
     return [_log_out(r) for r in rows]
 
@@ -150,6 +188,14 @@ def create_log(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(admin)
+    # M-2: contact_id debe existir cuando no es null (sin FK en la
+    # tabla, se verifica aquí para no dejar logs huérfanos).
+    if payload.contact_id is not None and db.get(Contact, payload.contact_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="contact_id no corresponde a ningún contacto.",
+        )
     row = EmailLog(
         contact_id=payload.contact_id,
         contact_name=payload.contact_name.strip(),
@@ -172,6 +218,7 @@ def update_log_status(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(admin)
     if payload.status not in LOG_STATUSES:
         raise HTTPException(status_code=422, detail=f"status must be one of: {', '.join(LOG_STATUSES)}")
     row = db.get(EmailLog, log_id)
@@ -189,6 +236,7 @@ def delete_log(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _check_correos_limit(admin)
     row = db.get(EmailLog, log_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Email log not found")

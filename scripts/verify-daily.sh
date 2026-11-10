@@ -14,6 +14,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "== git: diff --check =="
 (cd "$ROOT" && git diff --check && git diff --cached --check)
 
+# 2026-11-07: paridad ES/EN de los diccionarios i18n. Las secciones
+# Record<string,string> no las verifica tsc: una clave ausente se
+# renderiza como `undefined` sin fallar el build.
+echo "== i18n: paridad es/en =="
+(cd "$ROOT" && node --no-warnings scripts/check-i18n-parity.mjs)
+
 echo "== backend: pytest =="
 (cd "$ROOT/backend" && .venv/bin/python -m pytest tests -q)
 

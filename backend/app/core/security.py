@@ -116,11 +116,20 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
+    # H-5 (corrida 2026-11-10): usuario + fila de pendiente en UNA sola
+    # consulta (outerjoin). Antes eran dos SELECT por petición
+    # autenticada; las comprobaciones son las mismas, solo viajan juntas.
+    row = (
+        db.query(User, PendingActivation)
+        .outerjoin(PendingActivation, PendingActivation.user_id == User.id)
+        .filter(User.username == username)
+        .first()
+    )
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
+    user, pending = row
     # A token naming a different user id than the resolved user is
     # forged or recycled (username re-created): reject it. Legacy
     # sub-only tokens carry no user_id and skip this check.
@@ -138,12 +147,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revocado."
         )
     # Pending accounts see nothing, even with a token in hand (M1).
-    if (
-        db.query(PendingActivation)
-        .filter(PendingActivation.user_id == user.id)
-        .first()
-        is not None
-    ):
+    if pending is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail=PENDING_DETAIL
         )
@@ -183,8 +187,15 @@ def require_super_admin(
     return user
 
 
-def effective_role(user: User, db: Session) -> str:
-    """Display role: super_admin > admin > prueba."""
-    if is_super_admin(user, db):
+def effective_role(user: User, db: Session, super_flag: bool | None = None) -> str:
+    """Display role: super_admin > admin > prueba.
+
+    `super_flag` reuses an already-computed is_super_admin() result so a
+    caller that already asked (p. ej. /me) no paga la misma consulta dos
+    veces; cuando es None se consulta como antes.
+    """
+    if super_flag is None:
+        super_flag = is_super_admin(user, db)
+    if super_flag:
         return "super_admin"
     return "admin" if user.is_admin else "prueba"

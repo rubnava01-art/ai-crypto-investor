@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
 
-/** Pager anterior/siguiente entre los 3 manuales de Estudiar
+/** Pager anterior/siguiente entre los 4 manuales de Estudiar
  * (2026-11-05): es la alternativa visible y de teclado del swipe
  * entre manuales. En los extremos el botón sin destino NO se renderiza
  * (mejor que `disabled`: evita un botón muerto al final de una lectura
- * larga). Orden: plataforma → invertir → negocio. */
+ * larga). Orden: plataforma → invertir → negocio → influencer. */
 
 interface ManualPagerProps {
   prevHref?: string;
