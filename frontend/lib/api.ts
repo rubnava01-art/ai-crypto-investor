@@ -4,6 +4,7 @@
 // (timeout, token, 401, reintentos) en lib/api/client.ts.
 export * from "./api/types";
 export * from "./api/client";
+export * from "./api/market";
 import { systemApi } from "./api/system";
 import { usersApi } from "./api/users";
 import { crmApi } from "./api/crm";
@@ -11,6 +12,7 @@ import { academyApi } from "./api/academy";
 import { crearApi } from "./api/crear";
 import { espacioApi } from "./api/espacio";
 import { facturasApi } from "./api/facturas";
+import { marketApi } from "./api/market";
 import { clasesApi } from "./api/clases";
 import { correosApi } from "./api/correos";
 import { referidosApi } from "./api/referidos";
@@ -28,6 +30,7 @@ import { privacidadApi } from "./api/privacidad";
 
 export const api = {
   ...systemApi,
+  ...marketApi,
   ...usersApi,
   ...crmApi,
   ...academyApi,

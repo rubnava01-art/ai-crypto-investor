@@ -9,9 +9,10 @@ Permissions: any authenticated user reads; only admins write/delete
 (require_admin -> 403 for prueba), mirroring the other modules.
 """
 import datetime as dt
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
@@ -21,6 +22,13 @@ from app.models.tables import EduClass, User
 router = APIRouter(prefix="/api/clases", tags=["clases"])
 
 KINDS = ("grabada", "envivo")
+
+# URL allowlist (E3, 2026-11-10): solo esquemas http/https. Vacía = opcional.
+# Sin esquema (p. ej. "zoom.us/j/123") se RECHAZA con 422: la normalización
+# ("https://" si falta esquema) vive en el frontend, que es quien la
+# presenta al usuario; el backend solo valida el esquema cuando está
+# presente. Contratos simples: vacía o URL absoluta http(s).
+ALLOWED_URL_SCHEMES = ("http", "https")
 
 
 class EduClassOut(BaseModel):
@@ -41,6 +49,17 @@ class EduClassCreate(BaseModel):
     url: str = Field(default="", max_length=500)
     scheduled_at: str | None = None  # ISO datetime
     duration_min: int | None = Field(default=None, gt=0)
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, v: str) -> str:
+        url = (v or "").strip()
+        if not url:
+            return ""
+        parsed = urlparse(url)
+        if parsed.scheme not in ALLOWED_URL_SCHEMES or not parsed.netloc:
+            raise ValueError("url must be empty or an absolute http:// or https:// URL")
+        return url
 
 
 def _class_out(c: EduClass) -> EduClassOut:

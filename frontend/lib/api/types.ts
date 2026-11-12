@@ -135,6 +135,79 @@ export interface MarketPricesResponse {
   prices: CoinPrice[];
 }
 
+// ---------- Mercado: velas, ticker e indicadores (Clases, 2026-11-10) ----------
+// El backend devuelve OHLCV como CADENAS (CandleOut) y `last` como cadena
+// o null (TickerResponse); el frontend los parsea a número aquí, en la
+// frontera del cliente, y descarta las velas con OHLC no numérico en vez
+// de inventar un valor. Un 503 significa "sin datos" (sin velas o sin
+// suficientes velas): nunca se muestra un precio o una gráfica inventados.
+
+/** Vela tal como la devuelve el backend (cadenas). */
+export interface MarketCandleRaw {
+  open_time_utc: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+}
+
+/** Vela ya parseada a número (lista para graficar). */
+export interface MarketCandle {
+  openTimeUtc: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface MarketCandlesResponse {
+  symbol: string;
+  timeframe: string;
+  source: string;
+  updated_utc: string;
+  stale: boolean;
+  newest_candle_utc: string;
+  candles: MarketCandle[];
+}
+
+export interface MarketTickerResponse {
+  symbol: string;
+  last: number | null;
+  source: string;
+  updated_utc: string;
+  stale: boolean;
+}
+
+export interface MacdOut {
+  macd_line: number | null;
+  signal_line: number | null;
+  histogram: number | null;
+}
+
+export interface MarketIndicators {
+  rsi_14: number | null;
+  macd: MacdOut | null;
+  sma_20: number | null;
+  sma_50: number | null;
+  ema_20: number | null;
+  volatility_20: number | null;
+  volume_sma_20: number | null;
+  last_close: number | null;
+  n_candles: number;
+}
+
+export interface MarketIndicatorsResponse {
+  symbol: string;
+  timeframe: string;
+  source: string;
+  updated_utc: string;
+  stale: boolean;
+  newest_candle_utc: string;
+  indicators: MarketIndicators;
+}
+
 export interface MeResponse {
   username: string;
   is_admin: boolean;

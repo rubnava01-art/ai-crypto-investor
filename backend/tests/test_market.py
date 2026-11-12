@@ -75,6 +75,68 @@ def test_candles_rejects_nonpositive_limit(client, auth_headers):
         assert r.status_code == 422, (bad, r.text)
 
 
+def test_market_rejects_malformed_symbol(client, auth_headers):
+    # 2026-11-11: el símbolo se valida (formato BASE/COTIZACIÓN) antes
+    # de tocar la BD, el exchange, la caché o el limitador: un símbolo
+    # mal formado es 422 inmediato, no un 503 tras intentar la red.
+    # "FAKE/USD" sigue siendo 503 (formato válido, sin datos): ver
+    # test_candles_empty_db_is_503.
+    for bad in (
+        "",
+        "BTCUSD",  # sin barra
+        "BTC/USD/EXTRA",
+        "BTC/",
+        "/USD",
+        "B/USD",  # base de 1 letra
+        "BTC/USD;DROP",
+        "X" * 40 + "/USD",  # base demasiado larga
+    ):
+        for url in (
+            f"/api/market/candles?symbol={bad}",
+            f"/api/market/ticker?symbol={bad}",
+            f"/api/market/indicators?symbol={bad}",
+        ):
+            r = client.get(url, headers=auth_headers)
+            assert r.status_code == 422, (bad, url, r.text)
+        r = client.post(f"/api/market/ingest?symbol={bad}", headers=auth_headers)
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_market_symbol_is_normalized_to_uppercase(client, auth_headers):
+    # 2026-11-11: "btc/usd" encontraba 0 velas (el filtro de la BD es
+    # exacto) y creaba su propia entrada de caché de ticker: ahora se
+    # normaliza a BTC/USD antes de consultar nada.
+    import app.api.market as market_mod
+
+    market_mod._TICKER_CACHE.clear()
+    try:
+        fake_rows = [
+            [1700000000000 + i * 3600000, 100 + i, 101 + i, 99 + i, 100.5 + i, 10 + i]
+            for i in range(50)
+        ]
+        with patch("app.data.exchanges.fetch_ohlcv", return_value=fake_rows):
+            r = client.post(
+                "/api/market/ingest?symbol=BTC/USD&timeframe=1h", headers=auth_headers
+            )
+        assert r.status_code == 200, r.text
+
+        r = client.get(
+            "/api/market/candles?symbol=btc/usd&timeframe=1h", headers=auth_headers
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["symbol"] == "BTC/USD"
+
+        with patch(
+            "app.data.exchanges.fetch_ticker", return_value={"last": 50000}
+        ) as fetch:
+            r = client.get("/api/market/ticker?symbol=btc/usd", headers=auth_headers)
+        assert r.status_code == 200, r.text
+        assert r.json()["symbol"] == "BTC/USD"
+        fetch.assert_called_once_with("kraken", "BTC/USD")
+    finally:
+        market_mod._TICKER_CACHE.clear()
+
+
 def test_market_rejects_unsupported_exchange(client, auth_headers):
     # Antes un exchange inventado caía en 503 tras intentar la red
     # (en /prices, tras 4 tickers + 4 OHLCV fallidos); ahora es 422
