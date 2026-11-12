@@ -195,6 +195,9 @@ export function UsersPanel() {
     }
   };
 
+  // Cuentas pendientes: solo presentación, derivada de la lista ya cargada.
+  const pendingCount = (users ?? []).filter((u) => u.status === "pending").length;
+
   return (
     <>
       {dialog}
@@ -206,9 +209,25 @@ export function UsersPanel() {
         </span>
       }
     >
-      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
-        <strong className="text-zinc-300">{t.usuarios.introSuperLabel}</strong>{t.usuarios.introSuperBody}<strong className="text-zinc-300">{t.usuarios.introAdminLabel}</strong>{t.usuarios.introAdminBody}<strong className="text-zinc-300">{t.usuarios.introTrialLabel}</strong>{t.usuarios.introTrialBody}<strong className="text-zinc-300">{t.usuarios.introNewLabel}</strong>{t.usuarios.introNewBody}<strong className="text-zinc-300">{t.usuarios.introKeysLabel}</strong>{t.usuarios.introKeysBody}
-      </p>
+      {/* Cómo funciona el acceso (2026-11-12): la misma información de
+       * antes, ahora como lista por tema — cuentas nuevas primero, que es
+       * lo que el admin revisa a diario — en vez de un solo párrafo. Sin
+       * cambios de lógica ni de permisos. */}
+      <div className="mb-4">
+        <p className="mb-2 text-sm font-semibold text-zinc-200">{t.usuarios.introTitle}</p>
+        <ul className="space-y-1.5 text-sm leading-relaxed text-zinc-400">
+          <li><strong className="text-zinc-300">{t.usuarios.introNewLabel}</strong>{t.usuarios.introNewBody}</li>
+          <li><strong className="text-zinc-300">{t.usuarios.introTrialLabel}</strong>{t.usuarios.introTrialBody}</li>
+          <li><strong className="text-zinc-300">{t.usuarios.introAdminLabel}</strong>{t.usuarios.introAdminBody}</li>
+          <li><strong className="text-zinc-300">{t.usuarios.introSuperLabel}</strong>{t.usuarios.introSuperBody}</li>
+          <li><strong className="text-zinc-300">{t.usuarios.introKeysLabel}</strong>{t.usuarios.introKeysBody}</li>
+        </ul>
+        {users !== null && pendingCount > 0 && (
+          <p role="status" className="mt-3 inline-block rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-400">
+            {t.usuarios.pendingCount.replace("{n}", String(pendingCount))}
+          </p>
+        )}
+      </div>
 
       {loadError && (
         <div role="alert" className="mb-2 flex flex-wrap items-center gap-3">

@@ -64,6 +64,31 @@ def test_evaluate_with_stale_candles_is_503_and_persists_nothing(
     assert _signals_for(client, auth_headers, "STALE/USD") == []
 
 
+def test_evaluate_rejects_malformed_symbol(client, auth_headers):
+    # 2026-11-12: misma validación que /api/market (2026-11-11): 422
+    # antes de tocar la BD o el limitador; "FAKE/USD" sigue siendo 503
+    # (formato válido, sin datos): ver test_candles_empty_db_is_503.
+    for bad in ("", "BTCUSD", "BTC/USD/EXTRA", "BTC/", "/USD", "B/USD"):
+        r = client.post(
+            f"/api/strategy/evaluate?symbol={bad}&timeframe=1h",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_evaluate_symbol_is_normalized_to_uppercase(client, auth_headers):
+    # 2026-11-12: "norm/usd" encontraba 0 velas (el filtro de la BD es
+    # exacto): ahora se normaliza a NORM/USD antes de consultar nada.
+    now = time.time()
+    _seed(client, auth_headers, "NORM/USD", now)
+    r = client.post(
+        "/api/strategy/evaluate?symbol=norm/usd&timeframe=1h",
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["symbol"] == "NORM/USD"
+
+
 def test_timeframe_seconds_parsing():
     assert _timeframe_seconds("15m") == 900
     assert _timeframe_seconds("1h") == 3600

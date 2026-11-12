@@ -109,6 +109,10 @@ export type Dictionary = {
   flujos: Record<string, string>;
   // Planes (precios de suscripción, aprobados por Rubén 2026-11-06).
   planes: Record<string, string>;
+  // Landing pública, menú público y página de contacto (2026-11-12).
+  landing: Record<string, string>;
+  publicNav: Record<string, string>;
+  contacto: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
   estudiarGestos: Record<string, string>;
   reliability: Record<string, string>;

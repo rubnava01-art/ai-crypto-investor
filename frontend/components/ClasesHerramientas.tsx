@@ -48,6 +48,23 @@ function SectionTitle({ children }: { children: ReactNode }) {
   return <h3 className="mb-2 mt-5 text-sm font-semibold text-zinc-100 first:mt-0">{children}</h3>;
 }
 
+/** Tarjeta de una herramienta: número de orden + título a primera vista
+ * (2026-11-12): las 5 herramientas vivían en un solo flujo sin
+ * separación visual; cada una tiene ahora su propia tarjeta y el índice
+ * de salto del panel enlaza a su ancla. */
+function ToolCard({ id, num, title, badge, children }: { id: string; num: string; title: string; badge?: ReactNode; children: ReactNode }) {
+  return (
+    <section id={id} aria-label={title} className="scroll-mt-24 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-xs font-bold text-white">{num}</span>
+        <h3 className="min-w-0 flex-1 text-sm font-semibold text-zinc-100">{title}</h3>
+        {badge}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function LiveBadge({ live, liveLabel, staleLabel }: { live: boolean; liveLabel: string; staleLabel: string }) {
   return (
     <span
@@ -78,8 +95,7 @@ function CompoundCalculator() {
   const rateReady = rate.trim() !== "" && Number.isFinite(r);
   const result = valid && rateReady ? p * Math.pow(1 + r / 100, n) : null;
   return (
-    <div data-no-swipe>
-      <SectionTitle>{t.clases.calcTitle}</SectionTitle>
+    <ToolCard id="herramienta-calculadora" num="1" title={t.clases.calcTitle}>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <label className="text-xs text-zinc-400">{t.clases.calcInitial}
           <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="0" step="any" inputMode="decimal" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="1000" />
@@ -102,7 +118,7 @@ function CompoundCalculator() {
         <p className="mt-2 text-sm text-zinc-400">{principal.trim() === "" && rate.trim() === "" ? t.clases.calcEnterAll : t.clases.calcInvalid}</p>
       )}
       <p className="mt-1.5 text-xs font-medium text-amber-400">{t.clases.calcHypothetical}</p>
-    </div>
+    </ToolCard>
   );
 }
 
@@ -169,11 +185,12 @@ function BtcConverter() {
   const shownBtc = price !== null && lastEdited === "usd" && usdValid ? String(Number((usdNum / price).toFixed(8))) : btc;
 
   return (
-    <div data-no-swipe>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>{t.clases.convTitle}</SectionTitle>
-        {status === "ready" && ticker && <LiveBadge live={fresh} liveLabel={t.clases.convLive} staleLabel={t.clases.convStale} />}
-      </div>
+    <ToolCard
+      id="herramienta-conversor"
+      num="2"
+      title={t.clases.convTitle}
+      badge={status === "ready" && ticker ? <LiveBadge live={fresh} liveLabel={t.clases.convLive} staleLabel={t.clases.convStale} /> : undefined}
+    >
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.convLoading}</p>}
       {status === "nodata" && <p role="alert" className="text-sm text-amber-400">{t.clases.convUnavailable}</p>}
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
@@ -199,7 +216,7 @@ function BtcConverter() {
           </p>
         </>
       )}
-    </div>
+    </ToolCard>
   );
 }
 
@@ -259,15 +276,18 @@ function BtcChart() {
       .join(" ");
 
   return (
-    <div data-no-swipe>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>{t.clases.chartTitle}</SectionTitle>
-        {status === "ready" && data?.stale && (
+    <ToolCard
+      id="herramienta-grafica"
+      num="3"
+      title={t.clases.chartTitle}
+      badge={
+        status === "ready" && data?.stale ? (
           <span aria-live="polite" className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">
             {t.clases.convStale}
           </span>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.chartLoading}</p>}
       {status === "nodata" && <p role="alert" className="text-sm text-amber-400">{t.clases.chartNoData}</p>}
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
@@ -302,7 +322,7 @@ function BtcChart() {
       >
         {t.clases.chartRefresh}
       </button>
-    </div>
+    </ToolCard>
   );
 }
 
@@ -359,8 +379,7 @@ function IndicatorsStrip() {
     : [];
 
   return (
-    <div data-no-swipe>
-      <SectionTitle>{t.clases.indTitle}</SectionTitle>
+    <ToolCard id="herramienta-indicadores" num="4" title={t.clases.indTitle}>
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.indLoading}</p>}
       {status === "nodata" && <p role="alert" className="text-sm text-amber-400">{t.clases.indNoData}</p>}
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
@@ -381,7 +400,7 @@ function IndicatorsStrip() {
           </p>
         </>
       )}
-    </div>
+    </ToolCard>
   );
 }
 
@@ -399,8 +418,7 @@ function BitcoinEducation() {
     { term: t.clases.glossKill, def: t.clases.glossKillDef },
   ];
   return (
-    <div data-no-swipe>
-      <SectionTitle>{t.clases.btcTitle}</SectionTitle>
+    <ToolCard id="herramienta-bitcoin" num="5" title={t.clases.btcTitle}>
       <h4 className="text-sm font-semibold text-zinc-200">{t.clases.btcWhatTitle}</h4>
       <p className="mt-1 text-sm leading-relaxed text-zinc-400">{t.clases.btcWhatBody}</p>
       <h4 className="mt-3 text-sm font-semibold text-zinc-200">{t.clases.btcMoveTitle}</h4>
@@ -444,21 +462,41 @@ function BitcoinEducation() {
           </div>
         ))}
       </dl>
-    </div>
+    </ToolCard>
   );
 }
 
 export function ClasesHerramientas() {
   const { t } = useLanguage();
+  const jump = [
+    { href: "#herramienta-calculadora", label: t.clases.calcTitle },
+    { href: "#herramienta-conversor", label: t.clases.convTitle },
+    { href: "#herramienta-grafica", label: t.clases.chartTitle },
+    { href: "#herramienta-indicadores", label: t.clases.indTitle },
+    { href: "#herramienta-bitcoin", label: t.clases.btcTitle },
+  ];
   return (
     <div data-no-swipe>
       <Panel title={t.clases.toolsTitle}>
         <p className="mb-3 text-xs leading-relaxed text-zinc-400">{t.clases.toolsIntro}</p>
-        <CompoundCalculator />
-        <BtcConverter />
-        <BtcChart />
-        <IndicatorsStrip />
-        <BitcoinEducation />
+        <nav aria-label={t.clases.toolsJumpLabel} className="mb-4 flex flex-wrap gap-2">
+          {jump.map((j) => (
+            <a
+              key={j.href}
+              href={j.href}
+              className="inline-flex min-h-[36px] items-center rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-sky-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            >
+              {j.label}
+            </a>
+          ))}
+        </nav>
+        <div className="space-y-3">
+          <CompoundCalculator />
+          <BtcConverter />
+          <BtcChart />
+          <IndicatorsStrip />
+          <BitcoinEducation />
+        </div>
       </Panel>
     </div>
   );

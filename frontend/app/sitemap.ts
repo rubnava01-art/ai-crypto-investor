@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
 
 /** Sitemap (gestión SEO 2026-11-03, reel Peter Lead).
- * Solo las entradas públicas: la raíz y /login. El resto de rutas vive
- * tras login (token en localStorage) y no se lista, porque un bot no
- * vería contenido real en ellas. */
+ * Solo las entradas públicas: la raíz, /login y /contacto. El resto de
+ * rutas vive tras login (token en localStorage) y no se lista, porque un
+ * bot no vería contenido real en ellas. */
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://crypto-investor-web.onrender.com";
   return [
@@ -18,6 +18,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
+    },
+    {
+      url: `${base}/contacto`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
   ];
 }

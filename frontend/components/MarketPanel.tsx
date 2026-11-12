@@ -193,7 +193,12 @@ export function MarketPanel() {
       {error && <p role="alert" className="py-6 text-center text-sm leading-relaxed text-amber-400">{error}</p>}
       {!error && !prices && <p className="py-6 text-center text-sm text-zinc-400">{t.market.loadingPrices}</p>}
       {prices && (
-        <ul className="divide-y divide-zinc-800/70">
+        <>
+          <div aria-hidden="true" className="flex items-center justify-between border-b border-zinc-800/70 pb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span>{t.market.colAsset}</span>
+            <span>{t.market.colPrice24h}</span>
+          </div>
+          <ul className="divide-y divide-zinc-800/70">
           {prices.map((c) => {
             const style = COIN_STYLE[c.symbol] ?? { bg: "#52525b", glyph: c.symbol.slice(0, 1) };
             const up = (c.change_24h_pct ?? 0) >= 0;
@@ -232,6 +237,7 @@ export function MarketPanel() {
             );
           })}
         </ul>
+        </>
       )}
       {meta && (
         <p

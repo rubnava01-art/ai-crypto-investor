@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, setToken, ApiError } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
+import { PublicNav } from "../../components/PublicNav";
 import { SkipLink } from "../../components/ui";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
@@ -18,6 +19,11 @@ import { SkipLink } from "../../components/ui";
  * Metro azul/blanco (2026-11-05, v3): fondo azul fuerte plano con
  * mosaicos estilo Metro, tarjeta blanca de esquinas rectas, logo NEST
  * (public/nest-logo.svg: marca + N3ST, trazos blancos) en el encabezado.
+ * Dentro de la web (2026-11-12): la página usa PublicNav como
+ * encabezado, el mismo menú público de la landing (Inicio, Contacto,
+ * Registrarse, Login), para que el login no se sienta como otro sitio.
+ * Pestañas Entrar/Registrarse encima del formulario (mismo switchMode)
+ * y aviso de cuenta pendiente en el modo registro.
  * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
@@ -39,7 +45,12 @@ function LoginPageInner() {
   const introCls = reducedMotion ? undefined : "login-intro";
   const introStyle = (delayMs: number): CSSProperties | undefined =>
     reducedMotion ? undefined : ({ "--login-delay": `${delayMs}ms` } as CSSProperties);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  // ?mode=register preselecciona el modo registro (enlace "Registrarse"
+  // del menú público, /login?mode=register). La inicialización perezosa
+  // cubre la llegada directa; el efecto de abajo cubre el cambio de
+  // parámetro navegando dentro de /login sin remontar la página.
+  const [mode, setMode] = useState<"login" | "register">(() =>
+    searchParams.get("mode") === "register" ? "register" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +77,7 @@ function LoginPageInner() {
     loadChallenge();
   }, [loadChallenge]);
 
-  function switchMode(m: "login" | "register") {
+  const switchMode = useCallback((m: "login" | "register") => {
     setMode(m);
     setError(null);
     setNotice(null);
@@ -75,7 +86,13 @@ function LoginPageInner() {
     setShowPassword(false);
     setAnswer("");
     if (m === "register") loadChallenge();
-  }
+  }, [loadChallenge]);
+
+  useEffect(() => {
+    if (searchParams.get("mode") === "register" && mode !== "register") {
+      switchMode("register");
+    }
+  }, [searchParams, mode, switchMode]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,7 +142,9 @@ function LoginPageInner() {
     "w-full rounded-none border border-zinc-300 bg-white px-3.5 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition hover:border-zinc-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30";
 
   return (
-    <main data-login className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-blue-700 px-4 py-12">
+    <div className="flex min-h-dvh flex-col bg-blue-700">
+      <PublicNav />
+      <main data-login className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-12">
       <SkipLink label={t.shell.skipLink} />
       {/* Mosaicos estilo Metro: cuadrados planos blancos semitransparentes,
        * decorativos, sin movimiento. */}
@@ -164,6 +183,29 @@ function LoginPageInner() {
       >
         {/* Barra superior azul sólida: detalle Metro de la tarjeta. */}
         <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-blue-600" />
+        {/* Pestañas Entrar / Registrarse: el mismo cambio de modo que el
+         * enlace de abajo, visible desde arriba para que el acceso se
+         * entienda de un vistazo. */}
+        <div role="tablist" className="mb-5 grid grid-cols-2 gap-1 bg-zinc-100 p-1">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "login"}
+            onClick={() => switchMode("login")}
+            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "login" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+          >
+            {t.login.modeLoginTab}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "register"}
+            onClick={() => switchMode("register")}
+            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "register" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+          >
+            {t.login.modeRegisterTab}
+          </button>
+        </div>
         <label className="mb-4 block">
           <span className="mb-1.5 block text-sm font-semibold text-zinc-700">{t.login.userLabel}</span>
           <span className="relative block">
@@ -256,6 +298,12 @@ function LoginPageInner() {
           </div>
         )}
 
+        {mode === "register" && (
+          <p className="mb-5 rounded-none bg-blue-50 px-3.5 py-2.5 text-sm leading-relaxed text-blue-800 ring-1 ring-blue-200">
+            {t.login.registerPendingNote}
+          </p>
+        )}
+
         {sessionExpired && mode === "login" && (
           <p role="status" className="mb-5 rounded-none bg-amber-50 px-3.5 py-2.5 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-200">
             {t.reliability.sessionExpired}
@@ -314,7 +362,8 @@ function LoginPageInner() {
         {t.header.brand} · {t.login.secureNote}
       </p>
 
-    </main>
+      </main>
+    </div>
   );
 }
 

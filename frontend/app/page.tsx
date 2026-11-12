@@ -17,6 +17,7 @@ import type { MeResponse } from "../lib/api";
 import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { LanguageToggle, useLanguage } from "../lib/i18n";
 import { Footer } from "../components/Footer";
+import { Landing } from "../components/Landing";
 import { ultimaNovedadSistema } from "../lib/novedades";
 import dynamic from "next/dynamic";
 
@@ -93,6 +94,9 @@ export default function DashboardPage() {
   // No renderizar el dashboard hasta confirmar sesión: antes, los paneles se
   // montaban y disparaban llamadas sin token (flash de UI privada).
   const [checked, setChecked] = useState(false);
+  // Sin sesión, la raíz muestra la presentación pública (<Landing />) en
+  // vez de redirigir a /login; `authed` solo se activa con token.
+  const [authed, setAuthed] = useState(false);
 
   // Fase 4 (FE2): el reintento manual dormía 1,5s sin cancelación — al
   // navegar fuera en esa ventana, el setState posterior escribía en un
@@ -141,7 +145,11 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!getToken()) { router.replace(`/login?next=${encodeURIComponent("/")}`); return; }
+    // Sin token no hay redirect: la raíz es la landing pública y el
+    // visitante entra o se registra desde ahí. Con token, el dashboard
+    // de siempre (y si el token expiró, load() redirige a /login).
+    if (!getToken()) { setChecked(true); return; }
+    setAuthed(true);
     loadCancelledRef.current = false;
     setChecked(true);
     load();
@@ -200,6 +208,11 @@ export default function DashboardPage() {
         </div>
       </main>
     );
+  }
+
+  // Sin sesión, la raíz es la presentación pública, no el dashboard.
+  if (!authed) {
+    return <Landing />;
   }
 
   return (

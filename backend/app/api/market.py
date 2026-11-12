@@ -4,7 +4,6 @@ Every response carries the data source and update timestamp. With no
 connection, endpoints return 503 with a clear message (never fake data).
 """
 import datetime as dt
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rate_limit import market_limiter
 from app.core.security import get_current_user, require_admin
+from app.core.symbols import validate_symbol as _validate_symbol
 from app.data import exchanges, ingest
 from app.database import get_db
 from app.indicators import technical as ind
@@ -76,32 +76,6 @@ def _validate_exchange(exchange: str) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Exchange no soportado: {exchange}. Usa: {', '.join(exchanges.SUPPORTED)}.",
         )
-
-
-# 2026-11-11 (B2 del backlog de Clases): el símbolo lo escribe el
-# usuario en el query param sin validar. Dos problemas: "btc/usd" no
-# encontraba las velas guardadas como "BTC/USD" (el filtro de
-# latest_candles es exacto) y creaba una entrada de caché de ticker
-# distinta; un símbolo sin "/" o de 10 KB llegaba igual a la BD y al
-# exchange. Se valida el FORMATO (BASE/COTIZACIÓN, mayúsculas) y se
-# normaliza antes de tocar nada. NO es una allowlist BTC/ETH: la API
-# es genérica a propósito (los tests ingieren ADA/DOGE/SOL y el
-# escáner usa exchanges.SYMBOLS) — solo se rechaza lo mal formado.
-_SYMBOL_RE = re.compile(r"^[A-Z]{2,12}/[A-Z]{2,12}$")
-
-
-def _validate_symbol(symbol: str) -> str:
-    """Normaliza (sin espacios, mayúsculas) y valida el formato del
-    símbolo. 422 antes de tocar la BD, el exchange, la caché o el
-    limitador, mismo patrón que _validate_exchange. El detalle no
-    reproduce el valor completo: un símbolo malicioso puede ser largo."""
-    normalized = symbol.strip().upper()
-    if not _SYMBOL_RE.match(normalized):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Símbolo no válido: {symbol.strip()[:32]!r}. Usa el formato BASE/COTIZACIÓN, por ejemplo BTC/USD.",
-        )
-    return normalized
 
 
 def _check_market_limit(user: User) -> None:

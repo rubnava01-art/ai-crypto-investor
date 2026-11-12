@@ -165,6 +165,7 @@ export function InvestorPanel({
               ⚠️ <strong>{t.invertir.realWarningTitle}</strong> {t.invertir.realWarningBody}
             </div>
           )}
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">{t.invertir.stepValidate}</p>
           <p className="text-base font-semibold text-zinc-100">{t.invertir.validateTitle}</p>
           <dl className="mt-3 space-y-2.5 text-sm">
             <div className="flex items-baseline justify-between gap-3">
@@ -238,6 +239,7 @@ export function InvestorPanel({
         </div>
       ) : (
         <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">{t.invertir.stepForm}</p>
           <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={() => setSide("buy")}
@@ -263,19 +265,23 @@ export function InvestorPanel({
             </button>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <select aria-label={t.invertir.symbolAria} className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
-              <option value="BTC/USD">{t.invertir.bitcoin}</option>
-              <option value="ETH/USD">{t.invertir.ethereum}</option>
-            </select>
-            <input aria-label={t.invertir.amountPlaceholder}
-              className={inputCls}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder={t.invertir.amountPlaceholder}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            <label className="text-xs text-zinc-400">{t.invertir.symbolLabel}
+              <select aria-label={t.invertir.symbolAria} className={`${inputCls} mt-1`} value={symbol} onChange={(e) => setSymbol(e.target.value)}>
+                <option value="BTC/USD">{t.invertir.bitcoin}</option>
+                <option value="ETH/USD">{t.invertir.ethereum}</option>
+              </select>
+            </label>
+            <label className="text-xs text-zinc-400">{t.invertir.amountLabel}
+              <input aria-label={t.invertir.amountPlaceholder}
+                className={`${inputCls} mt-1`}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t.invertir.amountPlaceholder}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </label>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-zinc-400">
             {t.invertir.price} {symbol}:{" "}
@@ -314,6 +320,18 @@ export function InvestorPanel({
             )}{" "}
             · {t.invertir.capital} {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
           </p>
+          {validAmount && price !== null && (
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+              {t.invertir.estQty}:{" "}
+              <span className="font-mono font-semibold tabular-nums text-zinc-100">{qty.toFixed(8)}</span>
+              {pctCapital != null && (
+                <>
+                  {" "}· {t.invertir.pctCapital}:{" "}
+                  <span className="font-mono font-semibold tabular-nums text-zinc-100">{pctCapital.toFixed(1)}%</span>
+                </>
+              )}
+            </p>
+          )}
           {priceStale && price && (
             <p role="status" className="mt-2 text-xs leading-relaxed text-amber-400">
               {t.reliability.stalePrice}

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.symbols import validate_symbol as _validate_symbol
 from app.core.rate_limit import strategy_limiter
 from app.core.security import get_current_user
 from app.data import ingest
@@ -68,6 +69,11 @@ def evaluate(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # 2026-11-12 (seguimiento de la validación del 2026-11-11 en
+    # /api/market): mismo validate_symbol — "btc/usd" no encontraba
+    # las velas guardadas como "BTC/USD" y un símbolo mal formado
+    # llegaba a la BD y consumía el limitador. 422 antes del limitador.
+    symbol = _validate_symbol(symbol)
     # Per-USER limiter (M3): every evaluate writes a Signal +
     # RiskDecision row and reads 200 candles — it used to be unlimited.
     if not strategy_limiter.allow(f"strategy:{user.id}"):
