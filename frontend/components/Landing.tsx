@@ -5,6 +5,9 @@ import { useLanguage } from "../lib/i18n";
 import type { NavKey } from "../lib/i18n";
 import { PublicNav } from "./PublicNav";
 import { PlanesPanel } from "./PlanesPanel";
+import { PlanesCompare } from "./PlanesCompare";
+import { CompoundCalculator } from "./CompoundCalculator";
+import { LandingAi } from "./LandingAi";
 import { Footer } from "./Footer";
 
 /** Presentación pública de Grow Business Platform (2026-11-12): lo que
@@ -16,16 +19,38 @@ import { Footer } from "./Footer";
  * <PlanesPanel /> (una sola fuente: Esencial $19, Crecimiento $49,
  * Negocio Total $99, 14 días gratis). Los módulos extra son los reales
  * del menú (t.nav, mismos nombres que ModuleNav): nada inventado.
- * Sin emojis; fondo casi negro y azul fuerte, como la casa. */
+ * Sin emojis; fondo casi negro y azul fuerte, como la casa.
+ *
+ * Orden de secciones: héroe (con calculadora) → franja de confianza →
+ * franja de precios → 4 pilares → sección IA → etapas → planes + tabla
+ * comparativa → cómo empezar → cierre final con CTA → footer.
+ * Convención "24 módulos": moreModules.length (24) = rutas de ModuleNav
+ * (28) menos las 4 con presentación propia: / (Invertir), /estudiar,
+ * /crear e /inicio (la propia portada). Gestionar es familia, no ruta:
+ * sus módulos (crm, facturas, correos…) están dentro de los 24. La
+ * cifra se deriva de moreModules.length, nunca a mano. */
+
+const CTA_CLASS =
+  "inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60";
+
+function StartFreeCta({ label }: { label: string }) {
+  return (
+    <Link href="/login?mode=register" className={CTA_CLASS}>
+      {label}
+    </Link>
+  );
+}
+
 export function Landing() {
   const { t } = useLanguage();
   const l = t.landing;
   const p = t.planes;
-  const modules = [
-    { title: l.modInvertirTitle, desc: l.modInvertirDesc },
-    { title: l.modEstudiarTitle, desc: l.modEstudiarDesc },
-    { title: l.modCrearTitle, desc: l.modCrearDesc },
-    { title: l.modGestionarTitle, desc: l.modGestionarDesc },
+  const c = t.clases;
+  const pillars = [
+    { id: "pilar-invertir", title: l.modInvertirTitle, desc: l.modInvertirDesc },
+    { id: "pilar-estudiar", title: l.modEstudiarTitle, desc: l.modEstudiarDesc },
+    { id: "pilar-crear", title: l.modCrearTitle, desc: l.modCrearDesc },
+    { id: "pilar-gestionar", title: l.modGestionarTitle, desc: l.modGestionarDesc },
   ];
   // Resto de módulos reales (ModuleNav / t.nav), fuera de los 4 pilares
   // (Invertir, Estudiar, Crear ya son tarjetas) y de Inicio (la propia
@@ -49,48 +74,96 @@ export function Landing() {
     { name: p.nameCrecimiento, price: p.priceCrecimiento },
     { name: p.nameTotal, price: p.priceTotal },
   ];
+  // Franja de confianza: cifras derivadas del código, nunca a mano.
+  // "14" se extrae de p.trialBadge (única fuente de la prueba gratis);
+  // "2" idiomas = es + en (tipo Lang en lib/i18n/types.ts).
+  const trustItems = [
+    { value: String(moreModules.length), label: l.trustModules },
+    { value: String(pillars.length), label: l.trustPillars },
+    { value: String(stripPlans.length), label: l.trustPlans },
+    { value: p.trialBadge.match(/\d+/)?.[0] ?? "14", label: l.trustTrial },
+    { value: "2", label: l.trustLangs },
+  ];
+  // Segmentación por etapa: cada etapa enlaza a su tarjeta de plan.
+  const stages = [
+    { stage: l.stageStartTitle, name: p.nameEsencial, tag: p.tagEsencial, href: "#plan-esencial" },
+    { stage: l.stageGrowTitle, name: p.nameCrecimiento, tag: p.tagCrecimiento, href: "#plan-crecimiento" },
+    { stage: l.stageScaleTitle, name: p.nameTotal, tag: p.tagTotal, href: "#plan-total" },
+  ];
+  // Mini-índice de las 5 herramientas de Clases (mini-panel Estudiar).
+  const classTools = [
+    { name: c.calcTitle, desc: l.pillarEstudiarTool1Desc },
+    { name: c.convTitle, desc: l.pillarEstudiarTool2Desc },
+    { name: c.chartTitle, desc: l.pillarEstudiarTool3Desc },
+    { name: c.indTitle, desc: l.pillarEstudiarTool4Desc },
+    { name: c.btcTitle, desc: l.pillarEstudiarTool5Desc },
+  ];
 
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-100">
       <PublicNav />
       <main className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Héroe */}
+        {/* Héroe: texto a la izquierda, calculadora a la derecha en
+            escritorio; apilado en móvil. La calculadora es 100 %
+            navegador (sin red, sin auth) y reutiliza t.clases.calc*. */}
         <section className="py-12 sm:py-16">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
-            {l.eyebrow}
-          </p>
-          <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-            {l.title}
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
-            {l.subtitle}
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/login"
-              className="inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              {l.ctaLogin}
-            </Link>
-            <Link
-              href="/login?mode=register"
-              className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              {l.ctaRegister}
-            </Link>
-            <a
-              href="#planes"
-              className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-3 text-sm font-semibold text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              {l.ctaPlans}
-            </a>
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
+            <div>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
+                {l.eyebrow}
+              </p>
+              <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
+                {l.title}
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+                {l.subtitle}
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                >
+                  {l.ctaLogin}
+                </Link>
+                <Link
+                  href="/login?mode=register"
+                  className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                >
+                  {l.ctaRegister}
+                </Link>
+                <a
+                  href="#planes"
+                  className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-3 text-sm font-semibold text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                >
+                  {l.ctaPlans}
+                </a>
+              </div>
+            </div>
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+              <h2 className="text-lg font-bold text-zinc-50">{c.calcTitle}</h2>
+              <div className="mt-3">
+                <CompoundCalculator idPrefix="hero-calc" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Franja de confianza: 5 cifras reales, derivadas del código. */}
+        <section id="confianza" aria-label={l.trustTitle} className="scroll-mt-20 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-5 sm:px-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            {trustItems.map((item) => (
+              <div key={item.label} className="text-center">
+                <p className="text-3xl font-extrabold tabular-nums text-zinc-50">{item.value}</p>
+                <p className="mt-1 text-sm text-zinc-400">{item.label}</p>
+              </div>
+            ))}
           </div>
         </section>
 
         {/* Franja compacta de precios: los 3 precios + 14 días gratis,
             visibles sin bajar ni pulsar. El detalle con beneficios está
             en la sección de planes, justo después de los módulos. */}
-        <section aria-label={p.title} className="rounded-xl border border-blue-800/60 bg-blue-500/10 px-4 py-5 sm:px-6">
+        <section aria-label={p.title} className="mt-6 rounded-xl border border-blue-800/60 bg-blue-500/10 px-4 py-5 sm:px-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {stripPlans.map((plan) => (
               <div key={plan.name} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 sm:flex-col sm:items-start">
@@ -115,17 +188,90 @@ export function Landing() {
           </p>
         </section>
 
-        {/* Módulos: 4 pilares + el resto de módulos reales */}
+        {/* Módulos: 4 bloques verticales (uno por pilar) con mini-panel
+            honesto y CTA propio; después, la lista de 24 módulos. Los
+            mini-paneles son estáticos (sin fetch, sin token, sin datos
+            falsos); el contenido de ejemplo va etiquetado "Ejemplo". */}
         <section aria-label={l.modulesTitle} className="border-t border-zinc-800 py-10 sm:py-12">
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{l.modulesTitle}</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
             {l.modulesIntro}
           </p>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {modules.map((m) => (
-              <article key={m.title} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-                <h3 className="text-lg font-bold text-zinc-50">{m.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-400">{m.desc}</p>
+          <div className="mt-6 space-y-6">
+            {pillars.map((pillar, i) => (
+              <article key={pillar.id} id={pillar.id} aria-label={pillar.title} className="scroll-mt-20 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
+                <h3 className="text-lg font-bold text-zinc-50">{pillar.title}</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">{pillar.desc}</p>
+                {/* Mini-panel Invertir: evaluador de estrategia (estático). */}
+                {i === 0 && (
+                  <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+                    <p className="text-sm font-semibold text-zinc-100">{l.pillarInvertirPanelTitle}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-zinc-400">{l.pillarInvertirPanelBody}</p>
+                    <p className="mt-2 text-sm font-medium text-amber-400">{l.pillarInvertirSimNote}</p>
+                  </div>
+                )}
+                {/* Mini-panel Estudiar: índice de las 5 herramientas de Clases. */}
+                {i === 1 && (
+                  <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+                    <p className="text-sm font-semibold text-zinc-100">{l.pillarEstudiarPanelTitle}</p>
+                    <ul className="mt-2 space-y-2">
+                      {classTools.map((tool) => (
+                        <li key={tool.name} className="text-sm leading-relaxed text-zinc-400">
+                          <span className="font-semibold text-zinc-200">{tool.name}</span>
+                          {" — "}
+                          {tool.desc}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-sm font-medium text-amber-400">{l.pillarEstudiarAuthNote}</p>
+                  </div>
+                )}
+                {/* Mini-panel Crear: muestra del generador de logo (SVG en
+                    navegador, sin backend), etiquetada como ejemplo. */}
+                {i === 2 && (
+                  <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-zinc-100">{l.pillarCrearPanelTitle}</p>
+                      <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-200">
+                        {l.exampleLabel}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
+                      <svg viewBox="0 0 96 96" className="h-24 w-24 shrink-0 rounded-xl" role="img" aria-label={l.pillarCrearPanelTitle}>
+                        <rect width="96" height="96" rx="16" fill="#2563eb" />
+                        <path d="M48 22 L74 70 L22 70 Z" fill="none" stroke="#ffffff" strokeWidth="5" strokeLinejoin="round" />
+                        <circle cx="48" cy="58" r="7" fill="#ffffff" />
+                      </svg>
+                      <p className="max-w-sm text-sm leading-relaxed text-zinc-400">{l.pillarCrearPanelBody}</p>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{l.pillarCrearNote}</p>
+                  </div>
+                )}
+                {/* Mini-panel Gestionar: contacto + plantilla de ejemplo. */}
+                {i === 3 && (
+                  <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-zinc-100">{l.pillarGestionarPanelTitle}</p>
+                      <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-200">
+                        {l.exampleLabel}
+                      </span>
+                    </div>
+                    <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                      <p className="text-sm font-semibold text-zinc-100">{l.pillarGestionarContactName}</p>
+                      <p className="mt-0.5 text-sm text-zinc-400">{l.pillarGestionarContactEmail}</p>
+                      <p className="text-sm text-zinc-400">{l.pillarGestionarContactPhone}</p>
+                    </div>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      {l.pillarGestionarTemplateLabel}
+                    </p>
+                    <p className="mt-1 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm leading-relaxed text-zinc-200">
+                      {l.pillarGestionarTemplate}
+                    </p>
+                  </div>
+                )}
+                <div className="mt-4">
+                  <StartFreeCta label={l.ctaStartFree} />
+                </div>
               </article>
             ))}
           </div>
@@ -143,6 +289,32 @@ export function Landing() {
           </ul>
         </section>
 
+        {/* Sección IA y Automatización (13 herramientas reales). */}
+        <LandingAi />
+
+        {/* Para cada etapa: Empieza / Crece / Escala → su plan. */}
+        <section id="etapas" aria-label={l.stageTitle} className="scroll-mt-20 border-t border-zinc-800 py-10 sm:py-12">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{l.stageTitle}</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+            {l.stageIntro}
+          </p>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {stages.map((s) => (
+              <article key={s.stage} className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+                <h3 className="text-lg font-bold text-zinc-50">{s.stage}</h3>
+                <p className="mt-2 text-base font-semibold text-zinc-100">{s.name}</p>
+                <p className="mt-1 flex-1 text-sm leading-relaxed text-zinc-400">{s.tag}</p>
+                <a
+                  href={s.href}
+                  className="mt-4 inline-flex min-h-[44px] items-center rounded-lg px-3 py-3 text-sm font-semibold text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                >
+                  {l.stageCta}: {s.name}
+                </a>
+              </article>
+            ))}
+          </div>
+        </section>
+
         {/* Planes reales (una sola fuente: PlanesPanel / t.planes) */}
         <section id="planes" aria-label={l.plansTitle} className="scroll-mt-20 border-t border-zinc-800 py-10 sm:py-12">
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{l.plansTitle}</h2>
@@ -151,6 +323,10 @@ export function Landing() {
           </p>
           <div className="mt-6">
             <PlanesPanel />
+          </div>
+          <PlanesCompare />
+          <div className="mt-6">
+            <StartFreeCta label={l.ctaStartFree} />
           </div>
           <p className="mt-6 text-sm leading-relaxed text-zinc-400">{l.simNote}</p>
         </section>
@@ -169,6 +345,18 @@ export function Landing() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* Cierre final: CTA + microcopy de activación por admin. */}
+        <section aria-label={l.finalTitle} className="border-t border-zinc-800 py-10 text-center sm:py-12">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{l.finalTitle}</h2>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+            {l.finalDesc}
+          </p>
+          <div className="mt-6 flex justify-center">
+            <StartFreeCta label={l.ctaStartFree} />
+          </div>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-400">{l.howStep2Desc}</p>
         </section>
       </main>
       <Footer />

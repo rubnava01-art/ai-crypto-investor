@@ -3,7 +3,7 @@
 import { useLanguage } from "../lib/i18n";
 
 /** Icono de verificación (sin emoji): marca de la lista de funciones. */
-function Check() {
+export function Check() {
   return (
     <svg
       className="mt-0.5 h-4 w-4 shrink-0 text-amber-400"
@@ -26,31 +26,49 @@ function Check() {
  * con 14 días de prueba gratis. Solo muestra los planes: no hay cobro
  * en línea todavía, la prueba y la suscripción se activan con el
  * administrador (ver activationNote). Sin botones de compra falsos. */
+/** Funciones propias de cada plan, como claves de t.planes, en orden
+ * Esencial → Crecimiento → Negocio Total. FUENTE ÚNICA: las tarjetas de
+ * abajo y la tabla comparativa (<PlanesCompare />) se derivan de aquí
+ * por código; nunca reescribir las listas a mano en otro sitio. Cada
+ * nivel acumula el anterior ("Todo lo de X, más:"). */
+export const PLAN_FEATURE_KEYS = [
+  ["fCrm", "fFacturas", "fInventario", "fCorreos"],
+  ["fInvertir", "fEstudiar", "fCrear", "fEspacio"],
+  ["fTalento", "fRiesgos", "fPlanillas", "fAnalisis", "fReferidos", "fAjustador"],
+] as const;
+
+/** Ids de ancla de cada tarjeta de plan (para la segmentación por etapa
+ * de la landing: #plan-esencial, #plan-crecimiento, #plan-total). */
+export const PLAN_CARD_IDS = ["plan-esencial", "plan-crecimiento", "plan-total"] as const;
+
 export function PlanesPanel() {
   const { t } = useLanguage();
   const p = t.planes;
 
   const cards = [
     {
+      id: PLAN_CARD_IDS[0],
       name: p.nameEsencial,
       tag: p.tagEsencial,
       price: p.priceEsencial,
-      features: [p.fCrm, p.fFacturas, p.fInventario, p.fCorreos],
+      features: PLAN_FEATURE_KEYS[0].map((k) => p[k]),
       popular: false,
     },
     {
+      id: PLAN_CARD_IDS[1],
       name: p.nameCrecimiento,
       tag: p.tagCrecimiento,
       price: p.priceCrecimiento,
-      features: [p.fInvertir, p.fEstudiar, p.fCrear, p.fEspacio],
+      features: PLAN_FEATURE_KEYS[1].map((k) => p[k]),
       includes: p.includesEsencial,
       popular: true,
     },
     {
+      id: PLAN_CARD_IDS[2],
       name: p.nameTotal,
       tag: p.tagTotal,
       price: p.priceTotal,
-      features: [p.fTalento, p.fRiesgos, p.fPlanillas, p.fAnalisis, p.fReferidos, p.fAjustador],
+      features: PLAN_FEATURE_KEYS[2].map((k) => p[k]),
       includes: p.includesCrecimiento,
       popular: false,
     },
@@ -72,10 +90,11 @@ export function PlanesPanel() {
         {cards.map((c) => (
           <article
             key={c.name}
+            id={c.id}
             className={
               c.popular
-                ? "relative flex flex-col rounded-xl border-2 border-amber-500 bg-zinc-900/60 p-5 shadow-lg"
-                : "flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"
+                ? "relative flex scroll-mt-20 flex-col rounded-xl border-2 border-amber-500 bg-zinc-900/60 p-5 shadow-lg"
+                : "flex scroll-mt-20 flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"
             }
           >
             {c.popular && (

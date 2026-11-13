@@ -12,6 +12,7 @@ import { Panel } from "./Panel";
 import { ApiErrorBanner } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+import { CompoundCalculator } from "./CompoundCalculator";
 
 type LoadStatus = "loading" | "ready" | "nodata" | "error";
 
@@ -81,43 +82,13 @@ function LiveBadge({ live, liveLabel, staleLabel }: { live: boolean; liveLabel: 
 }
 
 // ---------- (a) Calculadora de interés compuesto (solo navegador) ----------
-
-function CompoundCalculator() {
+// Extraída a ./CompoundCalculator.tsx (2026-11-12) para reutilizarla en
+// la landing pública; aquí solo se monta dentro de su ToolCard.
+function ClasesCompoundCalculator() {
   const { t } = useLanguage();
-  const [principal, setPrincipal] = useState("");
-  // SIN tasa por defecto: vacía hasta que el usuario escriba una.
-  const [rate, setRate] = useState("");
-  const [years, setYears] = useState("10");
-  const p = Number(principal);
-  const r = Number(rate);
-  const n = Number(years);
-  const valid = principal.trim() !== "" && Number.isFinite(p) && p > 0 && Number.isFinite(n) && n > 0;
-  const rateReady = rate.trim() !== "" && Number.isFinite(r);
-  const result = valid && rateReady ? p * Math.pow(1 + r / 100, n) : null;
   return (
     <ToolCard id="herramienta-calculadora" num="1" title={t.clases.calcTitle}>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <label className="text-xs text-zinc-400">{t.clases.calcInitial}
-          <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="0" step="any" inputMode="decimal" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="1000" />
-        </label>
-        <label className="text-xs text-zinc-400">{t.clases.calcRate}
-          <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" step="any" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="—" aria-describedby="calc-rate-hint" />
-        </label>
-        <label className="text-xs text-zinc-400">{t.clases.calcYears}
-          <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="1" step="1" inputMode="numeric" value={years} onChange={(e) => setYears(e.target.value)} />
-        </label>
-      </div>
-      <p id="calc-rate-hint" className="mt-1.5 text-xs text-zinc-500">{t.clases.calcRateHint}</p>
-      {result !== null ? (
-        <p className="mt-2 text-sm text-zinc-100">
-          {t.clases.calcResult}: <strong className="tabular-nums">{fmtUsd(result, "en-US")}</strong>
-        </p>
-      ) : valid && !rateReady ? (
-        <p className="mt-2 text-sm text-zinc-400">{t.clases.calcEnterRate}</p>
-      ) : (
-        <p className="mt-2 text-sm text-zinc-400">{principal.trim() === "" && rate.trim() === "" ? t.clases.calcEnterAll : t.clases.calcInvalid}</p>
-      )}
-      <p className="mt-1.5 text-xs font-medium text-amber-400">{t.clases.calcHypothetical}</p>
+      <CompoundCalculator idPrefix="clases-calc" />
     </ToolCard>
   );
 }
@@ -491,7 +462,7 @@ export function ClasesHerramientas() {
           ))}
         </nav>
         <div className="space-y-3">
-          <CompoundCalculator />
+          <ClasesCompoundCalculator />
           <BtcConverter />
           <BtcChart />
           <IndicatorsStrip />
