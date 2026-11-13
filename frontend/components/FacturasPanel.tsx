@@ -10,6 +10,7 @@ import { useLanguage } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
 import { formatDate, formatMoney } from "../lib/format";
+import { buildInvoiceHtml, invoiceTotals } from "../lib/invoiceHtml";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -20,12 +21,12 @@ const fmtDate = (iso: string | null, locale: string) => formatDate(iso, locale);
 
 const emptyItem = (): InvoiceItem => ({ description: "", qty: 1, unit_price: 0 });
 
-function totals(items: InvoiceItem[], taxRate: number) {
-  const sub = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unit_price) || 0), 0);
-  const tax = sub * ((Number(taxRate) || 0) / 100);
-  return { sub, tax, total: sub + tax };
-}
+// Totales compartidos con el HTML de impresión (lib/invoiceHtml.ts).
+const totals = invoiceTotals;
 
+/** Impresión de factura (C1): el HTML se construye en lib/invoiceHtml.ts,
+ * donde TODOS los campos se escapan (escapeHtml). Aquí solo se abre la
+ * ventana y se escribe el documento ya escapado. */
 function printInvoiceHtml(opts: {
   number: string;
   date: string;
@@ -44,21 +45,7 @@ function printInvoiceHtml(opts: {
     notes: string; thanks: string;
   };
 }) {
-  const t = totals(opts.items, opts.taxRate);
-  const rows = opts.items
-    .map(
-      (it) => `<tr><td>${it.description}</td><td style="text-align:center">${it.qty}</td><td style="text-align:right">${money(it.unit_price)}</td><td style="text-align:right">${money(it.qty * it.unit_price)}</td></tr>`
-    )
-    .join("");
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.txt.title} ${opts.number}</title>
-  <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.tot{margin-top:20px;text-align:right;font-size:16px}.tot b{font-size:20px}.mut{color:#555}</style>
-  </head><body><h1>${opts.txt.heading} ${opts.number}</h1><p class="mut">${opts.date}</p>
-  <p><b>${opts.sellerName}</b><br>${opts.sellerPhone}<br>${opts.sellerEmail}</p>
-  <p><b>${opts.txt.client}</b> ${opts.clientName}<br>${opts.clientPhone}<br>${opts.clientEmail}</p>
-  <table><tr><th>${opts.txt.concept}</th><th style="text-align:center">${opts.txt.qty}</th><th style="text-align:right">${opts.txt.price}</th><th style="text-align:right">${opts.txt.amount}</th></tr>${rows}</table>
-  <div class="tot"><p>${opts.txt.subtotal} ${money(t.sub)}</p><p>${opts.txt.tax} (${opts.taxRate}%): ${money(t.tax)}</p><p><b>${opts.txt.total} ${money(t.total)}</b></p></div>
-  ${opts.notes ? `<p><b>${opts.txt.notes}</b> ${opts.notes}</p>` : ""}
-  <p class="mut">${opts.txt.thanks}</p></body></html>`;
+  const html = buildInvoiceHtml(opts);
   const w = window.open("", "_blank");
   if (!w) return;
   w.document.write(html);

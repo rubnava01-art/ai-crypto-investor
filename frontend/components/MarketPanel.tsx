@@ -66,18 +66,24 @@ export function MarketPanel() {
   const locale = lang === "en" ? "en-US" : "es-MX";
   const isCancelled = useCancelled();
   const restAbortRef = useRef<AbortController | null>(null);
+  // P2-1 (2026-11-13): si la primera carga ya fue, los sondeos de fondo
+  // no tocan el botón — el spinner solo aparece en la primera carga y
+  // en el clic manual de Actualizar.
+  const loadedOnceRef = useRef(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (foreground = false) => {
     restAbortRef.current?.abort();
     const ctrl = new AbortController();
     restAbortRef.current = ctrl;
-    setLoading(true);
+    const showLoading = foreground || !loadedOnceRef.current;
+    if (showLoading) setLoading(true);
     try {
       const r = await api.marketPrices({ signal: ctrl.signal });
       if (isCancelled() || ctrl.signal.aborted) return;
       setPrices(r.prices);
       setMeta({ source: r.source, updated: r.updated_utc, stale: r.stale });
       setError(null);
+      loadedOnceRef.current = true;
     } catch (e) {
       if (ctrl.signal.aborted || isCancelled()) return;
       if (!(e instanceof ApiError)) setError(t.market.loadFailed);
@@ -253,7 +259,7 @@ export function MarketPanel() {
       )}
       <button
         type="button"
-        onClick={load}
+        onClick={() => load(true)}
         disabled={loading}
         className="mt-3 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:border-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-40"
       >

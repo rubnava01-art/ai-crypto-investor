@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getToken, setToken } from "../lib/api";
+import { loginUrl } from "../lib/session";
 import { FAMILY_ACCENT, familyForHref, ModuleNav } from "./ModuleNav";
 import { ProfileMenu } from "./ProfileMenu";
 import { Footer } from "./Footer";
@@ -41,7 +42,11 @@ export function ModuleShell({
     // Fase 4 (FE7): preservar el destino (?next=) para volver tras el login,
     // igual que el 401 centralizado del cliente API. El token ya se leyó en
     // el inicializador de estado; aquí solo queda redirigir si no hay sesión.
-    if (!getToken()) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    // La URL se construye en lib/session.ts (C2): conserva pathname + query.
+    // Sin expired=1: no hay sesión, no es una expiración.
+    if (!getToken()) {
+      router.replace(loginUrl(window.location.pathname + window.location.search));
+    }
   }, [router, pathname]);
 
   if (!checked) {
@@ -66,13 +71,13 @@ export function ModuleShell({
       <SkipLink label={t.shell.skipLink} />
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div className="min-w-0">
-          <p className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+          <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
             <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
             {t.header.brand}
           </p>
           <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">{moduleTitle}</h1>
           <p className="mt-0.5 text-sm leading-relaxed text-zinc-400">{subtitle}</p>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-500">{t.header.tagline}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{t.header.tagline}</p>
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />

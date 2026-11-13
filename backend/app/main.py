@@ -283,6 +283,12 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(MetricsMiddleware)
+    # M4 (2026-11-13): Cache-Control: private, max-age=60 ONLY on the
+    # explicitly allowlisted near-static GETs (see
+    # app/core/cache_control.py). No-store stays the default elsewhere.
+    from app.core.cache_control import CacheControlMiddleware
+
+    app.add_middleware(CacheControlMiddleware)
     # Added last = outermost: compresses every JSON response (typical
     # list/dashboard payloads shrink ~70-80% on the wire). Binary PDF
     # downloads are already compressed and stay untouched in practice.

@@ -59,6 +59,7 @@ export type Dictionary = {
     back: string;
     logout: string;
     refresh: string;
+    refreshing: string;
   };
   // Slots de traducción total (2026-10-30): cada grupo de trabajo rellena
   // SOLO su marcador con `nombre: Record<string, string>;` por namespace.

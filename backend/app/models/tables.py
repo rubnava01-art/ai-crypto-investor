@@ -48,6 +48,15 @@ class User(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+    # Plan elegido al registrarse (2026-11-13, A2): la tarjeta de plan
+    # de la landing enlaza a /login?mode=register&plan=<clave> y el
+    # registro guarda la elección para que el admin la vea en Control
+    # de usuarios antes de aprobar. Nullable: las cuentas viejas y los
+    # registros sin plan no tienen nada que guardar. Valores canónicos:
+    # "esencial" | "crecimiento" | "total" (claves de t.planes /
+    # PLAN_CARD_IDS sin el prefijo "plan-"). Llega por migración
+    # Alembic, nunca solo con create_all, en BD existentes.
+    requested_plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class SuperAdminGrant(Base):

@@ -43,6 +43,10 @@ class UserOut(BaseModel):
     is_admin: bool
     is_super_admin: bool
     status: str = "active"  # "active" | "pending"
+    # Plan elegido en la landing al registrarse (A2, 2026-11-13):
+    # "esencial" | "crecimiento" | "total" | None. El admin lo ve en
+    # Control de usuarios junto a la cuenta pendiente, antes de aprobar.
+    requested_plan: str | None = None
     created_at: str | None = None
 
 
@@ -102,6 +106,7 @@ def _out(
         is_admin=u.is_admin,
         is_super_admin=super_flag,
         status="pending" if pending else "active",
+        requested_plan=u.requested_plan,
         created_at=u.created_at.isoformat() if u.created_at else None,
     )
 

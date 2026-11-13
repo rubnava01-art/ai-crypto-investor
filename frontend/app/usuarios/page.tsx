@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "../../lib/api";
+import { expiredLoginUrlFromLocation } from "../../lib/session";
 import { ModuleShell } from "../../components/ModuleShell";
 import { useLanguage } from "../../lib/i18n";
 import { UsersPanel } from "../../components/UsersPanel";
@@ -24,7 +25,9 @@ export default function UsuariosPage() {
         else router.replace("/");
       })
       .catch((err) => {
-        if (err instanceof ApiError && err.status === 401) router.replace("/login");
+        // C2: el 401 usa el redirect central (lib/session.ts) con
+        // expired=1 y el destino preservado, como el cliente API.
+        if (err instanceof ApiError && err.status === 401) router.replace(expiredLoginUrlFromLocation());
         else router.replace("/");
       });
   }, [router]);

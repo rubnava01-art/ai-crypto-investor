@@ -4,6 +4,7 @@ Every response carries the data source and update timestamp. With no
 connection, endpoints return 503 with a clear message (never fake data).
 """
 import datetime as dt
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -35,7 +36,22 @@ MARKET_COINS = (
     ("BNB", "BNB", "BNB/USD"),
 )
 _PRICES_CACHE: dict = {"at": 0.0, "payload": None}
-_PRICES_TTL_S = 60.0
+# 2026-11-13 (A1): el TTL era 60 s == el sondeo del frontend (60 s), así
+# que en régimen estable casi cada sondeo era un MISS de ~5 s contra
+# Kraken (medido: MISS 5,06 s vs HIT ~5 ms). TTL 300 s: 4 de cada 5
+# sondeos son HIT frescos y el 5.º se sirve stale-while-revalidate
+# (inmediato, ~ms) con refresco en segundo plano, así que el régimen
+# estable es siempre ~ms. No se toca trading, ni el WS de Kraken, ni
+# los rate limits.
+_PRICES_TTL_S = 300.0
+# Tope de antigüedad para servir stale: pasado esto, el endpoint vuelve
+# a hacer el fetch síncrono (y 503 si el exchange falla y no hay nada
+# que servir). Evita servir datos indefinidamente viejos si el refresco
+# en fondo falla una y otra vez.
+_PRICES_MAX_STALE_S = 3600.0
+# Guarda del refresco en fondo: un solo refresco en vuelo por proceso.
+_PRICES_REFRESH_LOCK = threading.Lock()
+_PRICES_REFRESHING = False
 # Caché de ticker por (exchange, símbolo), mismo patrón stale que /prices
 # (corrida 3 agentes): antes cada llamada pegaba al exchange sin caché.
 _TICKER_CACHE: dict[tuple, dict] = {}
@@ -85,6 +101,8 @@ def _check_market_limit(user: User) -> None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiadas consultas de mercado. Espera un minuto.",
+            # 2026-11-13 (M5): el cliente necesita saber cuánto esperar.
+            headers={"Retry-After": "60"},
         )
 
 
@@ -362,6 +380,46 @@ def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
     return out
 
 
+def _refresh_prices_background(exchange: str) -> None:
+    """Refresco en segundo plano (stale-while-revalidate): corre en un
+    hilo daemon, nunca bloquea la respuesta que lo disparó. En éxito
+    reemplaza la caché; en fallo total (todos los tickers a None, o
+    excepción) deja la caché vieja intacta — servir dato viejo es
+    mejor que servir una lista vacía como si fuera actual."""
+    global _PRICES_REFRESHING
+    started = time.monotonic()
+    try:
+        prices = _fetch_market_prices(exchange)
+        if prices and all(p.price_usd is None for p in prices):
+            return
+        payload = {
+            "source": exchange,
+            "updated_utc": _utcnow(),
+            "stale": False,
+            "prices": [p.model_dump() for p in prices],
+        }
+        _PRICES_CACHE["at"] = started
+        _PRICES_CACHE["payload"] = payload
+    except Exception:  # noqa: BLE001 - el refresco en fondo nunca rompe nada
+        pass
+    finally:
+        with _PRICES_REFRESH_LOCK:
+            _PRICES_REFRESHING = False
+
+
+def _trigger_background_refresh(exchange: str) -> None:
+    """Dispara un refresco en fondo salvo que ya haya uno en vuelo."""
+    global _PRICES_REFRESHING
+    with _PRICES_REFRESH_LOCK:
+        if _PRICES_REFRESHING:
+            return
+        _PRICES_REFRESHING = True
+    thread = threading.Thread(
+        target=_refresh_prices_background, args=(exchange,), daemon=True
+    )
+    thread.start()
+
+
 @router.get("/prices", response_model=MarketPricesResponse)
 def get_market_prices(
     exchange: str = Query(DEFAULT_EXCHANGE),
@@ -369,22 +427,28 @@ def get_market_prices(
 ):
     """Live prices for the top coins from the exchange's public API.
 
-    Cached 60s per exchange. Serves stale cache (flagged) when the
-    exchange is unreachable; 503 only when there is nothing to show
-    (never fake data). The cache is only valid for the exchange that
-    filled it: a request for another exchange must refetch instead of
-    receiving the first exchange's prices under the wrong source.
+    Cached 300s per exchange, stale-while-revalidate (2026-11-13, A1):
+    dentro del TTL se sirve el HIT fresco; con la caché vencida pero
+    dentro del tope de antigüedad se sirve el dato viejo marcado stale
+    y se dispara un refresco en fondo, así que ningún sondeo del
+    frontend (60 s) espera los ~5 s del fetch a Kraken. Pasado el tope
+    de antigüedad, o sin caché, el fetch es síncrono: sirve stale si
+    el exchange falla y hay algo que mostrar, y 503 solo cuando no hay
+    nada (nunca datos inventados). La caché solo vale para el exchange
+    que la llenó: pedir otro exchange siempre refetchea.
     """
     _validate_exchange(exchange)
     _check_market_limit(user)
     now = time.monotonic()
-    if (
-        _PRICES_CACHE["payload"] is not None
-        and _PRICES_CACHE["payload"].get("source") == exchange
-        and now - _PRICES_CACHE["at"] < _PRICES_TTL_S
-    ):
-        payload = _PRICES_CACHE["payload"]
-        return MarketPricesResponse(**{**payload, "stale": False})
+    cached = _PRICES_CACHE["payload"]
+    same_exchange = cached is not None and cached.get("source") == exchange
+    if same_exchange:
+        age = now - _PRICES_CACHE["at"]
+        if age < _PRICES_TTL_S:
+            return MarketPricesResponse(**{**cached, "stale": False})
+        if age < _PRICES_MAX_STALE_S:
+            _trigger_background_refresh(exchange)
+            return MarketPricesResponse(**{**cached, "stale": True})
     try:
         prices = _fetch_market_prices(exchange)
         if prices and all(p.price_usd is None for p in prices):
@@ -392,7 +456,7 @@ def get_market_prices(
             # fall through to the stale-cache / 503 path below.
             raise RuntimeError("all coin tickers failed")
     except Exception as e:  # noqa: BLE001 - surface as 503, never fake
-        if _PRICES_CACHE["payload"] is not None and _PRICES_CACHE["payload"].get("source") == exchange:
+        if same_exchange:
             payload = _PRICES_CACHE["payload"]
             return MarketPricesResponse(**{**payload, "stale": True})
         raise HTTPException(

@@ -487,6 +487,7 @@ export interface AdminUser {
   is_admin: boolean;
   is_super_admin: boolean;
   status: "active" | "pending";
+  requested_plan: string | null;
   created_at: string | null;
 }
 

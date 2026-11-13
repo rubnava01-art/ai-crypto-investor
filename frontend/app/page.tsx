@@ -9,7 +9,7 @@ import {
   type OperationsResponse, type RiskLimits, type LogEntry, type SignalSide,
 } from "../lib/api";
 import { Panel } from "../components/Panel";
-import { LoadMore, SkipLink, newId } from "../components/ui";
+import { ApiErrorBanner, LoadMore, SkipLink, newId } from "../components/ui";
 import { ModuleNav } from "../components/ModuleNav";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
@@ -29,7 +29,7 @@ import dynamic from "next/dynamic";
 const panelLoading = () => {
   const { t } = useLanguage();
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-400">
       {t.dashboard.panelLoading}
     </div>
   );
@@ -73,6 +73,11 @@ export default function DashboardPage() {
     iso ? new Date(iso).toLocaleString(locale, { timeZone: "UTC", hour12: false }) + " UTC" : "—";
   const [offline, setOffline] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // M13: error de carga con reintento (ApiErrorBanner) y estado de carga
+  // del botón Actualizar. M10: un fallo de /me distinto de 401 se muestra
+  // aquí en vez de tragarse en silencio.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [confirmKill, setConfirmKill] = useState(false);
 
   const [system, setSystem] = useState<SystemStatus | null>(null);
@@ -104,6 +109,8 @@ export default function DashboardPage() {
   const loadCancelledRef = useRef(false);
   const load = useCallback(async () => {
     setActionError(null);
+    setLoadError(null);
+    setRefreshing(true);
     // Intento con un reintento: un fallo transitorio de red no debe tirar
     // todo el dashboard al modo offline sin intentarlo de nuevo.
     const attempts = [0, 1];
@@ -126,12 +133,23 @@ export default function DashboardPage() {
              d.modes, d.operations, d.risk, d.logs].some((s) => s == null)) {
           setActionError(t.dashboard.partialError);
         }
-        api.me().then((m) => { if (!loadCancelledRef.current) setMe(m); }).catch(() => { if (!loadCancelledRef.current) setMe(null); });
+        // M10: un fallo de /me distinto de 401 se muestra (antes se
+        // tragaba en silencio y el usuario perdía los paneles de admin
+        // sin ningún mensaje). Un 401 ya disparó el redirect central.
+        api.me().then((m) => { if (!loadCancelledRef.current) setMe(m); }).catch((err) => {
+          if (loadCancelledRef.current) return;
+          setMe(null);
+          if (!(err instanceof ApiError && err.status === 401)) setLoadError(err);
+        });
+        setRefreshing(false);
         return;
       } catch (err) {
+        // C2: SIN redirect propio. Un 401 en una petición autenticada ya
+        // disparó handleUnauthorized (lib/api/client.ts), único dueño del
+        // redirect a /login?next=…&expired=1. Redirigir aquí con
+        // router.replace pisaba ese aviso de sesión expirada.
         if (err instanceof ApiError && err.status === 401) {
-          setToken(null);
-          router.replace(`/login?next=${encodeURIComponent("/")}`);
+          setRefreshing(false);
           return;
         }
         if (i === attempts.length - 1) {
@@ -142,7 +160,8 @@ export default function DashboardPage() {
         }
       }
     }
-  }, [router]);
+    setRefreshing(false);
+  }, [router, t]);
 
   useEffect(() => {
     // Sin token no hay redirect: la raíz es la landing pública y el
@@ -220,7 +239,7 @@ export default function DashboardPage() {
       <SkipLink label={t.shell.skipLink} />
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
         <div>
-          <p className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+          <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
             {t.header.brand}
           </p>
@@ -232,11 +251,20 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <LanguageToggle />
           <DemoBadge />
+          {/* M13: estado de carga visible y sin doble envío mientras carga. */}
           <button
             onClick={load}
-            className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            disabled={refreshing}
+            aria-busy={refreshing}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
-            {t.dashboard.refresh}
+            {refreshing && (
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+              </svg>
+            )}
+            {refreshing ? t.common.refreshing : t.dashboard.refresh}
           </button>
           <ProfileMenu onLogout={logout} />
         </div>
@@ -263,14 +291,16 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}      {actionError && (
+      {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}
+      {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
+      {actionError && (
         <p role="alert" className="mb-5 rounded-lg bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-400">
           {actionError}
         </p>
       )}
 
       <section id="contenido" tabIndex={-1} aria-label={t.dashboard.heroHeading} className="mb-6 outline-none sm:mb-8">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.heroHeading}</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.heroHeading}</h2>
       <div className="mb-5">
         <MarketPanel />
       </div>
@@ -312,7 +342,7 @@ export default function DashboardPage() {
       )}
 
       <section aria-label={t.dashboard.secondaryHeading} className="mb-6 sm:mb-8">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.secondaryHeading}</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.secondaryHeading}</h2>
       <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
         <Panel title={t.dashboard.systemTitle} badge={<DemoBadge quiet />}>
@@ -373,14 +403,14 @@ export default function DashboardPage() {
               <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
                 {logs.slice(0, logsVisible).map((l) => (
                   <li key={l.id} className="flex gap-2 font-mono">
-                    <span className="shrink-0 text-zinc-500">{time(l.created_utc)}</span>
+                    <span className="shrink-0 text-zinc-400">{time(l.created_utc)}</span>
                     <span className={`shrink-0 font-semibold ${
-                      l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-500"
+                      l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-400"
                     }`}>
                       {l.level}
                     </span>
                     <span className="break-words text-zinc-400">
-                      <span className="text-zinc-500">[{l.category}]</span> {l.message}
+                      <span className="text-zinc-400">[{l.category}]</span> {l.message}
                     </span>
                   </li>
                 ))}
@@ -397,7 +427,7 @@ export default function DashboardPage() {
       </section>
 
       <section aria-label={t.dashboard.controlTitle} className="mb-6 sm:mb-8">
-        <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">{t.dashboard.controlTitle}</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.controlTitle}</h2>
       <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* Scanner controls */}
         <Panel title={t.dashboard.scannerControlsTitle}>
@@ -423,7 +453,7 @@ export default function DashboardPage() {
             </button>
           </div>
           ) : (
-            <p className="mt-3 text-xs text-zinc-500">{t.dashboard.controlsAdminOnly}</p>
+            <p className="mt-3 text-xs text-zinc-400">{t.dashboard.controlsAdminOnly}</p>
           )}
         </Panel>
 
@@ -550,7 +580,7 @@ export default function DashboardPage() {
                       <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
                     </div>
                     <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
-                    <p className="mt-1 text-xs text-zinc-500">
+                    <p className="mt-1 text-xs text-zinc-400">
                       {sig.status} · {time(sig.created_utc)}
                     </p>
                   </li>
@@ -572,7 +602,7 @@ export default function DashboardPage() {
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">{t.dashboard.ordersTitle}</h3>
                   {operations.orders.length === 0 ? (
-                    <p className="text-sm text-zinc-500">{t.dashboard.noOrders}</p>
+                    <p className="text-sm text-zinc-400">{t.dashboard.noOrders}</p>
                   ) : (
                     <ul className="space-y-2">
                       {operations.orders.map((o, i) => (
@@ -586,7 +616,7 @@ export default function DashboardPage() {
                           <p className="mt-1 text-xs text-zinc-400">
                             {t.dashboard.quantity} {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
                           </p>
-                          <p className="mt-1 text-xs text-zinc-500">
+                          <p className="mt-1 text-xs text-zinc-400">
                             {time(typeof o["created_utc"] === "string" ? o["created_utc"] : null)}
                           </p>
                         </li>

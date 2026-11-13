@@ -1,4 +1,5 @@
 import type { MeResponse } from "./types";
+import { expiredLoginUrlFromLocation } from "../session";
 
 // Cliente fetch del API (extraído de lib/api.ts en Fase 4, sin cambios
 // de comportamiento). Único punto de fetch con timeout: request() (JSON)
@@ -45,6 +46,7 @@ export type ApiErrorKey =
   | "notFound"
   | "server"
   | "timeout"
+  | "tooManyRequests"
   | "unknown";
 
 export function errorKeyForStatus(status: number): ApiErrorKey {
@@ -52,6 +54,7 @@ export function errorKeyForStatus(status: number): ApiErrorKey {
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 404) return "notFound";
+  if (status === 429) return "tooManyRequests";
   if (status >= 500) return "server";
   return "unknown";
 }
@@ -171,6 +174,8 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 // al login. Solo aplica a peticiones con auth: true, así un 401 de login
 // por contraseña incorrecta sigue mostrando su error en la misma página
 // sin redirigir, y nunca se redirige estando ya en /login.
+// Único dueño del redirect (C2, 2026-11-13): la URL se construye en
+// lib/session.ts y conserva pathname + query del destino.
 export function handleUnauthorized() {
   if (typeof window === "undefined") return;
   if (window.location.pathname === "/login") return;
@@ -178,8 +183,7 @@ export function handleUnauthorized() {
   // Fase 4 (FE7): preservar el destino (?next=) y marcar la expiración para
   // que /login muestre "sesión expirada" en vez de un login pelado. El
   // backend sigue siendo el gate real; esto es solo UX de redirección.
-  const next = window.location.pathname || "/";
-  window.location.replace(`/login?next=${encodeURIComponent(next)}&expired=1`);
+  window.location.replace(expiredLoginUrlFromLocation());
 }
 
 // Detalle de error del backend cuando lo hay (FastAPI: {"detail": "..."});

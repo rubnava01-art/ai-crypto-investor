@@ -8,7 +8,7 @@ export default function NotFound() {
   const { t } = useLanguage();
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-zinc-950 px-4 py-10 text-center">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.25em] text-emerald-400">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-emerald-400">
         {t.header.brand}
       </p>
       <h1 className="text-2xl font-bold tracking-tight text-zinc-100">{t.misc.notFoundTitle}</h1>

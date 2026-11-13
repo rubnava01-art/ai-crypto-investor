@@ -117,6 +117,10 @@ export function apiErrorText(err: unknown, t: Dictionary): string {
       notFound: t.reliability.errorNotFound,
       server: t.reliability.errorServer,
       timeout: t.reliability.errorTimeout,
+      // M5: un 429 se muestra como "espera un minuto", nunca como error
+      // genérico; el cliente no reintenta 429 automáticamente (request()
+      // solo reintenta red/timeout y 502/503/504 en GETs opt-in).
+      tooManyRequests: t.reliability.errorTooManyRequests,
       unknown: t.reliability.errorUnknown,
     };
     return map[err.key] ?? err.message;

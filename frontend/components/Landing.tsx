@@ -1,14 +1,37 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../lib/i18n";
-import type { NavKey } from "../lib/i18n";
 import { PublicNav } from "./PublicNav";
 import { PlanesPanel } from "./PlanesPanel";
-import { PlanesCompare } from "./PlanesCompare";
 import { CompoundCalculator } from "./CompoundCalculator";
-import { LandingAi } from "./LandingAi";
+import { landingModuleKeys } from "./ModuleNav";
+import { SkipLink } from "./ui";
 import { Footer } from "./Footer";
+
+// M3 (2026-11-13): lo que está bajo el pliegue (sección IA y tabla
+// comparativa) no viaja en el bundle inicial: se carga al renderizar,
+// con un estado de carga visible. El héroe y la franja de precios se
+// quedan en el bundle inicial.
+const sectionLoading = () => (
+  <div role="status" className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-400">
+    <SectionLoadingText />
+  </div>
+);
+function SectionLoadingText() {
+  const { t } = useLanguage();
+  return <>{t.common.loading}</>;
+}
+const LandingAi = dynamic(() => import("./LandingAi").then((m) => m.LandingAi), {
+  ssr: false,
+  loading: sectionLoading,
+});
+const PlanesCompare = dynamic(() => import("./PlanesCompare").then((m) => m.PlanesCompare), {
+  ssr: false,
+  loading: sectionLoading,
+});
 
 /** Presentación pública de Grow Business Platform (2026-11-12): lo que
  * ve un visitante sin sesión en la raíz, en vez de acabar en /login.
@@ -24,11 +47,19 @@ import { Footer } from "./Footer";
  * Orden de secciones: héroe (con calculadora) → franja de confianza →
  * franja de precios → 4 pilares → sección IA → etapas → planes + tabla
  * comparativa → cómo empezar → cierre final con CTA → footer.
- * Convención "24 módulos": moreModules.length (24) = rutas de ModuleNav
- * (28) menos las 4 con presentación propia: / (Invertir), /estudiar,
- * /crear e /inicio (la propia portada). Gestionar es familia, no ruta:
- * sus módulos (crm, facturas, correos…) están dentro de los 24. La
- * cifra se deriva de moreModules.length, nunca a mano. */
+ * Convención "24 módulos": landingModuleKeys().length (24) = rutas de
+ * ModuleNav (28) menos las 4 con presentación propia: / (Invertir),
+ * /estudiar, /crear e /inicio (la propia portada). Gestionar es familia,
+ * no ruta: sus módulos (crm, facturas, correos…) están dentro de los 24.
+ * La cifra se deriva de MODULES, nunca a mano; los 3 módulos solo-admin
+ * van marcados con "(solo admin)". */
+
+// M8 (2026-11-13): constantes con nombre en vez de regex sobre el texto
+// del badge o literales sueltos. TRIAL_DAYS es la duración de la prueba
+// gratis (misma que p.trialBadge, "14 días gratis"); LANG_COUNT es el
+// número de idiomas (tipo Lang en lib/i18n/types.ts: es + en).
+const TRIAL_DAYS = 14;
+const LANG_COUNT = 2;
 
 const CTA_CLASS =
   "inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60";
@@ -46,6 +77,20 @@ export function Landing() {
   const l = t.landing;
   const p = t.planes;
   const c = t.clases;
+  // M2: CTA sticky discreto solo en móvil, visible cuando el héroe ya
+  // quedó arriba (el visitante que baja hasta la tabla no tiene que
+  // subir a buscar un CTA).
+  const heroRef = useRef<HTMLElement | null>(null);
+  const [showStickyCta, setShowStickyCta] = useState(false);
+  useEffect(() => {
+    const onScroll = () => {
+      const bottom = heroRef.current?.getBoundingClientRect().bottom ?? 0;
+      setShowStickyCta(bottom < 0);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const pillars = [
     { id: "pilar-invertir", title: l.modInvertirTitle, desc: l.modInvertirDesc },
     { id: "pilar-estudiar", title: l.modEstudiarTitle, desc: l.modEstudiarDesc },
@@ -54,14 +99,10 @@ export function Landing() {
   ];
   // Resto de módulos reales (ModuleNav / t.nav), fuera de los 4 pilares
   // (Invertir, Estudiar, Crear ya son tarjetas) y de Inicio (la propia
-  // portada). Solo nombres: la lista completa vive en el menú al entrar.
-  const moreModules: NavKey[] = [
-    "analizador", "crm", "referidos", "business", "espacio", "facturas",
-    "correos", "chat", "recomendaciones", "desarrollo", "talento",
-    "riesgos", "planillas", "analisis", "tendencias", "auditor",
-    "privacidad", "inventario", "perfil", "usuarios", "ajustador",
-    "terminal", "flujos", "planes",
-  ];
+  // portada). Se deriva de MODULES (M8): si el menú cambia, la lista y
+  // el "24 módulos" cambian solos. Solo nombres: la lista completa vive
+  // en el menú al entrar.
+  const moreModules = landingModuleKeys();
   const steps = [
     { n: "1", title: l.howStep1Title, desc: l.howStep1Desc },
     { n: "2", title: l.howStep2Title, desc: l.howStep2Desc },
@@ -75,14 +116,13 @@ export function Landing() {
     { name: p.nameTotal, price: p.priceTotal },
   ];
   // Franja de confianza: cifras derivadas del código, nunca a mano.
-  // "14" se extrae de p.trialBadge (única fuente de la prueba gratis);
-  // "2" idiomas = es + en (tipo Lang en lib/i18n/types.ts).
+  // Los días de prueba y los idiomas son constantes con nombre (M8).
   const trustItems = [
     { value: String(moreModules.length), label: l.trustModules },
     { value: String(pillars.length), label: l.trustPillars },
     { value: String(stripPlans.length), label: l.trustPlans },
-    { value: p.trialBadge.match(/\d+/)?.[0] ?? "14", label: l.trustTrial },
-    { value: "2", label: l.trustLangs },
+    { value: String(TRIAL_DAYS), label: l.trustTrial },
+    { value: String(LANG_COUNT), label: l.trustLangs },
   ];
   // Segmentación por etapa: cada etapa enlaza a su tarjeta de plan.
   const stages = [
@@ -102,14 +142,15 @@ export function Landing() {
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-100">
       <PublicNav />
-      <main className="mx-auto max-w-6xl px-4 sm:px-6">
+      <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 outline-none sm:px-6">
+        <SkipLink label={t.shell.skipLink} />
         {/* Héroe: texto a la izquierda, calculadora a la derecha en
             escritorio; apilado en móvil. La calculadora es 100 %
             navegador (sin red, sin auth) y reutiliza t.clases.calc*. */}
-        <section className="py-12 sm:py-16">
+        <section ref={heroRef} className="py-12 sm:py-16">
           <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
             <div>
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">
                 {l.eyebrow}
               </p>
               <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
@@ -118,18 +159,18 @@ export function Landing() {
               <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
                 {l.subtitle}
               </p>
+              {/* M2: jerarquía de un solo primario — Registrarse primero
+                  (el visitante sin cuenta), Entrar como secundario y Ver
+                  planes como enlace terciario. */}
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-                >
-                  {l.ctaLogin}
+                <Link href="/login?mode=register" className={CTA_CLASS}>
+                  {l.ctaRegister}
                 </Link>
                 <Link
-                  href="/login?mode=register"
+                  href="/login"
                   className="inline-flex min-h-[44px] items-center rounded-lg border border-zinc-700 px-5 py-3 text-sm font-bold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >
-                  {l.ctaRegister}
+                  {l.ctaLogin}
                 </Link>
                 <a
                   href="#planes"
@@ -278,12 +319,13 @@ export function Landing() {
           <h3 className="mt-8 text-lg font-bold text-zinc-50">{l.moreModulesTitle}</h3>
           <p className="mt-1 text-sm leading-relaxed text-zinc-400">{l.moreModulesIntro}</p>
           <ul className="mt-4 flex flex-wrap gap-2">
-            {moreModules.map((key) => (
+            {moreModules.map(({ key, adminOnly }) => (
               <li
                 key={key}
                 className="rounded-full border border-zinc-700 bg-zinc-900/60 px-3.5 py-2 text-sm font-medium text-zinc-200"
               >
                 {t.nav[key].label}
+                {adminOnly && <span className="text-zinc-400"> ({l.adminOnlyTag})</span>}
               </li>
             ))}
           </ul>
@@ -359,6 +401,20 @@ export function Landing() {
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-400">{l.howStep2Desc}</p>
         </section>
       </main>
+      {/* M2: CTA sticky discreto solo en móvil, tras pasar el héroe. */}
+      {showStickyCta && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur sm:hidden">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
+            <p className="min-w-0 text-xs leading-snug text-zinc-400">
+              {p.trialBadge} · {p.nameEsencial} {p.priceEsencial}
+              {p.perMonth}
+            </p>
+            <Link href="/login?mode=register" className="inline-flex min-h-[44px] shrink-0 items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60">
+              {l.ctaStartFree}
+            </Link>
+          </div>
+        </div>
+      )}
       <Footer />
     </div>
   );

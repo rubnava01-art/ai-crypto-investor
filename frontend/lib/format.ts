@@ -38,3 +38,17 @@ export function formatDateTimeUtc(iso: string | null | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-US", { timeZone: "UTC", hour12: false }) + " UTC";
 }
+
+/** Escapa texto para interpolarlo en HTML (C1, 2026-11-13): & < > " '.
+ * Sin esto, un dato guardado (p. ej. la descripción de una factura, que
+ * puede venir del CRM) podía romper el HTML de impresión e inyectar
+ * script en una ventana del mismo origen (XSS almacenado). */
+export function escapeHtml(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

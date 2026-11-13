@@ -13,7 +13,7 @@ export const usersApi = {
   updateUser: (id: number, patch: { role?: "admin" | "prueba" | "super_admin"; password?: string }) =>
     request<AdminUser>(`/api/users/${id}`, { method: "PATCH", auth: true, body: patch }),
   registerChallenge: () => request<RegisterChallenge>("/api/auth/register-challenge"),
-  register: (body: { username: string; password: string; challenge_id: string; answer: number }) =>
+  register: (body: { username: string; password: string; challenge_id: string; answer: number; plan?: string }) =>
     request<AdminUser>("/api/auth/register", { method: "POST", body }),
   deleteUser: (id: number) =>
     request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),

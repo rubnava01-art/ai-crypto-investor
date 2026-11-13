@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.hardening import audit
-from app.core.rate_limit import login_limiter, login_lockout
+from app.core.rate_limit import LoginLockout, login_limiter, login_lockout
 from app.core.security import (
     PENDING_DETAIL,
     check_password_bytes,
@@ -70,16 +70,52 @@ def _password_byte_cap(v: str) -> str:
     return v
 
 
+# Plan elegido en la landing (A2, 2026-11-13): claves canónicas de
+# t.planes — "esencial" | "crecimiento" | "total" (nombres
+# nameEsencial / nameCrecimiento / nameTotal y anclas PLAN_CARD_IDS
+# "plan-esencial" / "plan-crecimiento" / "plan-total" en
+# PlanesPanel.tsx). El registro acepta ambas formas y guarda la
+# canónica corta; cualquier otro valor es 422. Sin pago en línea: la
+# elección solo se guarda para que el admin la vea al aprobar.
+REQUESTED_PLAN_KEYS = ("esencial", "crecimiento", "total")
+
+
+def normalize_requested_plan(value: str) -> str:
+    """Canonicaliza el plan del query param ?plan= / del registro.
+
+    Acepta la clave corta ("esencial") y el id de tarjeta
+    ("plan-esencial"); rechaza cualquier otro valor con ValueError
+    (Pydantic lo convierte en 422)."""
+    v = (value or "").strip().lower()
+    if v.startswith("plan-"):
+        v = v[len("plan-"):]
+    if v not in REQUESTED_PLAN_KEYS:
+        raise ValueError(
+            "plan debe ser uno de: " + ", ".join(REQUESTED_PLAN_KEYS)
+        )
+    return v
+
+
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=12, max_length=128)
     challenge_id: str = Field(min_length=1)
     answer: int
+    # Plan elegido en la landing (?plan=<clave>). Opcional: registrarse
+    # sin elegir plan sigue funcionando y guarda NULL.
+    plan: str | None = None
 
     @field_validator("password")
     @classmethod
     def _password_bytes(cls, v: str) -> str:
         return _password_byte_cap(v)
+
+    @field_validator("plan")
+    @classmethod
+    def _normalize_plan(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return normalize_requested_plan(v)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -89,6 +125,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos de inicio de sesión. Espera un minuto.",
+            # 2026-11-13 (M5): el cliente necesita saber cuánto esperar.
+            headers={"Retry-After": "60"},
         )
     # Per-account lockout (M3): checked before verifying, so a locked
     # account cannot be brute-forced even with the right password.
@@ -96,6 +134,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos fallidos. Espera unos minutos.",
+            headers={"Retry-After": str(LoginLockout.LOCKOUT_SECONDS)},
         )
     user = db.query(User).filter(User.username == payload.username).first()
     if user is None or not verify_password(payload.password, user.password_hash):
@@ -155,6 +194,8 @@ def register_challenge(request: Request):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiadas verificaciones. Espera un minuto.",
+            # 2026-11-13 (M5).
+            headers={"Retry-After": "60"},
         )
     _prune_challenges()
     a = random.randint(10, 99)
@@ -175,6 +216,8 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos de registro. Espera un minuto.",
+            # 2026-11-13 (M5).
+            headers={"Retry-After": "60"},
         )
     _prune_challenges()
     expected = _CHALLENGES.pop(payload.challenge_id, None)
@@ -190,6 +233,9 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         username=username,
         password_hash=hash_password(payload.password),
         is_admin=False,
+        # A2: la elección de plan de la landing, ya canonicalizada por
+        # el validador (None si se registró sin elegir plan).
+        requested_plan=payload.plan,
     )
     db.add(user)
     db.flush()  # populate user.id without committing yet
@@ -206,5 +252,6 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         "is_admin": False,
         "is_super_admin": False,
         "status": "pending",
+        "requested_plan": user.requested_plan,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }

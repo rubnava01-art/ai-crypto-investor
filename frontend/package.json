@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
+    "test": "node --test --import ./test-register.mjs \"lib/**/*.test.ts\"",
     "check": "npm run typecheck && npm run build",
     "start": "next start"
   },

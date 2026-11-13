@@ -23,6 +23,15 @@ export function UsersPanel() {
         : u.is_admin
           ? t.usuarios.roleAdmin
           : t.usuarios.roleTrial;
+  // P1-1 (2026-11-13): nombre visible del plan elegido en el registro.
+  const planName = (key: string | null) =>
+    key === "esencial"
+      ? t.planes.nameEsencial
+      : key === "crecimiento"
+        ? t.planes.nameCrecimiento
+        : key === "total"
+          ? t.planes.nameTotal
+          : key;
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [meSuper, setMeSuper] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -279,6 +288,16 @@ export function UsersPanel() {
                     )}
                   </p>
                   <p className="text-xs text-zinc-400">{roleLabel(u)}</p>
+                  {u.status === "pending" && u.requested_plan && (
+                    <p className="mt-1">
+                      <span className="whitespace-nowrap rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-400">
+                        {t.usuarios.requestedPlan.replace(
+                          "{plan}",
+                          planName(u.requested_plan) ?? u.requested_plan,
+                        )}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 {u.status === "pending" ? (
                   <>

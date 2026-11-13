@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
 
 /** Icono de verificación (sin emoji): marca de la lista de funciones. */
@@ -37,9 +38,30 @@ export const PLAN_FEATURE_KEYS = [
   ["fTalento", "fRiesgos", "fPlanillas", "fAnalisis", "fReferidos", "fAjustador"],
 ] as const;
 
+/** Claves de plan para ?plan= (contrato A2, 2026-11-13): los valores
+ * EXACTOS que viajan en /login?mode=register&plan=<clave> y en el
+ * payload de registro; el admin los ve en la vista de pendientes.
+ * Sufijos de las claves de t.planes (nameEsencial, priceEsencial…). */
+export const PLAN_KEYS = ["esencial", "crecimiento", "total"] as const;
+export type PlanKey = (typeof PLAN_KEYS)[number];
+
+export function isPlanKey(value: string | null | undefined): value is PlanKey {
+  return value === "esencial" || value === "crecimiento" || value === "total";
+}
+
 /** Ids de ancla de cada tarjeta de plan (para la segmentación por etapa
  * de la landing: #plan-esencial, #plan-crecimiento, #plan-total). */
 export const PLAN_CARD_IDS = ["plan-esencial", "plan-crecimiento", "plan-total"] as const;
+
+/** Nombre visible de un plan por su clave (para el aviso post-registro). */
+export function planNameForKey(t: { planes: Record<string, string> }, key: PlanKey): string {
+  const map: Record<PlanKey, string> = {
+    esencial: t.planes.nameEsencial,
+    crecimiento: t.planes.nameCrecimiento,
+    total: t.planes.nameTotal,
+  };
+  return map[key];
+}
 
 export function PlanesPanel() {
   const { t } = useLanguage();
@@ -48,6 +70,7 @@ export function PlanesPanel() {
   const cards = [
     {
       id: PLAN_CARD_IDS[0],
+      planKey: PLAN_KEYS[0],
       name: p.nameEsencial,
       tag: p.tagEsencial,
       price: p.priceEsencial,
@@ -56,6 +79,7 @@ export function PlanesPanel() {
     },
     {
       id: PLAN_CARD_IDS[1],
+      planKey: PLAN_KEYS[1],
       name: p.nameCrecimiento,
       tag: p.tagCrecimiento,
       price: p.priceCrecimiento,
@@ -65,6 +89,7 @@ export function PlanesPanel() {
     },
     {
       id: PLAN_CARD_IDS[2],
+      planKey: PLAN_KEYS[2],
       name: p.nameTotal,
       tag: p.tagTotal,
       price: p.priceTotal,
@@ -97,11 +122,9 @@ export function PlanesPanel() {
                 : "flex scroll-mt-20 flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"
             }
           >
-            {c.popular && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-500 px-3 py-0.5 text-xs font-bold text-zinc-950">
-                {p.mostPopular}
-              </span>
-            )}
+            {/* M1 (2026-11-13): sin badge "El más elegido" — era una
+                afirmación sin fuente. El borde ámbar de la tarjeta central
+                se conserva como distinción visual, sin texto. */}
             <h2 className="text-lg font-bold text-zinc-100">{c.name}</h2>
             <p className="mt-1 text-sm text-zinc-400">{c.tag}</p>
             <p className="mt-4 flex items-baseline gap-1">
@@ -109,7 +132,7 @@ export function PlanesPanel() {
               <span className="text-sm text-zinc-400">{p.perMonth}</span>
             </p>
             <p className="mt-1 text-xs font-semibold text-amber-300">{p.trialBadge}</p>
-            <ul className="mt-5 space-y-2.5 text-sm text-zinc-200">
+            <ul className="mt-5 flex-1 space-y-2.5 text-sm text-zinc-200">
               {c.includes && <li className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{c.includes}</li>}
               {c.features.map((f) => (
                 <li key={f} className="flex items-start gap-2">
@@ -118,6 +141,14 @@ export function PlanesPanel() {
                 </li>
               ))}
             </ul>
+            {/* A2: CTA propio por tarjeta — la elección de plan viaja en
+                ?plan= hasta el registro y de ahí al admin. */}
+            <Link
+              href={`/login?mode=register&plan=${c.planKey}`}
+              className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+            >
+              {p.startWith.replace("{plan}", c.name)}
+            </Link>
           </article>
         ))}
       </div>

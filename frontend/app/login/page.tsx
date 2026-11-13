@@ -2,8 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, setToken, ApiError } from "../../lib/api";
+import { api, getToken, setToken, ApiError } from "../../lib/api";
+import { safeNext } from "../../lib/session";
+import { isPlanKey, planNameForKey, type PlanKey } from "../../components/PlanesPanel";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
 import { PublicNav } from "../../components/PublicNav";
@@ -27,18 +30,29 @@ import { SkipLink } from "../../components/ui";
  * Cuentas por aprobar (2026-10-30): el registro ya NO inicia sesión
  * directo — la cuenta queda pendiente hasta que un administrador la
  * active desde el módulo Control de usuarios; el login de una cuenta
- * pendiente responde 403 con el aviso en español. */
+ * pendiente responde 403 con el aviso en español.
+ * 2026-11-13: destino ?next= validado en lib/session.ts (A4); con
+ * sesión válida se redirige fuera de /login salvo expired=1 (A5); el
+ * plan elegido en las tarjetas (?plan=) se conserva, se muestra y se
+ * envía en el registro (A2); el aviso post-registro es honesto — sin
+ * plazo inventado y con enlace a /contacto (A3); el cambio de modo ya
+ * no borra las credenciales escritas (M12). */
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Fase 4 (FE7): volver al destino preservado (?next=) tras el login y
   // avisar cuando la llegada es por sesión expirada (?expired=1). Solo se
-  // aceptan destinos internos ("/..." sin "//") para no abrir redirects.
+  // aceptan destinos internos validados (lib/session.ts): sin backslash,
+  // sin slashes codificados y nunca el propio /login.
   const nextParam = searchParams.get("next");
-  const nextDest =
-    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
+  const nextDest = safeNext(nextParam);
   const sessionExpired = searchParams.get("expired") === "1";
   const { t } = useLanguage();
+  // A2: plan elegido en las tarjetas de PlanesPanel (?plan=esencial |
+  // crecimiento | total). Un valor desconocido se ignora, no se inventa.
+  const planParam = searchParams.get("plan");
+  const plan: PlanKey | null = isPlanKey(planParam) ? planParam : null;
+  const planName = plan ? planNameForKey(t, plan) : null;
   // Intro animado: con movimiento reducido no se aplica ninguna clase de
   // animación; la media query de globals.css es la red de seguridad.
   const reducedMotion = usePrefersReducedMotion();
@@ -55,10 +69,18 @@ function LoginPageInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [registeredPlan, setRegisteredPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
+
+  // A5: con sesión válida, /login no es destino — volver al destino
+  // pedido (o al dashboard). Con expired=1 NO se redirige: el aviso de
+  // sesión expirada debe seguir visible y el token ya no vale.
+  useEffect(() => {
+    if (!sessionExpired && getToken()) router.replace(nextDest);
+  }, [sessionExpired, nextDest, router]);
 
   const loadChallenge = useCallback(async () => {
     try {
@@ -77,12 +99,14 @@ function LoginPageInner() {
     loadChallenge();
   }, [loadChallenge]);
 
+  // M12: cambiar de modo ya NO borra el usuario ni la contraseña: si el
+  // usuario escribió sus credenciales en "Entrar" y toca "Registrarse"
+  // por error, no lo pierde todo. Solo se limpian error, aviso y respuesta.
   const switchMode = useCallback((m: "login" | "register") => {
     setMode(m);
     setError(null);
     setNotice(null);
-    setUsername("");
-    setPassword("");
+    setRegisteredPlan(null);
     setShowPassword(false);
     setAnswer("");
     if (m === "register") loadChallenge();
@@ -98,9 +122,12 @@ function LoginPageInner() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    setRegisteredPlan(null);
     setLoading(true);
     try {
-      const res = await api.login(username, password);
+      // M6: el login también recorta el usuario (el registro ya lo hacía):
+      // " ruben " no debe fallar cuando la cuenta es "ruben".
+      const res = await api.login(username.trim(), password);
       setToken(res.access_token);
       router.replace(nextDest);
     } catch (err) {
@@ -114,6 +141,14 @@ function LoginPageInner() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    setRegisteredPlan(null);
+    // M6: la respuesta matemática debe ser un entero. Sin esto, Number(" ")
+    // es 0, "1e2" es 100 y "abc" es NaN (null en JSON → 422 crudo).
+    const trimmedAnswer = answer.trim();
+    if (!/^-?\d+$/.test(trimmedAnswer)) {
+      setError(t.login.errorAnswerInvalid);
+      return;
+    }
     setLoading(true);
     try {
       if (!challenge) throw new Error(t.login.errorChallenge);
@@ -121,17 +156,26 @@ function LoginPageInner() {
         username: username.trim(),
         password,
         challenge_id: challenge.challenge_id,
-        answer: Number(answer),
+        answer: Number(trimmedAnswer),
+        // A2: la elección de plan viaja al backend (requested_plan) para
+        // que el admin la vea en los pendientes. Sin plan, no se envía.
+        ...(plan ? { plan } : {}),
       });
       // Cuenta pendiente: NO inicia sesión directa; un administrador la
       // activa desde Control de usuarios y entonces podrá entrar.
       setNotice(t.login.noticePending);
+      setRegisteredPlan(planName);
       setMode("login");
-      setUsername("");
       setPassword("");
       setAnswer("");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.login.errorCreate);
+      // M6: el 422 del reto (respuesta no entera o reto vencido) se muestra
+      // con texto i18n, no con el detalle crudo del backend.
+      if (err instanceof ApiError && err.status === 422) {
+        setError(t.login.errorAnswerInvalid);
+      } else {
+        setError(err instanceof ApiError ? err.message : t.login.errorCreate);
+      }
       loadChallenge();
     } finally {
       setLoading(false);
@@ -143,7 +187,7 @@ function LoginPageInner() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-blue-700">
-      <PublicNav />
+      <PublicNav variant="onBlue" />
       <main data-login className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-12">
       <SkipLink label={t.shell.skipLink} />
       {/* Mosaicos estilo Metro: cuadrados planos blancos semitransparentes,
@@ -173,6 +217,11 @@ function LoginPageInner() {
         <p className={`mt-1 max-w-xs text-sm leading-relaxed text-blue-100${introCls ? " login-intro" : ""}`} style={introStyle(250)}>
           {mode === "login" ? t.login.subtitleLogin : t.login.subtitleRegister}
         </p>
+        {mode === "register" && planName && (
+          <p className="mt-2 rounded-none bg-white/15 px-3 py-1.5 text-sm font-semibold text-white">
+            {t.login.pendingPlan.replace("{plan}", planName)}
+          </p>
+        )}
       </div>
 
       <form
@@ -185,12 +234,13 @@ function LoginPageInner() {
         <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-blue-600" />
         {/* Pestañas Entrar / Registrarse: el mismo cambio de modo que el
          * enlace de abajo, visible desde arriba para que el acceso se
-         * entienda de un vistazo. */}
-        <div role="tablist" className="mb-5 grid grid-cols-2 gap-1 bg-zinc-100 p-1">
+         * entienda de un vistazo. M12: dos botones simples con
+         * aria-pressed en vez de un tablist incompleto (sin tabpanel ni
+         * navegación con flechas). */}
+        <div className="mb-5 grid grid-cols-2 gap-1 bg-zinc-100 p-1">
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === "login"}
+            aria-pressed={mode === "login"}
             onClick={() => switchMode("login")}
             className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "login" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
           >
@@ -198,8 +248,7 @@ function LoginPageInner() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === "register"}
+            aria-pressed={mode === "register"}
             onClick={() => switchMode("register")}
             className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "register" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
           >
@@ -218,6 +267,7 @@ function LoginPageInner() {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               placeholder={t.login.userPlaceholder}
+              maxLength={64}
               required
             />
           </span>
@@ -235,7 +285,8 @@ function LoginPageInner() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               placeholder={t.login.passwordPlaceholder}
-              minLength={mode === "register" ? 12 : 1}
+              minLength={12}
+              maxLength={128}
               required
             />
             <button
@@ -256,9 +307,9 @@ function LoginPageInner() {
               )}
             </button>
           </span>
-          {mode === "register" && (
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.login.passwordMinHint}</p>
-          )}
+          {/* M12: la misma pista en ambos modos (todas las contraseñas
+              de la plataforma tienen al menos 12 caracteres). */}
+          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.login.passwordMinHint}</p>
         </label>
 
         {mode === "register" && (
@@ -283,6 +334,7 @@ function LoginPageInner() {
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 inputMode="numeric"
+                maxLength={10}
                 required
                 autoComplete="off"
                 placeholder={t.login.answerPlaceholder}
@@ -304,16 +356,29 @@ function LoginPageInner() {
           </p>
         )}
 
-        {sessionExpired && mode === "login" && (
+        {/* M10: el aviso de sesión expirada se muestra en ambos modos. */}
+        {sessionExpired && (
           <p role="status" className="mb-5 rounded-none bg-amber-50 px-3.5 py-2.5 text-sm leading-relaxed text-amber-700 ring-1 ring-amber-200">
             {t.reliability.sessionExpired}
           </p>
         )}
 
         {notice && (
-          <p role="status" className="mb-5 rounded-none bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-emerald-700 ring-1 ring-emerald-200">
-            {notice}
-          </p>
+          <div role="status" className="mb-5 rounded-none bg-emerald-50 px-3.5 py-2.5 text-sm leading-relaxed text-emerald-700 ring-1 ring-emerald-200">
+            <p>{notice}</p>
+            {registeredPlan && (
+              <p className="mt-1 font-semibold">{t.login.pendingPlan.replace("{plan}", registeredPlan)}</p>
+            )}
+            {/* A3: qué pasa ahora, sin inventar plazo ni contacto: la
+                activación la revisa un administrador y no hay un plazo
+                publicado; la página de contacto es el siguiente paso. */}
+            <p className="mt-1">{t.login.pendingNext}</p>
+            <p className="mt-2">
+              <Link href="/contacto" className="font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-900">
+                {t.login.contactLink}
+              </Link>
+            </p>
+          </div>
         )}
 
         {error && (

@@ -7,7 +7,7 @@
 // ClassSection, que se duplica). Datos en vivo solo de /api/market/*:
 // un 503 es "sin datos" y nunca se muestra un precio viejo como actual.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { api, isMarketNoData, type MarketCandlesResponse, type MarketIndicatorsResponse, type MarketTickerResponse } from "../lib/api";
+import { api, ApiError, isMarketNoData, type MarketCandlesResponse, type MarketIndicatorsResponse, type MarketTickerResponse } from "../lib/api";
 import { Panel } from "./Panel";
 import { ApiErrorBanner } from "./ui";
 import { useLanguage } from "../lib/i18n";
@@ -107,8 +107,13 @@ function BtcConverter() {
   const [usd, setUsd] = useState("");
   const [lastEdited, setLastEdited] = useState<"btc" | "usd">("btc");
   const abortRef = useRef<AbortController | null>(null);
+  // M10: tras el primer 401 el cliente ya disparó el redirect central a
+  // /login — el sondeo debe parar, no volver a disparar handleUnauthorized
+  // ni pintar un banner de error en una página que se está abandonando.
+  const sessionGoneRef = useRef(false);
 
   const load = useCallback(async () => {
+    if (sessionGoneRef.current) return;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -123,6 +128,12 @@ function BtcConverter() {
     } catch (e) {
       if (ctrl.signal.aborted || isCancelled()) return;
       if (e instanceof DOMException && e.name === "AbortError") return;
+      // 401: la sesión expiró y el redirect global ya está en marcha.
+      // Parar el sondeo y no mostrar error: no hay nada que reintentar.
+      if (e instanceof ApiError && e.status === 401) {
+        sessionGoneRef.current = true;
+        return;
+      }
       setError(e);
       setStatus(isMarketNoData(e) ? "nodata" : "error");
     }
@@ -131,6 +142,8 @@ function BtcConverter() {
   useEffect(() => {
     load();
     // Sondeo ~10 s, pausado con la pestaña oculta (no gasta peticiones).
+    // Tras un 401, load() ya no hace nada (sessionGoneRef): el intervalo
+    // sigue vivo pero sin red hasta desmontar el componente.
     const poll = setInterval(() => {
       if (document.hidden) return;
       load();

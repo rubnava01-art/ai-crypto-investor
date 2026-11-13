@@ -24,7 +24,7 @@ function Icon({ d, children }: { d?: string; children?: React.ReactNode }) {
   );
 }
 
-const MODULES = [
+export const MODULES = [
   {
     href: "/inicio",
     label: "Inicio",
@@ -267,7 +267,7 @@ const MODULES = [
 // Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
 // descripción visibles salen de ahí, no de los textos fijos de MODULES
 // (que quedan como respaldo si una ruta no tiene entrada).
-const KEY_BY_HREF: Record<string, NavKey> = {
+export const KEY_BY_HREF: Record<string, NavKey> = {
   "/inicio": "inicio",
   "/": "invertir",
   "/estudiar": "estudiar",
@@ -297,6 +297,23 @@ const KEY_BY_HREF: Record<string, NavKey> = {
   "/flujos": "flujos",
   "/planes": "planes",
 };
+
+/** Rutas con presentación propia en la landing (no se listan entre los
+ * "módulos extra"): la propia portada (/inicio), Invertir (raíz),
+ * Estudiar y Crear (los 4 pilares). */
+export const LANDING_PRESENTATION_HREFS: readonly string[] = ["/inicio", "/", "/estudiar", "/crear"];
+
+/** Claves de módulo para la landing (M8, 2026-11-13): se derivan de
+ * MODULES, así el "24 módulos" de la franja de confianza no se
+ * desincroniza si el menú añade o quita una ruta. Los 3 módulos
+ * solo-admin van marcados para que la landing no prometa a un visitante
+ * de prueba módulos que no verá en su menú. */
+export function landingModuleKeys(): { key: NavKey; adminOnly: boolean }[] {
+  return MODULES.filter((m) => !LANDING_PRESENTATION_HREFS.includes(m.href)).map((m) => ({
+    key: KEY_BY_HREF[m.href],
+    adminOnly: "adminOnly" in m && (m as { adminOnly?: boolean }).adminOnly === true,
+  }));
+}
 
 /** Familias de navegación (Fase 5, F1): las 26 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
@@ -462,7 +479,7 @@ export function ModuleNav() {
           listan entradas admin ni se habla de "solo lectura"; las entradas
           adminOnly aparecen solo cuando /me confirma admin. */}
       {role === "loading" && (
-        <p role="status" className="px-1 py-2 text-xs text-zinc-500">
+        <p role="status" className="px-1 py-2 text-xs text-zinc-400">
           {t.nav.checkingRole}
         </p>
       )}
@@ -502,7 +519,7 @@ export function ModuleNav() {
           const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
           return (
             <section key={g.key} aria-label={groupLabel}>
-              <h2 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
                 <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
                 {groupLabel}
               </h2>

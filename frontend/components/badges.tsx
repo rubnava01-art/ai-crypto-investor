@@ -11,9 +11,12 @@ export function DemoBadge({ quiet = false }: { quiet?: boolean } = {}) {
   return (
     <span
       className={
+        // M13: mínimo de texto funcional 12 px (antes 10/11 px) y zinc-400
+        // como mínimo para el texto secundario. La etiqueta DEMO no se
+        // toca en texto ni presencia, solo en tamaño/contraste.
         quiet
-          ? "inline-flex shrink-0 select-none items-center whitespace-nowrap rounded-md bg-zinc-500/10 px-2 py-1 text-[10px] font-semibold leading-none tracking-widest text-zinc-400 ring-1 ring-inset ring-zinc-500/30"
-          : "inline-flex shrink-0 select-none items-center whitespace-nowrap rounded-md bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold leading-none tracking-widest text-amber-400 ring-1 ring-inset ring-amber-500/40"
+          ? "inline-flex shrink-0 select-none items-center whitespace-nowrap rounded-md bg-zinc-500/10 px-2 py-1 text-xs font-semibold leading-none tracking-widest text-zinc-400 ring-1 ring-inset ring-zinc-500/30"
+          : "inline-flex shrink-0 select-none items-center whitespace-nowrap rounded-md bg-amber-500/15 px-2.5 py-1 text-xs font-bold leading-none tracking-widest text-amber-400 ring-1 ring-inset ring-amber-500/40"
       }
     >
       DEMO
@@ -45,5 +48,5 @@ export function StatusDot({
 }
 
 export function EmptyState({ text }: { text: string }) {
-  return <p className="px-4 py-8 text-center text-sm leading-relaxed text-zinc-500">{text}</p>;
+  return <p className="px-4 py-8 text-center text-sm leading-relaxed text-zinc-400">{text}</p>;
 }
