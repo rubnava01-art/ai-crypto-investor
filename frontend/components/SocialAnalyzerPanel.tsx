@@ -143,7 +143,7 @@ function levelCls(level: SocialLevel): string {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 function loadSaved(): SocialAnalysis[] {
   try {
@@ -393,11 +393,11 @@ export function SocialAnalyzerPanel() {
             />
           </div>
         </div>
-        <p className="text-xs leading-relaxed text-zinc-500">{t.social.manualNote}</p>
+        <p className="text-xs leading-relaxed text-zinc-400">{t.social.manualNote}</p>
         <button
           type="submit"
           disabled={!input.trim()}
-          className="w-full rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+          className="w-full rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {t.social.analyze}
         </button>

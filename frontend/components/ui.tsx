@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../lib/api";
-import type { Dictionary } from "../lib/i18n";
+import { useLanguage, type Dictionary } from "../lib/i18n";
 import { formatDate, formatMoney } from "../lib/format";
 
 // ---------- Button / Input ----------
@@ -33,19 +33,40 @@ export function Button({
 }) {
   const tone =
     variant === "primary"
-      ? "bg-emerald-600 text-white hover:bg-emerald-500"
+      ? "bg-emerald-700 text-white hover:bg-emerald-800"
       : variant === "danger"
-        ? "bg-red-700 text-white hover:bg-red-600"
+        ? "bg-red-700 text-white hover:bg-red-800"
         : "border border-zinc-700 text-zinc-200 hover:bg-zinc-800";
   return <button type="button" className={`${btnBase} ${tone} ${className}`} {...props} />;
 }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  // H-3 Fase B: patrón migrado a .fintech-input (globals.css) con los
+  // tokens --fintech-* (borde slate-800, fondo slate-900 sólido,
+  // placeholder slate-400, foco esmeralda). El anillo de foco lo da la
+  // regla global :focus-visible; el className del llamador sigue
+  // pudiendo ampliarlo (las utilidades Tailwind ganan a la capa
+  // components). Sin cambio de conducta: mismo alto 44px, mismo radio.
   return (
     <input
       {...props}
-      className={`w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${props.className ?? ""}`}
+      className={`fintech-input ${props.className ?? ""}`}
     />
+  );
+}
+
+/** PanelLoading compartido (H-12): el mismo estado de carga que Estudiar
+ * y Crear duplicaban en local, con texto zinc-400 (AA sobre oscuro, ver
+ * H-1). Se usa como `loading` de los dynamic() de paneles diferidos. */
+export function PanelLoading() {
+  const { t } = useLanguage();
+  return (
+    <div
+      role="status"
+      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-400"
+    >
+      {t.dashboard.panelLoading}
+    </div>
   );
 }
 
@@ -211,7 +232,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="min-h-[44px] flex-1 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+            className="min-h-[44px] flex-1 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
           >
             {t.reliability.confirmOk}
           </button>
@@ -300,7 +321,7 @@ export function LoadMore({
   if (visible >= total) return null;
   return (
     <div className="mt-3 text-center">
-      <p className="mb-2 text-xs text-zinc-500">
+      <p className="mb-2 text-xs text-zinc-400">
         {t.reliability.showingOf.replace("{n}", String(visible)).replace("{total}", String(total))}
       </p>
       <button
@@ -349,10 +370,13 @@ export async function copyTextWithFallback(text: string): Promise<boolean> {
     ta.style.position = "fixed";
     ta.style.opacity = "0";
     document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    return ok;
+    try {
+      ta.select();
+      return document.execCommand("copy");
+    } finally {
+      // B-5: quitarlo siempre; si execCommand lanza, no queda huérfano.
+      ta.remove();
+    }
   } catch {
     return false;
   }

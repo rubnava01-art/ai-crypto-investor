@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.auditor import USER_AGENT, check_host_allowed, validate_url
-from app.core.rate_limit import RateLimiter
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user
 from app.models.tables import User
 
@@ -774,9 +774,8 @@ def analizar_url(
     # Cualquier usuario autenticado puede analizar (como comentar en Inicio);
     # el control es SSRF + rate limit, no el rol.
     if not analizador_limiter.allow(f"analizador:{user.id}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas revisiones. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiadas revisiones. Espera un minuto.", analizador_limiter.window
         )
     final_url, titulo, texto, estructura = fetch_texto(payload.url)
     resultado = analizar_texto(texto)

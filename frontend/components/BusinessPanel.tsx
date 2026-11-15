@@ -125,7 +125,7 @@ export function BusinessPanel() {
             onClick={() => setArea(a.value)}
             className={
               area === a.value
-                ? "min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                ? "min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                 : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             }
           >
@@ -154,7 +154,7 @@ export function BusinessPanel() {
                       <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></Field>
                       <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
                       <div className="flex gap-2">
-                        <button onClick={saveEdit} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
+                        <button onClick={saveEdit} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
                         <button onClick={() => setEditingNote(null)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
                       </div>
                     </div>
@@ -198,7 +198,7 @@ export function BusinessPanel() {
                   value={noteBody}
                   onChange={(e) => setNoteBody(e.target.value)}
                 /></Field>
-                <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.saveNote}
                 </button>
               </div>
@@ -220,7 +220,7 @@ export function BusinessPanel() {
                     onChange={() => toggleTask(t)}
                     aria-label={tt.business.markTask.replace("{titulo}", t.title)}
                   />
-                  <span className={`flex-1 text-sm ${t.done ? "text-zinc-500 line-through" : "text-zinc-100"}`}>
+                  <span className={`flex-1 text-sm ${t.done ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
                     {t.title}
                   </span>
                   {isAdmin && (
@@ -243,7 +243,7 @@ export function BusinessPanel() {
                   onChange={(e) => setTaskTitle(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
                 /></Field>
-                <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {tt.business.add}
                 </button>
               </div>

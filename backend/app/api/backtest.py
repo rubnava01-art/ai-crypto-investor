@@ -14,7 +14,7 @@ from app.backtest.engine import (
     run_backtest,
     split_train_val_test,
 )
-from app.core.rate_limit import backtest_limiter
+from app.core.rate_limit import backtest_limiter, too_many_requests
 from app.core.security import get_current_user
 from app.core.symbols import validate_symbol as _validate_symbol
 from app.core.timeframes import validate_timeframe as _validate_timeframe
@@ -65,9 +65,8 @@ def run(
     timeframe = _validate_timeframe(timeframe)
     # Trabajo pesado síncrono: límite por usuario antes de tocar la BD.
     if not backtest_limiter.allow(f"backtest:{user.id}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiados backtests. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiados backtests. Espera un minuto.", backtest_limiter.window
         )
     candles = ingest.latest_candles(db, symbol, timeframe, 2000)
     if len(candles) < 100:

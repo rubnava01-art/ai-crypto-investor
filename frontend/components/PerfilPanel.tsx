@@ -35,11 +35,11 @@ export function PerfilPanel() {
   return (
     <Panel title={t.perfil.title}>
       {failed ? (
-        <p className="py-2 text-sm text-zinc-500">
+        <p className="py-2 text-sm text-zinc-400">
           {t.perfil.loadFailed}
         </p>
       ) : profile === null ? (
-        <p className="py-2 text-sm text-zinc-500">{t.perfil.loadingProfile}</p>
+        <p className="py-2 text-sm text-zinc-400">{t.perfil.loadingProfile}</p>
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-4 sm:gap-5">
@@ -47,7 +47,7 @@ export function PerfilPanel() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.avatar_data_url} alt={t.perfil.photoAlt} className="h-24 w-24 shrink-0 rounded-full object-cover ring-2 ring-zinc-700" />
             ) : (
-              <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-3xl font-bold text-white ring-2 ring-zinc-700">
+              <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-3xl font-bold text-white ring-2 ring-zinc-700">
                 {(profile.display_name || profile.username).slice(0, 1).toUpperCase()}
               </span>
             )}
@@ -60,7 +60,7 @@ export function PerfilPanel() {
             </div>
             <button
               onClick={() => setEditing(true)}
-              className="ml-auto min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+              className="ml-auto min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
             >
               {t.perfil.editProfile}
             </button>

@@ -6,10 +6,10 @@ import {
   api, getToken, setToken, ApiError,
   type SystemStatus, type BalancesResponse, type PerformanceResponse,
   type SignalsResponse, type StrategyOut, type SimulationModes,
-  type OperationsResponse, type RiskLimits, type LogEntry, type SignalSide,
+  type OperationsResponse, type RiskLimits, type LogEntry,
 } from "../lib/api";
 import { Panel } from "../components/Panel";
-import { ApiErrorBanner, LoadMore, SkipLink, newId } from "../components/ui";
+import { ApiErrorBanner, LoadMore, PanelLoading, SkipLink, newId } from "../components/ui";
 import { ModuleNav } from "../components/ModuleNav";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
@@ -27,32 +27,30 @@ import { MetricCardSkeleton, Skeleton } from "../components/Skeleton";
 // y el Asistente IA va al final de la página. MarketPanel (precios en vivo,
 // arriba) se queda en el bundle principal. El control de usuarios vive en
 // su propio módulo (/usuarios) desde 2026-10-30, no incrustado aquí.
-const panelLoading = () => {
-  const { t } = useLanguage();
-  return (
-    <div role="status">
-      <span className="sr-only">{t.dashboard.panelLoading}</span>
-      <Skeleton className="h-44 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
-    </div>
-  );
-};
+// B-7: el `panelLoading` local del dashboard era un duplicado del compartido
+// (ui.tsx, H-12) con otro aspecto (skeleton h-44 + texto sr-only); ahora los
+// tres dynamic() usan el compartido, con texto "Cargando…" visible.
 const InvestorPanel = dynamic(
   () => import("../components/InvestorPanel").then((m) => m.InvestorPanel),
-  { ssr: false, loading: panelLoading },
+  { ssr: false, loading: PanelLoading },
 );
 const AiAssistant = dynamic(
   () => import("../components/AiAssistant").then((m) => m.AiAssistant),
-  { ssr: false, loading: panelLoading },
+  { ssr: false, loading: PanelLoading },
+);
+// C4 (optimización 2026-11-14): la presentación de señales vive bajo el
+// pliegue (rejilla inferior) y solo presenta datos que ya trae
+// api.dashboard(); se descarga al renderizar, con el mismo skeleton.
+const SignalsPanel = dynamic(
+  () => import("../components/SignalsPanel").then((m) => m.SignalsPanel),
+  { ssr: false, loading: PanelLoading },
 );
 
 const money = (s: string | null) =>
   s == null || s === "" ? "—" : `$${Number(s).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (s: string | null) => (s == null || s === "" ? "—" : `${Number(s).toFixed(2)}%`);
-const sideColor: Record<SignalSide, string> = {
-  buy: "text-emerald-400",
-  sell: "text-red-400",
-  hold: "text-zinc-400",
-};
+// sideColor vivía aquí para la sección de señales; ahora está en
+// components/SignalsPanel.tsx (C4, optimización 2026-11-14).
 
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
   const { t } = useLanguage();
@@ -224,7 +222,7 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div role="status" aria-label={t.dashboard.loading} className="space-y-4">
           <Skeleton className="h-8 w-48 rounded-lg" ariaLabel={t.misc.loadingAria} />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <MetricCardSkeleton key={i} ariaLabel={t.misc.loadingAria} />
             ))}
@@ -447,14 +445,14 @@ export default function DashboardPage() {
             <button
               onClick={() => scanner("start")}
               disabled={scanning}
-              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t.dashboard.start}
             </button>
             <button
               onClick={() => scanner("stop")}
               disabled={!scanning}
-              className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {t.dashboard.stop}
             </button>
@@ -510,7 +508,7 @@ export default function DashboardPage() {
               <button
                 onClick={() => setConfirmKill(true)}
                 disabled={risk.kill_switch}
-                className="mt-5 min-h-[44px] w-full rounded-lg bg-red-700 px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                className="mt-5 min-h-[44px] w-full rounded-lg bg-red-700 px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
               >
                 {risk.kill_switch ? t.dashboard.killActivated : t.dashboard.killSwitch}
               </button>
@@ -523,7 +521,7 @@ export default function DashboardPage() {
                   <div className="mt-3 flex gap-2.5">
                     <button
                       onClick={engageKillSwitch}
-                      className="min-h-[44px] flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                      className="min-h-[44px] flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
                     >
                       {t.dashboard.confirm}
                     </button>
@@ -568,36 +566,8 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        {/* Signals */}
-        <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge quiet />}>
-          {signals ? (
-            signals.signals.length === 0 ? (
-              <EmptyState text={t.dashboard.noSignals} />
-            ) : (
-              <ul className="space-y-3">
-                {signals.signals.map((sig) => (
-                  <li key={sig.id} className="rounded-lg border border-zinc-800 p-3.5 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-semibold">{sig.symbol}</span>
-                      <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-xs text-zinc-400 sm:grid-cols-3">
-                      <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
-                      <span>{t.dashboard.target} {money(sig.target_price)}</span>
-                      <span>{t.dashboard.invalidation} {money(sig.invalidation_price)}</span>
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
-                    <p className="mt-1 text-xs text-zinc-400">
-                      {sig.status} · {time(sig.created_utc)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : (
-            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
-          )}
-        </Panel>
+        {/* Señales (C4: componente diferido, bajo el pliegue) */}
+        <SignalsPanel signals={signals} offline={offline} time={time} />
 
         {/* Operations */}
         <Panel title={t.dashboard.operationsTitle}>

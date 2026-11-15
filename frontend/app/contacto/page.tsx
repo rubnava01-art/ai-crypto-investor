@@ -36,7 +36,7 @@ export default function ContactoPage() {
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
               href="/login"
-              className="inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               {c.visitorLogin}
             </Link>
@@ -55,7 +55,7 @@ export default function ContactoPage() {
             <p className="mt-2 text-sm leading-relaxed text-zinc-300">{c.memberBody}</p>
             <Link
               href="/correos"
-              className="mt-5 inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="mt-5 inline-flex min-h-[44px] items-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               {c.memberCta}
             </Link>

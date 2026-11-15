@@ -354,13 +354,13 @@ export const FAMILY_ACCENT: Record<
   { active: string; hint: string; dot: string; ring: string }
 > = {
   invertir: {
-    active: "bg-emerald-600 text-white ring-emerald-500/50",
+    active: "bg-emerald-700 text-white ring-emerald-500/50",
     hint: "text-emerald-100/90",
     dot: "bg-emerald-500",
     ring: "focus-visible:ring-emerald-500/60",
   },
   estudiar: {
-    active: "bg-sky-600 text-white ring-sky-500/50",
+    active: "bg-sky-700 text-white ring-sky-500/50",
     hint: "text-sky-100/90",
     dot: "bg-sky-500",
     ring: "focus-visible:ring-sky-500/60",
@@ -372,13 +372,13 @@ export const FAMILY_ACCENT: Record<
     ring: "focus-visible:ring-violet-500/60",
   },
   negocio: {
-    active: "bg-amber-600 text-white ring-amber-500/50",
+    active: "bg-amber-700 text-white ring-amber-500/50",
     hint: "text-amber-100/90",
     dot: "bg-amber-500",
     ring: "focus-visible:ring-amber-500/60",
   },
   personal: {
-    active: "bg-teal-600 text-white ring-teal-500/50",
+    active: "bg-teal-700 text-white ring-teal-500/50",
     hint: "text-teal-100/90",
     dot: "bg-teal-500",
     ring: "focus-visible:ring-teal-500/60",
@@ -453,6 +453,11 @@ export function ModuleNav() {
           key={m.href}
           href={m.href}
           aria-current={active ? "page" : undefined}
+          // H-13: el hint se oculta en móvil (hidden sm:inline), así que
+          // va también como title (toque prolongado) y aria-label
+          // (lector de pantalla) con "etiqueta — descripción".
+          title={`${label} — ${hint}`}
+          aria-label={`${label} — ${hint}`}
           className={
             active
               ? `flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg ${accent.active} px-4 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-inset transition-colors`

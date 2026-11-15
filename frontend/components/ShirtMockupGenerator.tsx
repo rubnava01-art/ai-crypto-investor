@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { downloadSvg, downloadSvgAsPng } from "../lib/svgDownload";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
 
 // Colores: hex fijos; las etiquetas visibles salen del diccionario
 // dentro del componente (t.mockup.*).
@@ -102,6 +102,7 @@ export function ShirtMockupGenerator() {
   const ink = textColors[textIdx];
   const isBack = placement === "espalda";
   const isTech = format === "techpack";
+  const placementLabel = placement === "pecho" ? t.mockup.placeChest : placement === "espalda" ? t.mockup.placeBack : t.mockup.placeCenter;
   const slug = (techPack.design.trim() || techPack.client.trim() || designText.trim() || "diseno")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-");
@@ -214,9 +215,21 @@ export function ShirtMockupGenerator() {
 
   const sectionForm = (def: { key: TechSectionKey; title: string }) => {
     const s = techPack[def.key];
+    const filledCount = [s.printSize, s.embellishment, s.ink].filter((v) => v.trim()).length;
     return (
       <details key={def.key} className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2">
-        <summary className="cursor-pointer text-sm font-semibold text-zinc-100">{def.title}</summary>
+        <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-zinc-100">
+          <span className="flex-1">{def.title}</span>
+          <span className="flex items-center gap-1" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={`h-2 w-2 rounded-full ${i < filledCount ? "bg-sky-400" : "bg-zinc-700"}`} />
+            ))}
+            {s.pantones.map((pt, i) => (
+              <span key={i} className="-ml-0.5 h-3 w-3 rounded-full border border-zinc-600" style={{ backgroundColor: pt.color }} />
+            ))}
+          </span>
+          <span className="sr-only">{filledCount}/3</span>
+        </summary>
         <div className="mt-2 space-y-2">
           <input aria-label={`${def.title} ${t.mockup.tpPrintSize}`} className={inputCls} placeholder={t.mockup.tpPrintSize} value={s.printSize} onChange={(e) => setSectionField(def.key, "printSize", e.target.value)} maxLength={40} autoComplete="off" />
           <input aria-label={`${def.title} ${t.mockup.tpEmbellishment}`} className={inputCls} placeholder={t.mockup.tpEmbellishment} value={s.embellishment} onChange={(e) => setSectionField(def.key, "embellishment", e.target.value)} maxLength={40} autoComplete="off" />
@@ -262,7 +275,7 @@ export function ShirtMockupGenerator() {
           type="button"
           aria-pressed={!isTech}
           onClick={() => setFormat("mockup")}
-          className={`flex-1 rounded-lg min-h-[44px] px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${!isTech ? "bg-sky-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+          className={`flex-1 rounded-lg min-h-[44px] px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${!isTech ? "bg-sky-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
         >
           {t.mockup.formatMockup}
         </button>
@@ -270,7 +283,7 @@ export function ShirtMockupGenerator() {
           type="button"
           aria-pressed={isTech}
           onClick={() => setFormat("techpack")}
-          className={`flex-1 rounded-lg min-h-[44px] px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isTech ? "bg-sky-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+          className={`flex-1 rounded-lg min-h-[44px] px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${isTech ? "bg-sky-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
         >
           {t.mockup.formatTechPack}
         </button>
@@ -280,24 +293,63 @@ export function ShirtMockupGenerator() {
         <div className="space-y-3">
           <input aria-label={t.mockup.designAria} className={inputCls} placeholder={t.mockup.designPlaceholder} value={designText} onChange={(e) => setDesignText(e.target.value)} maxLength={24} autoComplete="off" />
           <input aria-label={t.mockup.subAria} className={inputCls} placeholder={t.mockup.subPlaceholder} value={subText} onChange={(e) => setSubText(e.target.value)} maxLength={40} autoComplete="off" />
-          <div className="grid grid-cols-2 gap-2">
-            <select className={inputCls} value={shirtIdx} onChange={(e) => setShirtIdx(Number(e.target.value))} aria-label={t.mockup.shirtAria}>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.mockup.shirtAria}</span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label={t.mockup.shirtAria}>
               {shirtColors.map((c, i) => (
-                <option key={c.name} value={i}>{t.mockup.shirtPrefix}{c.name}</option>
+                <button
+                  key={c.name}
+                  type="button"
+                  aria-pressed={shirtIdx === i}
+                  aria-label={`${t.mockup.shirtPrefix}${c.name}`}
+                  onClick={() => setShirtIdx(i)}
+                  className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 ${shirtIdx === i ? "border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40" : "border-zinc-700 bg-zinc-900 hover:bg-zinc-800"}`}
+                >
+                  <span className="h-5 w-5 rounded-full border border-white/30" style={{ backgroundColor: c.hex }} aria-hidden="true" />
+                  <span className="text-xs font-semibold text-zinc-200">{c.name}</span>
+                </button>
               ))}
-            </select>
-            <select className={inputCls} value={textIdx} onChange={(e) => setTextIdx(Number(e.target.value))} aria-label={t.mockup.textAria}>
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.mockup.textAria}</span>
+            <div className="grid grid-cols-5 gap-1.5" role="group" aria-label={t.mockup.textAria}>
               {textColors.map((c, i) => (
-                <option key={c.name} value={i}>{t.mockup.textPrefix}{c.name}</option>
+                <button
+                  key={c.name}
+                  type="button"
+                  aria-pressed={textIdx === i}
+                  aria-label={`${t.mockup.textPrefix}${c.name}`}
+                  onClick={() => setTextIdx(i)}
+                  className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 ${textIdx === i ? "border-sky-500 bg-sky-500/10 ring-2 ring-sky-500/40" : "border-zinc-700 bg-zinc-900 hover:bg-zinc-800"}`}
+                >
+                  <span className="h-5 w-5 rounded-full border border-white/30" style={{ backgroundColor: c.hex }} aria-hidden="true" />
+                  <span className="text-center text-[11px] font-semibold leading-tight text-zinc-200">{c.name}</span>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
           {!isTech && (
-            <select className={inputCls} value={placement} onChange={(e) => setPlacement(e.target.value as Placement)} aria-label={t.mockup.placementAria}>
-              <option value="pecho">{t.mockup.placeChest}</option>
-              <option value="centro">{t.mockup.placeCenter}</option>
-              <option value="espalda">{t.mockup.placeBack}</option>
-            </select>
+            <div>
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.mockup.placementAria}</span>
+              <div className="grid grid-cols-3 gap-2" role="group" aria-label={t.mockup.placementAria}>
+                {([
+                  { value: "pecho", label: t.mockup.placeChest },
+                  { value: "centro", label: t.mockup.placeCenter },
+                  { value: "espalda", label: t.mockup.placeBack },
+                ] as { value: Placement; label: string }[]).map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    aria-pressed={placement === o.value}
+                    onClick={() => setPlacement(o.value)}
+                    className={`min-h-[44px] rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40 ${placement === o.value ? "bg-sky-700 text-white" : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {isTech && (
@@ -319,7 +371,7 @@ export function ShirtMockupGenerator() {
               type="button"
               onClick={() => download(false)}
               disabled={!designText.trim()}
-              className="flex-1 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.mockup.downloadSvg}
             </button>
@@ -327,7 +379,7 @@ export function ShirtMockupGenerator() {
               type="button"
               onClick={() => download(true)}
               disabled={!designText.trim()}
-              className="flex-1 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.mockup.downloadPng}
             </button>
@@ -335,7 +387,16 @@ export function ShirtMockupGenerator() {
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         </div>
 
-        <div className="flex items-start justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+        <div>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{isTech ? t.mockup.tpTechPack : t.mockup.previewAria}</p>
+            <p className="text-xs text-zinc-400">
+              {isTech
+                ? [techPack.client, techPack.design].filter((v) => v.trim()).join(" · ")
+                : `${shirt.name} · ${ink.name} · ${placementLabel}`}
+            </p>
+          </div>
+          <div className="flex items-start justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           {isTech ? (
             <svg ref={techSvgRef} viewBox={`0 0 ${TP_W} ${TP_H}`} className="h-auto w-full max-w-md" role="img" aria-label={t.mockup.tpTechPack}>
               <rect width={TP_W} height={TP_H} fill="#ffffff" />
@@ -380,6 +441,7 @@ export function ShirtMockupGenerator() {
               </text>
             </svg>
           )}
+          </div>
         </div>
       </div>
     </Panel>

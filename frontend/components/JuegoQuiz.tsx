@@ -70,7 +70,7 @@ export function JuegoQuiz() {
         <button
           type="button"
           onClick={restart}
-          className="mt-4 flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+          className="mt-4 flex min-h-[44px] items-center rounded-xl bg-sky-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
         >
           {j.quizRestart}
         </button>
@@ -135,7 +135,7 @@ export function JuegoQuiz() {
           <button
             type="button"
             onClick={next}
-            className="flex min-h-[44px] items-center rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            className="flex min-h-[44px] items-center rounded-xl bg-sky-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-sky-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
           >
             {index + 1 >= total ? j.quizFinish : j.quizNext}
           </button>

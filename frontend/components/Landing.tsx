@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../lib/i18n";
 import { PublicNav } from "./PublicNav";
-import { PlanesPanel } from "./PlanesPanel";
 import { CompoundCalculator } from "./CompoundCalculator";
 import { landingModuleKeys } from "./ModuleNav";
 import { SkipLink } from "./ui";
@@ -14,10 +13,10 @@ import { Hero } from "./Hero";
 import { TrustStrip } from "./TrustStrip";
 import { Skeleton } from "./Skeleton";
 
-// M3 (2026-11-13): lo que está bajo el pliegue (sección IA y tabla
-// comparativa) no viaja en el bundle inicial: se carga al renderizar,
-// con un estado de carga visible. El héroe y la franja de precios se
-// quedan en el bundle inicial.
+// M3 (2026-11-13): lo que está bajo el pliegue (sección IA, tabla
+// comparativa y, desde F-4 2026-11-14, la sección de planes) no viaja
+// en el bundle inicial: se carga al renderizar, con un estado de carga
+// visible. El héroe y la franja de precios se quedan en el bundle inicial.
 // Rediseño fintech 2026-11-14 (Agente 2): el héroe lo compone <Hero />
 // (Agente UX/UI) con la calculadora existente como children; la franja
 // de confianza la compone <TrustStrip /> con SOLO números reales
@@ -38,6 +37,15 @@ const LandingAi = dynamic(() => import("./LandingAi").then((m) => m.LandingAi), 
   loading: sectionLoading,
 });
 const PlanesCompare = dynamic(() => import("./PlanesCompare").then((m) => m.PlanesCompare), {
+  ssr: false,
+  loading: sectionLoading,
+});
+// F-4 (2026-11-14, Agente 2): PlanesPanel también lazy (está bajo el
+// pliegue, como LandingAi/PlanesCompare). El registro con plan elegido
+// no vive en este componente: cada tarjeta enlaza a
+// /login?mode=register&plan=<clave> y /login lee `plan` de la URL y lo
+// envía como requested_plan; hacer lazy el panel no toca ese flujo.
+const PlanesPanel = dynamic(() => import("./PlanesPanel").then((m) => m.PlanesPanel), {
   ssr: false,
   loading: sectionLoading,
 });
@@ -65,7 +73,7 @@ const PlanesCompare = dynamic(() => import("./PlanesCompare").then((m) => m.Plan
  * van marcados con "(solo admin)". */
 
 const CTA_CLASS =
-  "inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 motion-safe:active:scale-[0.98] sm:w-auto";
+  "inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all duration-200 hover:bg-blue-700 hover:shadow-blue-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 motion-safe:active:scale-[0.98] sm:w-auto";
 
 function StartFreeCta({ label }: { label: string }) {
   return (
@@ -175,31 +183,50 @@ export function Landing() {
           </Hero>
         </section>
 
+        {/* C5 (2026-11-14): atajo visible desde el héroe hacia los planes.
+            <Hero /> (Agente UX/UI) no admite un tercer CTA, así que el
+            atajo vive aquí, justo debajo de él: prueba gratis prominente
+            + enlace al ancla #planes. Todo de t.planes / t.landing, sin
+            cifras ni copy nuevos. */}
+        <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center">
+          <span className="rounded-full bg-emerald-500/15 px-3.5 py-1.5 text-sm font-bold text-emerald-300">
+            {p.trialBadge}
+          </span>
+          <a
+            href="#planes"
+            className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-base font-bold text-blue-300 transition-colors hover:text-blue-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+          >
+            {l.priceStripCta}
+          </a>
+        </p>
+
         {/* Franja de confianza: solo números reales verificables. */}
         <TrustStrip items={trustItems} ariaLabel={l.trustStripAria} />
 
         {/* Franja compacta de precios: los 3 precios + 14 días gratis,
             visibles sin bajar ni pulsar. El detalle con beneficios está
-            en la sección de planes, justo después de los módulos. */}
-        <section aria-label={p.title} className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/[0.07] px-4 py-5 backdrop-blur sm:px-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            en la sección de planes, justo después de los módulos.
+            C5 (2026-11-14): precios mucho más grandes (el precio manda)
+            y píldora de prueba gratis más prominente. */}
+        <section aria-label={p.title} className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/[0.07] px-4 py-6 backdrop-blur sm:px-6 sm:py-7">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-6">
             {stripPlans.map((plan) => (
-              <div key={plan.name} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 sm:flex-col sm:items-start">
+              <div key={plan.name} className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 sm:flex-col sm:items-start sm:gap-y-2">
                 <span className="text-sm font-semibold text-slate-200">{plan.name}</span>
-                <span className="flex items-baseline gap-1">
-                  <span className="text-2xl font-extrabold tabular-nums text-slate-50">{plan.price}</span>
-                  <span className="text-sm text-slate-400">{p.perMonth}</span>
+                <span className="flex items-baseline gap-1.5">
+                  <span className="text-4xl font-extrabold tabular-nums tracking-tight text-slate-50 sm:text-5xl">{plan.price}</span>
+                  <span className="text-base text-slate-400">{p.perMonth}</span>
                 </span>
-                <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
+                <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-bold text-emerald-300">
                   {p.trialBadge}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-center sm:text-left">
+          <p className="mt-5 text-center sm:text-left">
             <a
               href="#planes"
-              className="inline-flex min-h-[44px] items-center rounded-lg px-2 py-2.5 text-sm font-semibold text-blue-300 transition-colors hover:text-blue-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="inline-flex min-h-[44px] items-center rounded-lg px-2 py-2.5 text-base font-bold text-blue-300 transition-colors hover:text-blue-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
             >
               {l.priceStripCta}
             </a>
@@ -334,13 +361,21 @@ export function Landing() {
           </div>
         </section>
 
-        {/* Planes reales (una sola fuente: PlanesPanel / t.planes) */}
-        <section id="planes" aria-label={l.plansTitle} className="scroll-mt-20 border-t border-slate-800/80 py-10 sm:py-12">
-          <h2 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">{l.plansTitle}</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
+        {/* Planes reales (una sola fuente: PlanesPanel / t.planes).
+            C5 (2026-11-14): sección más grande y jerárquica — título
+            mayor, más aire, y la prueba gratis como píldora prominente
+            junto al título (todo de t.planes, sin cifras nuevas). */}
+        <section id="planes" aria-label={l.plansTitle} className="scroll-mt-20 border-t border-slate-800/80 py-12 sm:py-16">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-50 sm:text-4xl">{l.plansTitle}</h2>
+          <p className="mt-3">
+            <span className="inline-block rounded-full bg-emerald-500/15 px-3.5 py-1.5 text-sm font-bold text-emerald-300">
+              {p.trialBadge}
+            </span>
+          </p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
             {l.plansIntro}
           </p>
-          <div className="mt-6">
+          <div className="mt-8">
             <PlanesPanel />
           </div>
           <PlanesCompare />
@@ -386,7 +421,7 @@ export function Landing() {
               {p.trialBadge} · {p.nameEsencial} {p.priceEsencial}
               {p.perMonth}
             </p>
-            <Link href="/login?mode=register" className="inline-flex min-h-[44px] shrink-0 items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60">
+            <Link href="/login?mode=register" className="inline-flex min-h-[44px] shrink-0 items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60">
               {l.ctaStartFree}
             </Link>
           </div>

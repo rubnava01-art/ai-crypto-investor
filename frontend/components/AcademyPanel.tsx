@@ -8,15 +8,17 @@ import {
 import { Panel } from "./Panel";
 import { useConfirm } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { isFreePrice } from "../lib/format";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 const kindBadge: Record<string, string> = {
   ebook: "bg-sky-500/15 text-sky-300",
   pack: "bg-violet-500/15 text-violet-300",
   academia: "bg-emerald-500/15 text-emerald-300",
+  guia: "bg-amber-500/15 text-amber-300",
 };
 
 const fmtDate = (iso: string | null, locale: string) =>
@@ -123,13 +125,13 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
                 <span className="ml-auto flex gap-1.5">
                   <button
                     onClick={() => toggleDelivered(s)}
-                    className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 active:bg-zinc-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    className="min-h-[44px] rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 active:bg-zinc-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {s.delivered ? t.academy.markUndelivered : t.academy.markDelivered}
                   </button>
                   <button
                     onClick={() => remove(s)}
-                    className="rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 active:bg-red-950/70 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 active:bg-red-950/70 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {t.academy.remove}
                   </button>
@@ -159,7 +161,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
           <button
             type="submit"
             disabled={busy || !contactId}
-            className="rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 active:bg-emerald-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="rounded-lg bg-emerald-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 active:bg-emerald-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.academy.registerBusy : t.academy.register}
           </button>
@@ -197,7 +199,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
           key={`${d.course_id}-${d.filename}`}
           onClick={() => download(d)}
           disabled={busyId === d.course_id}
-          className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 active:bg-sky-500 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+          className="min-h-[44px] rounded-lg bg-sky-700 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-800 active:bg-sky-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busyId === d.course_id
             ? t.academy.downloadBusy
@@ -214,7 +216,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
 export function AcademyPanel() {
   const isCancelled = useCancelled();
   const { t } = useLanguage();
-  const kindLabel = (k: string) => (k === "ebook" ? t.academy.kindEbook : k === "pack" ? t.academy.kindPack : k === "academia" ? t.academy.kindAcademia : k);
+  const kindLabel = (k: string) => (k === "ebook" ? t.academy.kindEbook : k === "pack" ? t.academy.kindPack : k === "academia" ? t.academy.kindAcademia : k === "guia" ? t.academy.kindGuia : k);
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
   const [courses, setCourses] = useState<AcademyCourse[] | null>(null);
@@ -261,9 +263,15 @@ export function AcademyPanel() {
                 <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${kindBadge[c.kind] ?? kindBadge.ebook}`}>
                   {kindLabel(c.kind)}
                 </span>
-                <span className="rounded-full bg-zinc-500/15 px-2.5 py-1 text-xs font-semibold text-zinc-300">
-                  ${c.price_usd} USD
-                </span>
+                {isFreePrice(c.price_usd) ? (
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+                    {t.academy.free}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-zinc-500/15 px-2.5 py-1 text-xs font-semibold text-zinc-300">
+                    ${c.price_usd} USD
+                  </span>
+                )}
               </span>
             }
           >
@@ -275,7 +283,7 @@ export function AcademyPanel() {
                   href={c.buy_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 active:bg-emerald-500 motion-safe:active:scale-[0.98]"
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 active:bg-emerald-800 motion-safe:active:scale-[0.98]"
                 >
                   {t.academy.buyLink}
                 </a>
@@ -283,7 +291,7 @@ export function AcademyPanel() {
               <DownloadButtons course={c} />
               <button
                 onClick={() => setOpenId(openId === c.id ? null : c.id)}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 active:bg-zinc-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 active:bg-zinc-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               >
                 {openId === c.id ? t.academy.hideStudents : `${t.academy.students} (${c.students_count})`}
               </button>

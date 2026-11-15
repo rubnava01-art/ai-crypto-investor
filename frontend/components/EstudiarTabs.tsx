@@ -25,11 +25,11 @@ interface EstudiarTabsProps {
 
 const tabBtn = (active: boolean) =>
   active
-    ? "min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+    ? "min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
     : "min-h-[44px] min-w-[44px] shrink-0 rounded-lg bg-zinc-800 px-4 py-2.5 text-sm font-semibold whitespace-nowrap text-zinc-300 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60";
 
 const arrowBtn =
-  "flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-lg font-bold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40";
+  "flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 text-lg font-bold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-50";
 
 export function EstudiarTabs({ sections, activeId, onSelect, onPrev, onNext }: EstudiarTabsProps) {
   const { t } = useLanguage();

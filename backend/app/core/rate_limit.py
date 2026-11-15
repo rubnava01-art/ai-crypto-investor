@@ -19,6 +19,24 @@ is a deployment change, not a code guess.
 import time
 from collections import defaultdict, deque
 
+from fastapi import HTTPException, status
+
+
+def too_many_requests(detail: str, retry_after_s: int = 60) -> HTTPException:
+    """429 con cabecera Retry-After (M-1, corrida 2026-11-14).
+
+    El cliente necesita saber cuánto esperar antes de reintentar; un
+    429 sin la cabecera no dice si son segundos o minutos.
+    `retry_after_s` es la ventana del limiter que dispara el 429
+    (60 s en todos los limiters por usuario; el lockout de login,
+    300 s, ya lleva su propia cabecera y no usa este helper).
+    """
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=detail,
+        headers={"Retry-After": str(retry_after_s)},
+    )
+
 
 class RateLimiter:
     def __init__(self, max_requests: int, window_seconds: int):

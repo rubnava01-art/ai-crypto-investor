@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.core.rate_limit import correos_limiter
+from app.core.rate_limit import correos_limiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, EmailLog, EmailTemplate, User
@@ -37,9 +37,9 @@ def _check_correos_limit(user: User) -> None:
     """M-1 (corrida 2026-11-10): limiter por USUARIO en Correos
     (30/min), mismo patrón que market/strategy/backtest."""
     if not correos_limiter.allow(f"correos:{user.id}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas consultas de Correos. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiadas consultas de Correos. Espera un minuto.",
+            correos_limiter.window,
         )
 
 

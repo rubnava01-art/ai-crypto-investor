@@ -8,7 +8,7 @@ import { ApiErrorBanner, LoadMore, useConfirm } from "./ui";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 /** Chat en vivo: mensajes cortos para usuarios autenticados. El panel
  * consulta cada ~5s (sin WebSocket en el tier gratuito) y se salta la
@@ -128,10 +128,10 @@ export function ChatPanel() {
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[85%] sm:max-w-[75%] sm:max-w-[75%] rounded-2xl px-3.5 py-2 ${
-                    mine ? "rounded-br-sm bg-emerald-600/90 text-white" : "rounded-bl-sm bg-zinc-800 text-zinc-100"
+                    mine ? "rounded-br-sm bg-emerald-700/90 text-white" : "rounded-bl-sm bg-zinc-800 text-zinc-100"
                   }`}
                 >
-                  <p className="text-[11px] font-semibold opacity-80">
+                  <p className="text-xs font-semibold opacity-80">
                     {m.author_label} <span className="font-normal opacity-70">@{m.author_username}</span>
                     <span className="ml-2 font-normal opacity-70">{fmtTime(m.created_at)}</span>
                   </p>
@@ -172,7 +172,7 @@ export function ChatPanel() {
         <button
           type="submit"
           disabled={busy || !text.trim()}
-          className="shrink-0 rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-emerald-700 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busy ? t.chat.sendBusy : t.chat.send}
         </button>

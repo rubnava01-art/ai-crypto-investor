@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "../lib/i18n";
 import { Analytics } from "../lib/analytics";
@@ -34,9 +35,27 @@ export const viewport: Viewport = {
   themeColor: "#030712",
 };
 
+// F-1 (2026-11-14, Agente 2): Inter + Plus Jakarta Sans autoalojadas
+// con next/font/google (parte de Next, sin dependencias nuevas): los
+// woff2 se sirven desde /_next/static, sin peticiones a Google en
+// runtime. Antes la pila solo se declaraba en globals.css y el 100 %
+// de los usuarios veía el fallback del sistema (0 @font-face).
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-inter",
+});
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  display: "swap",
+  variable: "--font-jakarta",
+});
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="dark">
+    <html lang="es" className={`dark ${inter.variable} ${jakarta.variable}`}>
       <body className="min-h-dvh bg-[#030712] text-zinc-100 antialiased">
         <Analytics />
         <LanguageProvider>{children}</LanguageProvider>

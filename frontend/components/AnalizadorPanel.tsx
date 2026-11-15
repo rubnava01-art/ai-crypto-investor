@@ -7,7 +7,7 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 function bandaCls(banda: AnalizarResponse["banda"]) {
   if (banda === "alto") return "bg-red-500/15 text-red-300 ring-red-500/40";
@@ -88,7 +88,7 @@ export function AnalizadorPanel() {
         <button
           type="submit"
           disabled={busy || !url.trim()}
-          className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+          className="w-full rounded-lg bg-emerald-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
         >
           {busy ? t.analizador.analyzeBusy : t.analizador.analyze}
         </button>
@@ -162,7 +162,7 @@ export function AnalizadorPanel() {
                     <li key={fila.nombre} className="flex items-start justify-between gap-3 text-xs">
                       <span className="text-zinc-300">
                         {fila.nombre}
-                        <span className="block text-zinc-500">{fila.detalle}</span>
+                        <span className="block text-zinc-400">{fila.detalle}</span>
                       </span>
                       <span className="shrink-0 font-semibold text-zinc-100">
                         {fila.puntos} / {fila.maximo}

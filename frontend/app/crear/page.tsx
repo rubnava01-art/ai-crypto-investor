@@ -4,21 +4,11 @@ import dynamic from "next/dynamic";
 import { useLanguage } from "../../lib/i18n";
 import { ModuleShell } from "../../components/ModuleShell";
 import { Panel } from "../../components/Panel";
+import { PanelLoading } from "../../components/ui";
 
 // Carga diferida (optimización 2026-11-06): CrearPanel arrastra
 // LogoGenerator + ShirtMockupGenerator; la tarjeta de Forge (arriba)
 // se queda en el chunk inicial y el panel se descarga al renderizar.
-function PanelLoading() {
-  const { t } = useLanguage();
-  return (
-    <div
-      role="status"
-      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500"
-    >
-      {t.dashboard.panelLoading}
-    </div>
-  );
-}
 const CrearPanel = dynamic(
   () => import("../../components/CrearPanel").then((m) => m.CrearPanel),
   { ssr: false, loading: PanelLoading },
@@ -46,7 +36,7 @@ export default function CrearPage() {
             href={FORGE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 inline-block rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            className="mt-3 inline-block rounded-lg bg-emerald-700 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
           >
             {t.crear.forgeOpen}
           </a>

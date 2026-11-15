@@ -239,7 +239,7 @@ export function MarketPanel() {
               );
             })}
           </div>
-          <div aria-hidden="true" className="mt-5 flex items-center justify-between border-b border-white/5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <div aria-hidden="true" className="mt-5 flex items-center justify-between border-b border-white/5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             <span>{t.market.colAsset}</span>
             <span>{t.market.colPrice24h}</span>
           </div>
@@ -268,7 +268,13 @@ export function MarketPanel() {
                   <Sparkline data={c.sparkline_24h} up={up} />
                 </div>
                 <div className="w-[7.5rem] shrink-0 text-right sm:w-36">
-                  <p className={`text-base font-semibold tabular-nums ${priceStale ? "text-slate-400 opacity-60" : "text-slate-100"}`} title={priceStale ? t.reliability.stalePrice : undefined}>
+                  <p className={`text-base font-semibold tabular-nums ${priceStale ? "text-slate-400 opacity-60" : "text-slate-100"}`} title={priceStale ? t.reliability.stalePrice : liveFresh ? t.market.liveNote : undefined}>
+                    {liveFresh && (
+                      <>
+                        <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-emerald-400 align-middle" />
+                        <span className="sr-only">{t.market.live}: </span>
+                      </>
+                    )}
                     {fmtPrice(price)}
                   </p>
                   <p className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
@@ -284,7 +290,7 @@ export function MarketPanel() {
       )}
       {meta && (
         <p
-          className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-slate-500"}`}
+          className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-slate-400"}`}
           role={!wsFresh && (meta.stale || lastTickAt > 0) ? "status" : undefined}
         >
           {wsFresh
@@ -298,7 +304,7 @@ export function MarketPanel() {
         type="button"
         onClick={() => load(true)}
         disabled={loading}
-        className="mt-3 min-h-[44px] w-full rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors duration-200 hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 min-h-[44px] w-full rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors duration-200 hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? t.market.refreshing : t.market.refresh}
       </button>

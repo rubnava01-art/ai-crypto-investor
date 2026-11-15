@@ -268,11 +268,11 @@ export function UsersPanel() {
                   aria-hidden="true"
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-bold text-white ${
                     u.status === "pending"
-                      ? "bg-amber-600"
+                      ? "bg-amber-700"
                       : u.is_super_admin
                         ? "bg-violet-600"
                         : u.is_admin
-                          ? "bg-emerald-600"
+                          ? "bg-emerald-700"
                           : "bg-zinc-600"
                   }`}
                 >
@@ -282,7 +282,7 @@ export function UsersPanel() {
                   <p className="truncate text-sm font-semibold text-zinc-100">
                     {u.username}
                     {u.status === "pending" && (
-                      <span className="ml-2 whitespace-nowrap rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">
+                      <span className="ml-2 whitespace-nowrap rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-400">
                         {t.usuarios.pendingBadge}
                       </span>
                     )}
@@ -290,7 +290,7 @@ export function UsersPanel() {
                   <p className="text-xs text-zinc-400">{roleLabel(u)}</p>
                   {u.status === "pending" && u.requested_plan && (
                     <p className="mt-1">
-                      <span className="whitespace-nowrap rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-400">
+                      <span className="whitespace-nowrap rounded-full bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-400">
                         {t.usuarios.requestedPlan.replace(
                           "{plan}",
                           planName(u.requested_plan) ?? u.requested_plan,
@@ -304,7 +304,7 @@ export function UsersPanel() {
                     <button
                       onClick={() => approve(u)}
                       aria-label={t.usuarios.approveTitle}
-                      className="min-h-[44px] rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      className="min-h-[44px] rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                       title={t.usuarios.approveTitle}
                     >
                       {t.usuarios.activate}
@@ -390,7 +390,7 @@ export function UsersPanel() {
                   <button
                     onClick={() => savePassword(u)}
                     disabled={pwBusy}
-                    className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                   >
                     {t.usuarios.saveNewPw}
                   </button>
@@ -450,7 +450,7 @@ export function UsersPanel() {
         <button
           type="submit"
           disabled={busy}
-          className="min-h-[44px] w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          className="min-h-[44px] w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
         >
           {busy ? t.usuarios.creating : t.usuarios.createUser}
         </button>

@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import copies as copy_service
 from app.ai.models import AIModelError
-from app.core.rate_limit import RateLimiter
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import CopyDraft, TrendNote, User
@@ -161,9 +161,8 @@ def generate_copy_endpoint(
     tone = _check(payload.tone, TONES, "tone")
     client_ip = request.client.host if request.client else "unknown"
     if not gen_limiter.allow(f"crear_gen:{admin.id}:{client_ip}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiados copies seguidos. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiados copies seguidos. Espera un minuto.", gen_limiter.window
         )
     try:
         result = copy_service.generate_copy(payload.topic.strip(), platform, tone)

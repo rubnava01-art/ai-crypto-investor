@@ -96,6 +96,9 @@ export function InvestorPanel({
   const amountNum = parseFloat(amount);
   const validAmount = Number.isFinite(amountNum) && amountNum > 0;
   const qty = validAmount && price ? amountNum / price : 0;
+  // Unidad del activo (BTC/ETH) para acompañar la cantidad estimada:
+  // "0.00012345" solo no dice de qué.
+  const base = symbol.split("/")[0];
   const pctCapital =
     validAmount && equityUsd && equityUsd > 0 ? (amountNum / equityUsd) * 100 : null;
   const isReal = mode === "real" && realEnabled;
@@ -148,9 +151,17 @@ export function InvestorPanel({
         )
       }
     >
+      {/* Indicador visual de pasos (1 Arma → 2 Valida): el texto del paso
+          sigue dentro de cada rama para lectores de pantalla. */}
+      {step !== "done" && (
+        <div className="mb-3 flex items-center gap-2" aria-hidden="true">
+          <span className={`h-1.5 flex-1 rounded-full ${step === "form" ? "bg-emerald-500" : "bg-emerald-500/40"}`} />
+          <span className={`h-1.5 flex-1 rounded-full ${step === "validate" ? "bg-emerald-500" : "bg-zinc-700"}`} />
+        </div>
+      )}
       {step === "done" ? (
         <div className="py-2">
-          <p className="text-sm leading-relaxed text-emerald-400">✓ {result}</p>
+          <p role="status" className="text-sm leading-relaxed text-emerald-400">✓ {result}</p>
           <button
             onClick={reset}
             className="mt-4 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
@@ -165,7 +176,7 @@ export function InvestorPanel({
               ⚠️ <strong>{t.invertir.realWarningTitle}</strong> {t.invertir.realWarningBody}
             </div>
           )}
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-500">{t.invertir.stepValidate}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.invertir.stepValidate}</p>
           <p className="text-base font-semibold text-zinc-100">{t.invertir.validateTitle}</p>
           <dl className="mt-3 space-y-2.5 text-sm">
             <div className="flex items-baseline justify-between gap-3">
@@ -199,7 +210,7 @@ export function InvestorPanel({
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.estQty}</dt>
-              <dd className="text-right font-mono tabular-nums">{qty.toFixed(8)}</dd>
+              <dd className="text-right font-mono tabular-nums">{qty.toFixed(8)} {base}</dd>
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.pctCapital}</dt>
@@ -208,7 +219,7 @@ export function InvestorPanel({
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-zinc-400">{t.invertir.mode}</dt>
               <dd className="text-right font-mono">
-                {isReal ? t.invertir.modeReal : orderMode} {t.invertir.riskGuardNote}
+                {isReal ? t.invertir.modeReal : orderMode === "paper" ? t.invertir.paperBadge : t.invertir.simBadge} {t.invertir.riskGuardNote}
               </dd>
             </div>
           </dl>
@@ -223,7 +234,7 @@ export function InvestorPanel({
               onClick={confirm}
               disabled={busy}
               className={`min-h-[44px] flex-1 rounded-lg px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
-                side === "buy" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
+                side === "buy" ? "bg-emerald-700 hover:bg-emerald-800" : "bg-red-600 hover:bg-red-700"
               }`}
             >
               {busy ? t.invertir.executing : isReal ? (side === "buy" ? t.invertir.confirmRealEnter : t.invertir.confirmRealExit) : side === "buy" ? t.invertir.confirmEnter : t.invertir.confirmExit}
@@ -239,14 +250,14 @@ export function InvestorPanel({
         </div>
       ) : (
         <div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">{t.invertir.stepForm}</p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.invertir.stepForm}</p>
           <div className="grid grid-cols-2 gap-2.5">
             <button
               onClick={() => setSide("buy")}
               aria-pressed={side === "buy"}
               className={`min-h-[44px] rounded-lg px-3 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
                 side === "buy"
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-emerald-700 text-white"
                   : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
               }`}
             >
@@ -283,47 +294,79 @@ export function InvestorPanel({
               />
             </label>
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-zinc-400">
-            {t.invertir.price} {symbol}:{" "}
-            {price ? (
-              <span
-                className={priceStale ? "font-semibold text-zinc-400 opacity-70" : "font-semibold text-zinc-100"}
-                title={priceStale ? t.reliability.stalePrice : undefined}
+          {/* Montos rápidos: solo rellenan el campo, no ejecutan nada.
+              20 es el tope acumulado de compras reales (Fase 8). */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-400">{t.invertir.quickAmount}</span>
+            {[5, 10, 20].map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setAmount(String(v))}
+                aria-pressed={amount === String(v)}
+                className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${
+                  amount === String(v)
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                    : "border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                }`}
               >
-                ${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                ${v}
+              </button>
+            ))}
+          </div>
+          {/* Caja de precio: el precio en vivo grande y separado del resto,
+              con su hora y el capital en tabular-nums; antes era una sola
+              línea densa que mezclaba precio, hora y capital. */}
+          <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-xs text-zinc-400">
+                {t.invertir.price} {symbol}
               </span>
-            ) : priceError ? (
-              <>
-                <span role="alert" className="font-semibold text-red-400">
-                  {t.invertir.priceLoadFailed}
-                </span>{" "}
-                <button
-                  type="button"
-                  onClick={() => loadPrice(() => false)}
-                  className="font-semibold text-zinc-100 underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              {price ? (
+                <span
+                  className={`font-mono text-lg font-bold tabular-nums ${priceStale ? "text-zinc-400 opacity-70" : "text-zinc-100"}`}
+                  title={priceStale ? t.reliability.stalePrice : undefined}
                 >
-                  {t.invertir.retry}
-                </button>
-              </>
-            ) : (
-              t.invertir.loadingPrice
-            )}
-            {priceUpdatedAt && (
-              <>
-                {" "}· {t.invertir.updatedAt}{" "}
-                {priceUpdatedAt.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </>
-            )}{" "}
-            · {t.invertir.capital} {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
-          </p>
+                  ${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                </span>
+              ) : priceError ? (
+                <span role="alert" className="text-sm font-semibold text-red-400">
+                  {t.invertir.priceLoadFailed}{" "}
+                  <button
+                    type="button"
+                    onClick={() => loadPrice(() => false)}
+                    className="font-semibold text-zinc-100 underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  >
+                    {t.invertir.retry}
+                  </button>
+                </span>
+              ) : (
+                <span className="text-sm text-zinc-400">{t.invertir.loadingPrice}</span>
+              )}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+              {priceUpdatedAt && (
+                <span>
+                  {t.invertir.updatedAt}{" "}
+                  {priceUpdatedAt.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </span>
+              )}
+              <span>
+                {t.invertir.capital}{" "}
+                <span className="font-mono tabular-nums text-zinc-200">
+                  {equityUsd != null ? `$${equityUsd.toFixed(2)}` : "—"}
+                </span>
+              </span>
+            </div>
+          </div>
           {validAmount && price !== null && (
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
               {t.invertir.estQty}:{" "}
-              <span className="font-mono font-semibold tabular-nums text-zinc-100">{qty.toFixed(8)}</span>
+              <span className="font-mono font-semibold tabular-nums text-zinc-100">{qty.toFixed(8)} {base}</span>
               {pctCapital != null && (
                 <>
                   {" "}· {t.invertir.pctCapital}:{" "}
@@ -344,10 +387,19 @@ export function InvestorPanel({
               setStep("validate");
             }}
             disabled={!validAmount || !price}
-            className="mt-4 min-h-[44px] w-full rounded-lg bg-zinc-100 px-3 py-3 text-sm font-bold text-zinc-900 hover:bg-white disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            className="mt-4 min-h-[44px] w-full rounded-lg bg-zinc-100 px-3 py-3 text-sm font-bold text-zinc-900 hover:bg-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.invertir.validateOrder}
           </button>
+          {(!validAmount || !price) && (
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+              {!validAmount
+                ? t.invertir.validateAmountZero
+                : priceError
+                  ? t.invertir.priceLoadFailed
+                  : t.invertir.waitingLivePrice}
+            </p>
+          )}
         </div>
       )}
     </Panel>

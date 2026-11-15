@@ -108,41 +108,53 @@ input[type="file"]::file-selector-button:hover {
 /* Sistema de diseño fintech — Grow Business Platform (2026-11-14,    */
 /* rediseño Agente 1). Tokens + utilidades compartidas; los           */
 /* componentes Hero / MetricCard / Skeleton / TrustStrip los usan.    */
-/* Sin next/font en el proyecto: la pila es Inter / Plus Jakarta Sans */
-/* con fallback del sistema, sin descargas nuevas en build.           */
+/* Con next/font/google (layout.tsx, F-1 2026-11-14): la pila es Inter  */
+/* / Plus Jakarta Sans autoalojadas, sin descargas externas en runtime.*/
 /* ------------------------------------------------------------------ */
 
 :root {
   /* ---- Color: una sola escala (slate + esmeralda + azul) ---- */
   /* Fondo: negro profundo / gris espacial. */
   --fintech-bg: #030712;
-  --fintech-bg-elevated: #0b0f19;
   --fintech-surface: rgb(15 23 42 / 0.6); /* slate-900/60 glass */
   --fintech-surface-solid: #0f172a; /* slate-900 */
   --fintech-surface-hover: #1e293b; /* slate-800 */
   /* Acentos: esmeralda (ganancias/éxito) y azul (marca/enlaces). */
   --fintech-emerald: #10b981;
   --fintech-emerald-hover: #34d399; /* emerald-400 */
-  --fintech-emerald-deep: #059669; /* emerald-600 */
+  --fintech-emerald-deep: #047857; /* emerald-700 — H-2 Fase B: blanco
+   * sobre emerald-700 = 5,48:1 (AA); emerald-600 era 3,77:1 y fallaba. */
   --fintech-blue: #3b82f6;
   --fintech-blue-hover: #60a5fa; /* blue-400 */
   --fintech-blue-deep: #2563eb; /* blue-600 */
   --fintech-danger: #ef4444; /* red-500 */
-  --fintech-danger-deep: #b91c1c; /* red-700 */
-  --fintech-warning: #f59e0b; /* amber-500, avisos demo/simulación */
+  /* Familias por módulo — paleta oficial (H-4 Fase B, 2026-11-14):
+   * UN acento por familia, codificado en ModuleNav.tsx:345-378
+   * (FAMILY_ACCENT, decisión de Rubén 2026-11-02) y documentado aquí.
+   * Fondos sólidos con texto blanco (ratios medidos, auditoría H-2):
+   * invertir emerald-700 #047857 (5,48:1) · estudiar sky-700 #0369a1
+   * (5,93:1) · crear violet-600 #7c3aed (5,70:1) · negocio amber-700
+   * #b45309 (5,02:1) · personal teal-700 #0f766e (5,47:1) · sistema
+   * zinc-600 #52525b (7,73:1). Los -600 de emerald/sky/teal/cyan/amber
+   * (3,19–4,10:1) NO se usan con texto blanco. El rojo queda reservado
+   * a peligro/riesgo, no es acento de familia. El anillo de foco es
+   * único y esmeralda en toda la app (:focus-visible global, arriba);
+   * los focus-visible:ring-*-500/60 por módulo viven en componentes y
+   * NO se tocan en esta fase (fuera de globals.css + ui.tsx). */
   /* Texto: principal casi blanco, secundario slate-400. Contraste AA
    * sobre #030712 en ambos casos (medido por QA 2026-11-14: #f9fafb
    * 19,27:1; #94a3b8 7,85:1). El terciario slate-500 (#64748b,
    * 4,23:1) NO llegaba a AA 4,5:1 y su único uso era el placeholder
-   * del .fintech-input sin uso: token y clase eliminados (B-2), no
-   * reutilizar #64748b para texto. */
+   * del antiguo .fintech-input sin uso (B-2; clase recreada en Fase B,
+   * H-3, con placeholder slate-400): no reutilizar #64748b para texto. */
   --fintech-text: #f9fafb;
   --fintech-text-muted: #94a3b8;
-  /* Bordes: un solo gris (slate-800) + variante suave. */
+  /* Bordes: un solo gris (slate-800). */
   --fintech-border: #1e293b; /* slate-800 */
-  --fintech-border-soft: rgb(30 41 59 / 0.6);
   /* ---- Tipografía ---- */
-  --font-sans: "Inter", "Plus Jakarta Sans", ui-sans-serif, system-ui,
+  /* F-1 (2026-11-14): las variables las define next/font en layout.tsx;
+   * el fallback del sistema sigue al final (display: swap). */
+  --font-sans: var(--font-inter), var(--font-jakarta), ui-sans-serif, system-ui,
     -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   /* ---- Radios: una sola escala ---- */
   --fintech-radius-sm: 0.5rem; /* 8px: botones, inputs, badges */
@@ -193,20 +205,6 @@ input[type="file"]::file-selector-button:hover {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: var(--fintech-shadow-sm);
-  }
-
-  /* Variante sólida (listas densas, menús) y elevada (diálogos). */
-  .fintech-card-solid {
-    border-radius: var(--fintech-radius-lg);
-    border: 1px solid var(--fintech-border);
-    background-color: var(--fintech-surface-solid);
-    box-shadow: var(--fintech-shadow-md);
-  }
-  .fintech-card-elevated {
-    border-radius: var(--fintech-radius-xl);
-    border: 1px solid var(--fintech-border);
-    background-color: var(--fintech-surface-solid);
-    box-shadow: var(--fintech-shadow-lg);
   }
 
   /* Números financieros: ancho tabular para que no salten al cambiar. */
@@ -270,20 +268,36 @@ input[type="file"]::file-selector-button:hover {
   .fintech-btn-secondary:hover:not(:disabled) {
     background-color: var(--fintech-surface-hover);
   }
-  .fintech-btn-ghost {
-    background-color: transparent;
-    color: var(--fintech-blue-hover);
+
+  /* ---- Input compartido (H-3 Fase B): el patrón de input de los
+   * paneles (border-zinc-700 bg-zinc-900 … placeholder-zinc-400
+   * focus:border-emerald-500, ~20 copias literales) centralizado aquí
+   * con los tokens --fintech-*. Fuente del patrón: components/ui.tsx
+   * (Input). La migración completa por paneles es backlog; este es el
+   * punto de partida canónico. Fondo sólido slate-900, borde slate-800,
+   * placeholder slate-400 (7,85:1 sobre oscuro, AA) y foco esmeralda.
+   * El anillo de foco lo da la regla global :focus-visible (esmeralda
+   * 2 px, H-4); aquí solo cambia el color del borde al enfocar. */
+  .fintech-input {
+    width: 100%;
+    min-height: 44px;
+    border-radius: var(--fintech-radius-sm);
+    border: 1px solid var(--fintech-border);
+    background-color: var(--fintech-surface-solid);
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--fintech-text);
+    transition:
+      border-color var(--fintech-duration) var(--fintech-ease),
+      box-shadow var(--fintech-duration) var(--fintech-ease);
   }
-  .fintech-btn-ghost:hover:not(:disabled) {
-    background-color: rgb(59 130 246 / 0.1);
-    text-decoration: underline;
+  .fintech-input::placeholder {
+    color: var(--fintech-text-muted);
   }
-  .fintech-btn-danger {
-    background-color: var(--fintech-danger-deep);
-    color: #fff;
-  }
-  .fintech-btn-danger:hover:not(:disabled) {
-    background-color: #dc2626;
+  .fintech-input:focus {
+    border-color: var(--fintech-emerald);
+    outline: none;
   }
 
   /* ---- Micro-interacción compartida: elevación suave al hover ---- */
@@ -307,23 +321,20 @@ input[type="file"]::file-selector-button:hover {
     letter-spacing: 0.2em;
     color: var(--fintech-blue-hover);
   }
-
-  /* Badge / chip: mismo radio y peso en toda la web. */
-  .fintech-badge {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 0.125rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1.5;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* Los skeletons usan animate-pulse de Tailwind; con movimiento
    * reducido se quedan estáticos en vez de pulsar. */
   .fintech-skeleton {
+    animation: none !important;
+  }
+  /* H-6 Fase B: los 4 usos de animate-spin / animate-pulse sin
+   * motion-safe: (login/page.tsx:324,396, app/page.tsx:269 spinners;
+   * AmbientSound.tsx:221 pulso) también se apagan aquí. El texto de
+   * estado ("Cargando…") sigue visible: el spinner es solo decorativo. */
+  .animate-spin,
+  .animate-pulse {
     animation: none !important;
   }
   /* Micro-interacciones apagadas: sin transiciones ni compresión. */

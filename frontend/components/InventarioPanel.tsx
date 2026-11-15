@@ -9,7 +9,7 @@ import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const UNITS: InventoryUnit[] = ["pieza", "kg", "litro", "metro", "caja", "otro"];
 
@@ -208,7 +208,7 @@ export function InventarioPanel() {
             <button
               type="submit"
               disabled={busy || !name.trim()}
-              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.inventario.saving : editing ? t.inventario.updateItem : t.inventario.saveItem}
             </button>
@@ -232,9 +232,9 @@ export function InventarioPanel() {
           autoComplete="off"
         /></Field>
         {items === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.inventario.loadingItems}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.inventario.loadingItems}</p>
         ) : visible.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">
+          <p className="py-2 text-sm text-zinc-400">
             {items.length === 0
               ? t.inventario.emptyItems
               : t.inventario.noMatch}

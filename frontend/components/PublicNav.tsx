@@ -96,10 +96,13 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
               </Link>
             );
           })}
-          <span className="ml-1 shrink-0">
-            <LanguageToggle />
-          </span>
         </nav>
+        {/* H-21: el toggle de idioma sale de la fila con scroll: antes
+            quedaba fuera de vista en móvil hasta desplazar; ahora es
+            fijo a la derecha del encabezado, siempre visible. */}
+        <span className="shrink-0">
+          <LanguageToggle />
+        </span>
       </div>
     </header>
   );

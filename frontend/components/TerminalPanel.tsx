@@ -347,11 +347,11 @@ export function TerminalPanel() {
             spellCheck={false}
             placeholder={tt.inputPlaceholder}
             aria-label={tt.inputAria}
-            className="min-w-0 flex-1 bg-transparent font-mono text-sm text-zinc-100 placeholder-zinc-600 caret-emerald-400 outline-none disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent font-mono text-sm text-zinc-100 placeholder-zinc-400 caret-emerald-400 outline-none disabled:opacity-50"
           />
         </form>
       </div>
-      <p className="border-t border-zinc-800 bg-zinc-900/70 px-4 py-2 text-xs leading-relaxed text-zinc-500">
+      <p className="border-t border-zinc-800 bg-zinc-900/70 px-4 py-2 text-xs leading-relaxed text-zinc-400">
         {tt.footer}
       </p>
     </section>

@@ -183,7 +183,7 @@ function LoginPageInner() {
   }
 
   const inputCls =
-    "w-full rounded-none border border-zinc-300 bg-white px-3.5 py-3 text-[15px] text-zinc-900 placeholder-zinc-400 outline-none transition hover:border-zinc-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30";
+    "w-full rounded-none border border-zinc-300 bg-white px-3.5 py-3 text-[15px] text-zinc-900 placeholder-zinc-600 outline-none transition hover:border-zinc-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/30";
 
   return (
     <div className="flex min-h-dvh flex-col bg-blue-700">
@@ -242,7 +242,7 @@ function LoginPageInner() {
             type="button"
             aria-pressed={mode === "login"}
             onClick={() => switchMode("login")}
-            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "login" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "login" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-600 hover:text-zinc-700"}`}
           >
             {t.login.modeLoginTab}
           </button>
@@ -250,7 +250,7 @@ function LoginPageInner() {
             type="button"
             aria-pressed={mode === "register"}
             onClick={() => switchMode("register")}
-            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "register" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+            className={`min-h-[44px] px-3 py-2.5 text-sm font-semibold transition ${mode === "register" ? "bg-white text-blue-700 shadow-sm" : "text-zinc-600 hover:text-zinc-700"}`}
           >
             {t.login.modeRegisterTab}
           </button>
@@ -293,7 +293,7 @@ function LoginPageInner() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? t.login.hidePassword : t.login.showPassword}
-              className="absolute right-1.5 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-none text-zinc-500 hover:text-blue-700"
+              className="absolute right-1.5 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-none text-zinc-600 hover:text-blue-700"
             >
               {showPassword ? (
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
@@ -309,7 +309,7 @@ function LoginPageInner() {
           </span>
           {/* M12: la misma pista en ambos modos (todas las contraseñas
               de la plataforma tienen al menos 12 caracteres). */}
-          <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">{t.login.passwordMinHint}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">{t.login.passwordMinHint}</p>
         </label>
 
         {mode === "register" && (
@@ -320,7 +320,7 @@ function LoginPageInner() {
             {challenge ? (
               <p className="mb-2 text-sm text-zinc-900">{challenge.question}</p>
             ) : (
-              <p role="status" className="mb-2 flex items-center gap-2 text-sm text-zinc-500">
+              <p role="status" className="mb-2 flex items-center gap-2 text-sm text-zinc-600">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
                   <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
@@ -390,7 +390,7 @@ function LoginPageInner() {
         <button
           type="submit"
           disabled={loading || (mode === "register" && !challenge)}
-          className="flex w-full items-center justify-center gap-2 rounded-none bg-blue-600 px-3 py-3 text-[15px] font-bold uppercase tracking-wide text-white transition hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-none bg-blue-600 px-3 py-3 text-[15px] font-bold uppercase tracking-wide text-white transition hover:bg-blue-700 motion-safe:active:scale-[0.99] disabled:opacity-50"
         >
           {loading && (
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 animate-spin">
@@ -401,7 +401,7 @@ function LoginPageInner() {
           {loading ? t.login.processing : mode === "login" ? t.login.loginSubmit : t.login.createSubmit}
         </button>
 
-        <p className="mt-5 text-center text-sm text-zinc-500">
+        <p className="mt-5 text-center text-sm text-zinc-600">
           {mode === "login" ? (
             <>
               {t.login.noAccount}{" "}

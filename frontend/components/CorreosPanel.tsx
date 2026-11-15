@@ -37,9 +37,9 @@ function ListSkeleton({ rows = 3 }: { rows?: number }) {
     <div role="status" aria-label="Cargando" className="space-y-3 py-2">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} aria-hidden="true" className="space-y-2">
-          <div className="h-4 w-2/5 motion-safe:animate-pulse rounded bg-zinc-800" />
-          <div className="h-3 w-full motion-safe:animate-pulse rounded bg-zinc-900/70" />
-          <div className="h-3 w-3/4 motion-safe:animate-pulse rounded bg-zinc-900/70" />
+          <div className="h-4 w-2/5 motion-safe:animate-pulse rounded bg-slate-800" />
+          <div className="h-3 w-full motion-safe:animate-pulse rounded bg-slate-800" />
+          <div className="h-3 w-3/4 motion-safe:animate-pulse rounded bg-slate-800" />
         </div>
       ))}
     </div>
@@ -190,24 +190,32 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
         </span>
       }
     >
-      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
+      <p className="mb-3 text-sm leading-relaxed text-zinc-400">
         {tt.correos.templatesIntro1}
         {tt.correos.templatesTokens}
         {tt.correos.templatesIntro2}
         {!isAdmin && tt.correos.templatesIntroViewer}
       </p>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {["{{nombre}}", "{{negocio}}", "{{telefono}}", "{{email}}"].map((tok) => (
+          <span key={tok} className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 font-mono text-xs text-cyan-300">{tok}</span>
+        ))}
+      </div>
 
       {isAdmin && (
-        <form onSubmit={add} className="space-y-3">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+          <p className="mb-3 text-sm font-semibold text-zinc-200">{tt.correos.newTemplate}</p>
+          <form onSubmit={add} className="space-y-3">
           <Field label={tt.correos.templateNameAria}><input aria-label={tt.correos.templateNameAria} className={inputCls} placeholder={tt.correos.templateNamePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
           <Field label={tt.correos.subjectAria}><input aria-label={tt.correos.subjectAria} className={inputCls} placeholder={tt.correos.subjectPlaceholder} value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} autoComplete="off" /></Field>
           <Field label={tt.correos.bodyAria}><textarea aria-label={tt.correos.bodyAria} className={inputCls} placeholder={tt.correos.bodyPlaceholder} value={body} onChange={(e) => setBody(e.target.value)} rows={3} /></Field>
-          <button type="submit" disabled={busy || !name.trim()} className="min-h-[44px] w-full rounded-lg bg-cyan-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+          <button type="submit" disabled={busy || !name.trim()} className="min-h-[44px] w-full rounded-lg bg-cyan-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
             {busy ? tt.correos.saving : tt.correos.saveTemplate}
           </button>
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-        </form>
+          </form>
+        </div>
       )}
 
       <div className="mt-5 border-t border-zinc-800 pt-4">
@@ -215,19 +223,21 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
         {loadingFirst && !templatesError ? (
           <ListSkeleton />
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">{tt.correos.emptyTemplates}</p>
+          <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
+            <p className="text-sm text-zinc-400">{tt.correos.emptyTemplates}</p>
+          </div>
         ) : (
           <>
-          <ul className="divide-y divide-zinc-800/70">
+          <ul className="space-y-3">
             {rows.map((t) => (
-              <li key={t.id} className="py-3">
+              <li key={t.id} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3.5">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="text-sm font-semibold text-zinc-100">{t.name}</span>
-                  <span className="text-xs text-zinc-500">{t.subject}</span>
+                  <span className="text-xs text-zinc-400">{t.subject}</span>
                   <span className="ml-auto flex items-center gap-2">
                     {isAdmin && (
                       <>
-                        <button onClick={() => onUse(t)} className="min-h-[44px] rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+                        <button onClick={() => onUse(t)} className="min-h-[44px] rounded-lg bg-cyan-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                           {tt.correos.use}
                         </button>
                         <button onClick={() => remove(t)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
@@ -237,7 +247,11 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
                     )}
                   </span>
                 </div>
-                {t.body && <ClampedBody text={t.body} t={tt} />}
+                {t.body && (
+                  <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-3 py-1">
+                    <ClampedBody text={t.body} t={tt} />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -449,6 +463,12 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
           {t.correos.composerIntro}
           {!isAdmin && t.correos.composerIntroViewer}
         </p>
+        {(contactId || manualName || manualEmail || subject || body || templateName) && (
+          <p className="mb-4 flex items-center gap-2 text-xs text-zinc-400">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-cyan-400" />
+            {t.correos.draftInTab}
+          </p>
+        )}
 
         <div className="space-y-3">
           <Field label={t.correos.crmContactAria}><select className={inputCls} value={contactId} onChange={(e) => setContactId(e.target.value)} onFocus={() => setContactsRequested(true)} aria-label={t.correos.crmContactAria}>
@@ -463,21 +483,52 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
           </div>
 
           {contact && recovered && (
-            <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm leading-relaxed text-zinc-200">
+            <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-sm leading-relaxed text-zinc-200">
               <p className="font-semibold text-cyan-200">{t.correos.recoveredTitle.replace("{nombre}", contact.name)}</p>
-              <p className="text-zinc-300">
-                {contact.phone && <>{t.correos.telLabel}{contact.phone} · </>}
-                {contact.email && <>{t.correos.emailLabel}{contact.email} · </>}
-                {t.correos.statusLabel}{contact.status}
-                {contact.tags.length > 0 && <>{t.correos.tagsLabel}{contact.tags.join(", ")}</>}
-              </p>
-              {contact.notes && <p className="text-zinc-400">{t.correos.notesLabel}{contact.notes}</p>}
-              <p className="text-zinc-400">
-                {t.correos.invoicesLabel}{recovered.invoices.length}
-                {recovered.invoices.length > 0 && <> ({recovered.invoices.map((i) => `${i.number} ${i.status}`).join(", ")})</>}
-                {t.correos.campaignsLabel}{recovered.campaigns.length}
-                {recovered.campaigns.length > 0 && <> ({recovered.campaigns.map((c) => c.name).join(", ")})</>}
-              </p>
+              <dl className="mt-3 space-y-2">
+                {contact.phone && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="text-zinc-400">{t.correos.telLabel}</dt>
+                    <dd className="font-medium text-zinc-100">{contact.phone}</dd>
+                  </div>
+                )}
+                {contact.email && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="text-zinc-400">{t.correos.emailLabel}</dt>
+                    <dd className="font-medium text-zinc-100">{contact.email}</dd>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <dt className="text-zinc-400">{t.correos.statusLabel}</dt>
+                  <dd><span className="rounded bg-cyan-500/20 px-1.5 py-0.5 text-xs font-semibold text-cyan-200">{contact.status}</span></dd>
+                </div>
+                {contact.tags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <dt className="text-zinc-400">{t.correos.tagsLabel}</dt>
+                    {contact.tags.map((tag) => (
+                      <dd key={tag}><span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{tag}</span></dd>
+                    ))}
+                  </div>
+                )}
+                {contact.notes && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="text-zinc-400">{t.correos.notesLabel}</dt>
+                    <dd className="text-zinc-300">{contact.notes}</dd>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <dt className="text-zinc-400">{t.correos.invoicesLabel}{recovered.invoices.length}</dt>
+                  {recovered.invoices.map((i) => (
+                    <dd key={i.id}><span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{i.number} · {i.status}</span></dd>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <dt className="text-zinc-400">{t.correos.campaignsLabel}{recovered.campaigns.length}</dt>
+                  {recovered.campaigns.map((c) => (
+                    <dd key={c.id}><span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{c.name}</span></dd>
+                  ))}
+                </div>
+              </dl>
             </div>
           )}
 
@@ -489,7 +540,7 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
                 {t.correos.copyMail}
               </button>
               {gmailUrl ? (
-                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-cyan-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-cyan-700 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                   {t.correos.openGmail}
                 </a>
               ) : (
@@ -498,7 +549,7 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
                 </button>
               )}
               {isAdmin && (
-                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {busy ? t.correos.saving : t.correos.saveToLog}
                 </button>
               )}
@@ -506,6 +557,26 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}
             {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           </form>
+
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              {t.correos.preview}
+            </p>
+            {subject || body ? (
+              <div className="mt-3">
+                <p className="text-xs text-zinc-400">
+                  {toName}
+                  {toEmail ? ` <${toEmail}>` : ""}
+                </p>
+                <p className="mt-1.5 text-sm font-semibold text-zinc-100">{subject || t.correos.noSubject}</p>
+                {body && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{body}</p>}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-zinc-400">
+                {t.correos.previewEmpty}
+              </p>
+            )}
+          </div>
         </div>
       </Panel>
     </div>
@@ -588,21 +659,23 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
       {loadingFirst && !logsError ? (
         <ListSkeleton />
       ) : rows.length === 0 ? (
-        <p className="py-2 text-sm text-zinc-500">{t.correos.emptyLogs}</p>
+        <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
+          <p className="text-sm text-zinc-400">{t.correos.emptyLogs}</p>
+        </div>
       ) : (
         <>
-        <ul className="divide-y divide-zinc-800/70">
+        <ul className="space-y-3">
           {rows.map((r) => (
-            <li key={r.id} className="py-3">
+            <li key={r.id} className={`rounded-xl border border-zinc-800 border-l-4 bg-zinc-950/60 p-3.5 ${r.status === "enviado" ? "border-l-emerald-500" : "border-l-amber-400"}`}>
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{r.subject || t.correos.noSubject}</span>
                 <span className="text-sm text-zinc-400">→ {r.contact_name}</span>
-                <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${r.status === "enviado" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${r.status === "enviado" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
                   {r.status === "enviado" ? t.correos.sentLabel : t.correos.preparedLabel}
                 </span>
-                {r.template_name && <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{r.template_name}</span>}
+                {r.template_name && <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{r.template_name}</span>}
                 <span className="ml-auto flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">{fmtDate(r.created_at, locale)}</span>
+                  <span className="text-xs text-zinc-400">{fmtDate(r.created_at, locale)}</span>
                   {isAdmin && r.status === "preparado" && (
                     <button onClick={() => changeStatus(r, "enviado")} className="min-h-[44px] rounded-lg border border-emerald-900/60 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                       {t.correos.markSent}
@@ -615,7 +688,11 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
                   )}
                 </span>
               </div>
-              {r.body && <ClampedBody text={r.body} t={t} />}
+              {r.body && (
+                <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-3 py-1">
+                  <ClampedBody text={r.body} t={t} />
+                </div>
+              )}
             </li>
           ))}
         </ul>

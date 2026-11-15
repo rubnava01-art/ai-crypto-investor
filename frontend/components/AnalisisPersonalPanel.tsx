@@ -16,7 +16,7 @@ type TabAP = "lean" | "encuesta" | "estres";
 
 const tabBtn = (active: boolean) =>
   `min-h-[44px] rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
-    active ? "bg-teal-600 text-white" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+    active ? "bg-teal-700 text-white" : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
   }`;
 
 const optBtn = (selected: boolean) =>
@@ -27,7 +27,7 @@ const optBtn = (selected: boolean) =>
   }`;
 
 const primaryBtn =
-  "min-h-[44px] rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
+  "min-h-[44px] rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const ghostBtn =
   "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -75,7 +75,7 @@ export function AnalisisPersonalPanel() {
   return (
     <Panel title={tx.titulo} badge={<span className="rounded-full bg-teal-900 px-3 py-1 text-xs font-semibold text-teal-200">Personal</span>}>
       <p className="text-sm leading-relaxed text-zinc-400">{tx.intro}</p>
-      <p className="mt-2 text-xs text-zinc-500">{tx.notaPrivacidad}</p>
+      <p className="mt-2 text-xs text-zinc-400">{tx.notaPrivacidad}</p>
 
       <div role="tablist" aria-label={tx.titulo} className="mt-4 flex flex-wrap gap-2">
         <button role="tab" aria-selected={tab === "lean"} onClick={() => setTab("lean")} className={tabBtn(tab === "lean")}>
@@ -149,7 +149,7 @@ export function AnalisisPersonalPanel() {
                   </fieldset>
                 ))}
               </div>
-              {!encuestaCompleta && <p className="text-sm text-zinc-500">{tx.encuesta.sinResponder}</p>}
+              {!encuestaCompleta && <p className="text-sm text-zinc-400">{tx.encuesta.sinResponder}</p>}
               <button type="button" disabled={!encuestaCompleta} onClick={() => setVerEncuesta(true)} className={`${primaryBtn} disabled:cursor-not-allowed disabled:opacity-50`}>
                 {tx.encuesta.verResultado}
               </button>
@@ -234,7 +234,7 @@ export function AnalisisPersonalPanel() {
                   );
                 })}
               </div>
-              {!estresCompleto && <p className="text-sm text-zinc-500">{tx.estres.sinResponder}</p>}
+              {!estresCompleto && <p className="text-sm text-zinc-400">{tx.estres.sinResponder}</p>}
               <button type="button" disabled={!estresCompleto} onClick={() => setVerEstres(true)} className={`${primaryBtn} disabled:cursor-not-allowed disabled:opacity-50`}>
                 {tx.estres.verResultado}
               </button>

@@ -16,7 +16,7 @@ import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
 
 
 /** Desarrollo digital: seguimiento de la adaptación digital de empresas.
@@ -115,7 +115,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       {isAdmin && (
         <form onSubmit={add} className="mt-2 flex gap-2">
           <Field label={t.desarrollo.newTaskAria} className="flex-1"><input aria-label={t.desarrollo.newTaskAria} className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.desarrollo.newTaskPlaceholder} maxLength={256} autoComplete="off" /></Field>
-          <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50">
+          <button type="submit" disabled={busy || !title.trim()} className="shrink-0 rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50">
             {t.desarrollo.addTask}
           </button>
         </form>
@@ -256,7 +256,7 @@ export function DesarrolloPanel() {
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-sky-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="w-full rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.desarrollo.createBusy : t.desarrollo.create}
           </button>
@@ -275,7 +275,7 @@ export function DesarrolloPanel() {
             <article key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{p.title}</span>
-                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[11px] font-semibold text-sky-300">
+                <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-semibold text-sky-300">
                   {stageLabel(p.stage)}
                 </span>
                 {p.contact_name && (

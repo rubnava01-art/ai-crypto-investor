@@ -22,7 +22,18 @@ const Ctx = createContext<LanguageCtx | null>(null);
  * ambos idiomas en cada página. El primer render es siempre español para
  * no romper la hidratación; mientras el diccionario EN carga, se sigue
  * mostrando español. Las cadenas españolas son byte-idénticas a antes.
- * El idioma también se refleja en <html lang> (antes hardcodeado a "es"). */
+ * El idioma también se refleja en <html lang> (antes hardcodeado a "es").
+ *
+ * F-5 (2026-11-14, Agente 2) — REVERTIDO: se intentó cargar también el
+ * ES con import() dinámico y el build pasó (First Load de / bajó de 176
+ * a 137 kB), pero el HTML SSR de / salió vacío: 0 role="status", 0
+ * animate-pulse, 0 "Cargando" (antes 8/15/8), porque el provider no
+ * renderiza hijos sin diccionario y en SSR el import() no corre. El
+ * primer render pasaba de skeleton a página en blanco hasta cargar el
+ * chunk ES. Sin fallback embebido no hay forma de diferir el ES sin
+ * romper el primer render; queda en backlog (ver registro de ejecución).
+ * NO reintentarlo sin un diseño con fallback o Suspense verificado en
+ * navegador real. */
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("es");
   const [dictEn, setDictEn] = useState<Dictionary | null>(null);
@@ -96,7 +107,7 @@ export function LanguageToggle() {
             aria-label={o.code === "es" ? "Español" : "English"}
             onClick={() => setLang(o.code)}
             className={`min-h-[44px] px-3 py-2.5 text-xs font-bold ${
-              active ? "bg-emerald-600 text-white" : "text-zinc-300 hover:bg-zinc-800"
+              active ? "bg-emerald-700 text-white" : "text-zinc-300 hover:bg-zinc-800"
             }`}
           >
             {o.short}

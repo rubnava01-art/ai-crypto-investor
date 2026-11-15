@@ -323,7 +323,7 @@ export function VideosPanel() {
                 })}
               </ul>
             )}
-            <p className="mt-3 text-xs text-zinc-500">{t.videos.playlistTitle}: {visible.length}</p>
+            <p className="mt-3 text-xs text-zinc-400">{t.videos.playlistTitle}: {visible.length}</p>
           </>
         )}
         {isAdmin && (
@@ -360,7 +360,7 @@ export function VideosPanel() {
               </Field>
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 active:bg-sky-500 motion-safe:active:scale-[0.98] disabled:opacity-50">
+              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-sky-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 active:bg-sky-800 motion-safe:active:scale-[0.98] disabled:opacity-50">
                 {busy ? t.videos.saving : editingId !== null ? t.videos.saveChanges : t.videos.create}
               </button>
               {editingId !== null && (

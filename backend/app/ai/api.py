@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.ai import assistant, learning
 from app.ai.models import get_model
 from app.core.hardening import audit
-from app.core.rate_limit import RateLimiter
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.tables import User
@@ -46,9 +46,8 @@ def ai_ask(
     client_ip = request.client.host if request.client else "unknown"
     key = f"ai_ask:{user.id}:{client_ip}"
     if not ai_limiter.allow(key):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas preguntas. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiadas preguntas. Espera un minuto.", ai_limiter.window
         )
     question = (payload.question or "").strip()
     if not question:

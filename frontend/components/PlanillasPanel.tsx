@@ -226,7 +226,7 @@ export function PlanillasPanel() {
             </div>
             <Field label={t.planillas.notasAria}><textarea aria-label={t.planillas.notasAria} className={inputCls} placeholder={t.planillas.notasPlaceholder} value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} /></Field>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">{busy ? t.planillas.saving : editingId !== null ? t.planillas.saveChanges : t.planillas.create}</button>
+              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">{busy ? t.planillas.saving : editingId !== null ? t.planillas.saveChanges : t.planillas.create}</button>
               {editingId !== null && <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800">{t.planillas.cancel}</button>}
             </div>
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}

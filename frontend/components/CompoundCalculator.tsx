@@ -39,7 +39,7 @@ export function CompoundCalculator({ idPrefix = "calc" }: { idPrefix?: string })
   const resultOverflow = rawResult !== null && !Number.isFinite(rawResult);
   const hintId = `${idPrefix}-rate-hint`;
   const inputClass =
-    "mt-1 w-full min-h-[44px] rounded-lg border border-slate-700 bg-[#0B0F19] px-3.5 py-2.5 text-sm text-slate-100 tabular-nums placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+    "mt-1 w-full min-h-[44px] rounded-lg border border-slate-700 bg-[#0B0F19] px-3.5 py-2.5 text-sm text-slate-100 tabular-nums placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40";
   return (
     <div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">

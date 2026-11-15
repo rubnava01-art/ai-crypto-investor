@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { ManualesPanel } from "../../components/ManualesPanel";
 import { EstudiarTabs, type EstudiarSection } from "../../components/EstudiarTabs";
 import { ModuleShell } from "../../components/ModuleShell";
+import { PanelLoading } from "../../components/ui";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion, useSwipeNav } from "../../lib/useSwipeNav";
 
@@ -13,17 +14,6 @@ import { usePrefersReducedMotion, useSwipeNav } from "../../lib/useSwipeNav";
 // renderizar. Los <section id="..."> se quedan en el DOM desde el
 // primer render para que el IntersectionObserver del montaje y el
 // swipe los encuentren igual que antes.
-function PanelLoading() {
-  const { t } = useLanguage();
-  return (
-    <div
-      role="status"
-      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-500"
-    >
-      {t.dashboard.panelLoading}
-    </div>
-  );
-}
 const JuegoPanel = dynamic(
   () => import("../../components/JuegoPanel").then((m) => m.JuegoPanel),
   { ssr: false, loading: PanelLoading },

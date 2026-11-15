@@ -227,12 +227,12 @@ export function AjustadorPanel() {
                 </div>
                 <p className="mt-1 text-xs text-zinc-400">{agentLabel(AGENT_BY_SECTION[key])}</p>
                 {last.length === 0 ? (
-                  <p className="mt-1 text-xs italic text-zinc-500">{t.ajustador.noImprovement}</p>
+                  <p className="mt-1 text-xs italic text-zinc-400">{t.ajustador.noImprovement}</p>
                 ) : (
                   <ul className="mt-1 space-y-1">
                     {last.map((n) => (
                       <li key={n.date + n.title} className="text-xs text-zinc-300">
-                        {n.title} <span className="text-zinc-500">({n.date})</span>
+                        {n.title} <span className="text-zinc-400">({n.date})</span>
                       </li>
                     ))}
                   </ul>
@@ -261,12 +261,12 @@ export function AjustadorPanel() {
                     <td className="py-3 pr-3 text-zinc-300">{agentLabel(AGENT_BY_SECTION[key])}</td>
                     <td className="py-3">
                       {last.length === 0 ? (
-                        <span className="text-xs italic text-zinc-500">{t.ajustador.noImprovement}</span>
+                        <span className="text-xs italic text-zinc-400">{t.ajustador.noImprovement}</span>
                       ) : (
                         <ul className="space-y-1">
                           {last.map((n) => (
                             <li key={n.date + n.title} className="text-xs text-zinc-300">
-                              {n.title} <span className="text-zinc-500">({n.date})</span>
+                              {n.title} <span className="text-zinc-400">({n.date})</span>
                             </li>
                           ))}
                         </ul>
@@ -373,7 +373,7 @@ export function AjustadorPanel() {
               <textarea aria-label={t.ajustador.proposalAria} className={inputCls} placeholder={t.ajustador.proposalPlaceholder} value={propuesta} onChange={(e) => setPropuesta(e.target.value)} rows={3} required maxLength={5000} />
             </Field>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">{busy ? t.ajustador.saving : editingId !== null ? t.ajustador.saveChanges : t.ajustador.create}</button>
+              <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">{busy ? t.ajustador.saving : editingId !== null ? t.ajustador.saveChanges : t.ajustador.create}</button>
               {editingId !== null && <button type="button" onClick={resetForm} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800">{t.ajustador.cancel}</button>}
             </div>
             {msg && <p className="text-sm text-emerald-400">{msg}</p>}

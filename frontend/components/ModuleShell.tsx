@@ -53,9 +53,9 @@ export function ModuleShell({
     return (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div role="status" aria-label={t.shell.loading} className="space-y-4">
-          <div aria-hidden="true" className="h-8 w-48 motion-safe:animate-pulse rounded-lg bg-zinc-800" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
+          <div aria-hidden="true" className="h-8 w-48 motion-safe:animate-pulse rounded-lg bg-slate-800" />
+          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-slate-800" />
+          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-slate-800" />
         </div>
       </main>
     );

@@ -7,7 +7,7 @@ import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 /** Forma EXACTA que escribe el Analizador de redes sociales en
  * localStorage ("grow-social-analyses"). Se valida defensivamente:
@@ -321,7 +321,7 @@ export function AuditorPanel() {
           <button
             type="submit"
             disabled={busy || !url.trim()}
-            className="shrink-0 rounded-lg bg-emerald-600 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-emerald-700 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.auditor.auditBusy : t.auditor.audit}
           </button>
@@ -359,7 +359,7 @@ export function AuditorPanel() {
               <p className="mt-1 text-xs text-zinc-400">
                 {t.auditor.notScore}
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                 {t.auditor.sourceNote}
               </p>
               {result.note && <p className="mt-1 text-xs text-amber-300">{result.note}</p>}
@@ -405,7 +405,7 @@ export function AuditorPanel() {
                             </span>
                             <span className="text-sm font-semibold text-zinc-100">{newLabels[c.id] ?? c.label}</span>
                             <span className="text-sm text-zinc-300">{c.value}</span>
-                            <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${sevBadge[sev] ?? sevBadge.aviso}`}>
+                            <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${sevBadge[sev] ?? sevBadge.aviso}`}>
                               {sevName[sev] ?? sev}
                             </span>
                             <span className="w-full text-xs text-zinc-400 sm:ml-auto sm:w-auto">{t.auditor.ideal}{c.ideal}</span>
@@ -485,7 +485,7 @@ export function AuditorPanel() {
                 <button
                   type="button"
                   onClick={() => setResult(a)}
-                  className="flex w-full flex-wrap items-baseline gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                  className="flex min-h-[44px] w-full flex-wrap items-baseline gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-zinc-200">{a.url}</span>
                   <span className="text-sm font-semibold text-zinc-100">

@@ -38,8 +38,18 @@ export function AmbientSound() {
   const [sound, setSound] = useState<SoundId>("blanco");
   const [volume, setVolume] = useState(50);
   const [playing, setPlaying] = useState(false);
+  // "Sonando" solo con la promesa de play() no prueba sonido: el
+  // tiempo transcurrido (onTimeUpdate) demuestra que el cabezal de
+  // reproducción avanza de verdad, y "Cargando…" (onWaiting) que el
+  // audio aún no ha empezado. El volumen o el interruptor de silencio
+  // del teléfono siguen siendo lo único que Rubén puede comprobar.
+  const [elapsed, setElapsed] = useState(0);
+  const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const fmtElapsed = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   // Las etiquetas se resuelven desde el diccionario; los ids y las rutas
   // de archivo no cambian (son identificadores, no texto traducible).
@@ -83,17 +93,23 @@ export function AmbientSound() {
     audio.volume = volume / 100;
     audio.loop = true;
     setError(null);
+    setWaiting(true);
     const result = audio.play();
     if (result) {
       result.then(
-        () => setPlaying(true),
+        () => {
+          setPlaying(true);
+          setWaiting(false);
+        },
         () => {
           setPlaying(false);
+          setWaiting(false);
           setError(t.ambient.playError);
         }
       );
     } else {
       setPlaying(true);
+      setWaiting(false);
     }
   };
 
@@ -104,6 +120,8 @@ export function AmbientSound() {
       audio.currentTime = 0;
     }
     setPlaying(false);
+    setWaiting(false);
+    setElapsed(0);
   };
 
   const onVolume = (v: number) => {
@@ -117,13 +135,26 @@ export function AmbientSound() {
     // Cambiar de sonido mientras suena cambia al instante; el clic en
     // el selector es un gesto del usuario, así que play() sigue siendo
     // sincrónico aquí.
-    if (playing) play(id);
+    if (playing) {
+      setElapsed(0);
+      play(id);
+    }
   };
 
   const onAudioError = () => {
     setPlaying(false);
+    setWaiting(false);
+    setElapsed(0);
     setError(t.ambient.loadError);
   };
+
+  const onTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (audio) setElapsed(Math.floor(audio.currentTime));
+  };
+
+  const onPlaying = () => setWaiting(false);
+  const onWaiting = () => setWaiting(true);
 
   const current = SOUNDS.find((s) => s.id === sound) ?? SOUNDS[0];
 
@@ -145,6 +176,9 @@ export function AmbientSound() {
         loop
         preload="none"
         onError={onAudioError}
+        onTimeUpdate={onTimeUpdate}
+        onPlaying={onPlaying}
+        onWaiting={onWaiting}
         aria-hidden="true"
       />
 
@@ -183,6 +217,11 @@ export function AmbientSound() {
             value={volume}
             onChange={(e) => onVolume(Number(e.target.value))}
           />
+          {volume === 0 && (
+            <p className="mt-1 text-xs leading-relaxed text-amber-400">
+              {t.espacio.volumeZero}
+            </p>
+          )}
         </div>
       </div>
 
@@ -195,7 +234,7 @@ export function AmbientSound() {
           type="button"
           onClick={() => play(sound)}
           disabled={playing}
-          className="min-h-[44px] rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[44px] rounded-lg bg-teal-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t.ambient.play}
         </button>
@@ -203,14 +242,21 @@ export function AmbientSound() {
           type="button"
           onClick={stop}
           disabled={!playing}
-          className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t.ambient.stop}
         </button>
       </div>
       {/* Estado siempre visible para que se vea claro si opera o no:
           por default (al entrar) está en Detenido; al sonar, punto
-          pulsante verde + "Sonando". */}
+          pulsante verde + "Sonando". El tiempo transcurrido es la
+          prueba visible de que el cabezal avanza (no solo la promesa
+          de play()). "Cargando…" es el estado mientras el audio aún
+          no ha empezado O SE ATASCA a mitad de reproducción: `waiting`
+          tiene prioridad sobre `playing`, así que un atasco no se
+          disfraza de "Sonando" con el tiempo congelado. Ninguno de los
+          dos prueba que se oiga: eso solo lo comprueba Rubén con sus
+          oídos (ver nota abajo). */}
       <p
         role="status"
         className="mt-2 flex items-center justify-center gap-2 text-center text-xs font-semibold"
@@ -218,12 +264,14 @@ export function AmbientSound() {
         <span
           aria-hidden="true"
           className={`inline-block h-2 w-2 rounded-full ${
-            playing ? "animate-pulse bg-teal-400" : "bg-zinc-600"
+            waiting ? "animate-pulse bg-amber-400" : playing ? "animate-pulse bg-teal-400" : "bg-zinc-600"
           }`}
         />
-        {playing ? (
+        {waiting ? (
+          <span className="text-amber-300">{t.espacio.loading}</span>
+        ) : playing ? (
           <span className="text-teal-300">
-            {t.ambient.playing.replace("{nombre}", current.label)} · {t.ambient.volumeWord} {volume}%
+            {t.ambient.playing.replace("{nombre}", current.label)} · {t.ambient.volumeWord} {volume}% · {fmtElapsed(elapsed)}
           </span>
         ) : (
           <span className="text-zinc-400">{t.ambient.stopped}</span>
@@ -234,6 +282,9 @@ export function AmbientSound() {
           {error}
         </p>
       )}
+      <p className="mt-2 text-center text-xs leading-relaxed text-zinc-400">
+        {t.espacio.iphoneSilent}
+      </p>
     </div>
   );
 }

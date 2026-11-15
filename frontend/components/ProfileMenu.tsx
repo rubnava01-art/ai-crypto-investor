@@ -5,7 +5,7 @@ import { api, ApiError, type MeResponse, type UserProfile } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 transition-colors hover:border-zinc-600 focus:border-emerald-500 focus:outline-none";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors hover:border-zinc-600 focus:border-emerald-500 focus:outline-none";
 
 const MAX_AVATAR_BYTES = 500 * 1024;
 
@@ -96,7 +96,7 @@ export function ProfileEditor({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-zinc-100">{t.perfil.title}</h2>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-400">
               {t.perfil.editorSubtitle}
             </p>
           </div>
@@ -115,7 +115,7 @@ export function ProfileEditor({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatar} alt={t.perfil.photoAlt} className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-zinc-700" />
           ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-bold text-white ring-1 ring-emerald-500/50">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-lg font-bold text-white ring-1 ring-emerald-500/50">
               {(displayName || initial.username).slice(0, 1).toUpperCase()}
             </span>
           )}
@@ -161,14 +161,14 @@ export function ProfileEditor({
           <button
             type="submit"
             disabled={busy}
-            className="flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:opacity-50"
+            className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:opacity-50"
           >
             {busy ? t.perfil.saving : t.perfil.saveProfile}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
+            className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
           >
             {t.common.close}
           </button>
@@ -230,7 +230,7 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t.perfil.menuAria}
-        className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-600 text-base font-bold text-white shadow-sm ring-1 ring-emerald-500/50 transition-colors hover:bg-emerald-500"
+        className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-700 text-base font-bold text-white shadow-sm ring-1 ring-emerald-500/50 transition-colors hover:bg-emerald-800"
       >
         {profile?.avatar_data_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -243,8 +243,8 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <div role="menu" aria-label={t.perfil.menuAria} className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
           <div className="border-b border-zinc-800 px-4 py-3">
             <p className="truncate text-sm font-semibold text-zinc-100">{displayName}</p>
-            <p className="truncate text-xs text-zinc-500">{me?.username}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">{roleText}</p>
+            <p className="truncate text-xs text-zinc-400">{me?.username}</p>
+            <p className="mt-0.5 text-xs text-zinc-400">{roleText}</p>
           </div>
           <button
             role="menuitem"

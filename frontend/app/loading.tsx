@@ -12,7 +12,7 @@ export default function Loading() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-6 sm:px-6 sm:py-8" role="status" aria-label={t.misc.loadingAria}>
       <HeroSkeleton ariaLabel={t.misc.loadingAria} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <MetricCardSkeleton key={i} ariaLabel={t.misc.loadingAria} />
         ))}

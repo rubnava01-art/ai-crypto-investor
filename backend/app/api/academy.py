@@ -30,7 +30,7 @@ from app.models.tables import Contact, Course, CourseEnrollment, User, utcnow
 
 router = APIRouter(prefix="/api/academy", tags=["academy"])
 
-KINDS = ("ebook", "pack", "academia")
+KINDS = ("ebook", "pack", "academia", "guia")
 
 # --- Real PDF files (Fase 2.5) --------------------------------------------
 # The actual PDFs live in the repo at backend/app/assets/pdfs/ and are served
@@ -44,6 +44,10 @@ PDF_FILES: dict[str, str] = {
     "whatsapp-vende": "whatsapp-vende.pdf",
     "sistema-contenido-ia": "sistema-contenido-ia.pdf",
     "marca-personal-rentable": "marca-personal-rentable.pdf",
+    # Free guide (Nov 2026): not an "ebook" kind on purpose — EBOOK_SLUGS
+    # feeds the Pack, which is exactly the 6 manuals, so a new kind keeps
+    # the Pack at 6 downloads.
+    "guia-comandos-prompts-visuales": "guia-comandos-prompts-visuales-chatgpt.pdf",
     # The $400 Academy delivers its complete-course PDF.
     "academia-habilidades-negocio": "academia-curso-completo.pdf",
     # The Pack has no single file: it is the 6 ebook PDFs (see downloads).
@@ -134,6 +138,18 @@ CATALOG: list[tuple[str, str, str, str, str, str, str]] = [
         "ebook",
         "https://go.hotmart.com/W107890679J",
         "Entrega digital vía Hotmart tras el pago.",
+    ),
+    (
+        # Free guide, Nov 2026 (title + subtitle verified from the PDF
+        # itself; no price / no buy link provided — free direct download).
+        "guia-comandos-prompts-visuales",
+        "Guía de Comandos y Prompts Visuales",
+        "Biblioteca práctica para crear anuncios, fotografías, infografías, "
+        "contenido para redes sociales y diseños comerciales con ChatGPT.",
+        "0.00",
+        "guia",
+        "",
+        "Guía gratuita: descarga directa en la plataforma, sin costo.",
     ),
     (
         "pack-creador-completo",

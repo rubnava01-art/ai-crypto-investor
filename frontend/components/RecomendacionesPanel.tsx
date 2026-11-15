@@ -8,7 +8,7 @@ import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
 
 /** Recomendaciones: el admin recomienda cursos de Estudiar y herramientas
  * de Crear. La lista empieza VACÍA — aquí nada se inventa. Prueba solo
@@ -126,7 +126,7 @@ export function RecomendacionesPanel() {
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="flex-1 rounded-lg bg-amber-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-amber-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {busy ? t.recomendaciones.saveBusy : editing ? t.recomendaciones.update : t.recomendaciones.publish}
             </button>
@@ -153,7 +153,7 @@ export function RecomendacionesPanel() {
             {rows.map((r) => (
               <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
+                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
                     {r.category === "curso" ? t.recomendaciones.catCourse : t.recomendaciones.catTool}
                   </span>
                   <span className="text-sm font-semibold text-zinc-100">{r.title}</span>

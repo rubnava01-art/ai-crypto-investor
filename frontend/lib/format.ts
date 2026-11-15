@@ -16,6 +16,15 @@ export function formatMoney(
   return n.toLocaleString(locale, { style: "currency", currency, maximumFractionDigits: 2 });
 }
 
+/** Precio gratis: "0.00", 0 o "0" (la guía de /estudiar es gratuita).
+ * null/"" o un valor no numérico no cuentan como gratis: un precio
+ * ausente debe seguir mostrando "—" o su importe, nunca "Gratis". */
+export function isFreePrice(value: string | number | null | undefined): boolean {
+  if (value === null || value === undefined || value === "") return false;
+  const n = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(n) && n === 0;
+}
+
 /** Fecha sola (día + mes corto + año) en hora local, o null si no hay fecha. */
 export function formatDate(iso: string | null | undefined, locale: string): string | null {
   if (!iso) return null;

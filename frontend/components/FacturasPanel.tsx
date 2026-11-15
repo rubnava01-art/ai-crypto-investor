@@ -95,7 +95,7 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
             <input aria-label={t.facturas.materialAria} className={`${inputCls} col-span-6`} placeholder={t.facturas.materialPlaceholder} value={r.material} onChange={(e) => setRow(i, { material: e.target.value })} autoComplete="off" />
             <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" placeholder={t.facturas.qtyPlaceholder} value={r.qty} onChange={(e) => setRow(i, { qty: Number(e.target.value) })} aria-label={t.facturas.qtyAria} />
             <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" placeholder={t.facturas.unitCostPlaceholder} value={r.unitCost} onChange={(e) => setRow(i, { unitCost: Number(e.target.value) })} aria-label={t.facturas.unitCostAria} />
-            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={t.facturas.removeMaterialAria}>×</button>
+            <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={t.facturas.removeMaterialAria}>×</button>
           </div>
         ))}
         <button type="button" onClick={() => setRows((rs) => [...rs, { material: "", qty: 1, unitCost: 0 }])} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
@@ -127,7 +127,7 @@ function MaterialsCalculator({ onUsePrice }: { onUsePrice: (desc: string, amount
           type="button"
           onClick={() => onUsePrice(t.facturas.calcLineDesc, Math.round(suggested * 100) / 100, 1)}
           disabled={suggested <= 0}
-          className="mt-3 min-h-[44px] w-full rounded-lg bg-amber-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+          className="mt-3 min-h-[44px] w-full rounded-lg bg-amber-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
         >
           {t.facturas.usePrice}
         </button>
@@ -309,7 +309,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                 <input aria-label={tt.facturas.descAria} className={`${inputCls} col-span-6`} placeholder={tt.facturas.descPlaceholder} value={it.description} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} maxLength={200} autoComplete="off" />
                 <input className={`${inputCls} col-span-2`} type="number" min="0" step="1" value={it.qty} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} aria-label={tt.facturas.qtyAria} />
                 <input className={`${inputCls} col-span-3`} type="number" min="0" step="0.01" value={it.unit_price} onChange={(e) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, unit_price: Number(e.target.value) } : x)))} aria-label={tt.facturas.unitPriceAria} />
-                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={tt.facturas.removeConceptAria}>×</button>
+                <button type="button" onClick={() => setItems((xs) => xs.filter((_, j) => j !== i))} disabled={items.length === 1} className="col-span-1 min-h-[44px] rounded-lg border border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={tt.facturas.removeConceptAria}>×</button>
               </div>
             ))}
             <button type="button" onClick={() => setItems((xs) => [...xs, emptyItem()])} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
@@ -330,7 +330,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
             </div>
 
             <div className="flex gap-2">
-              <button type="submit" disabled={busy || !clientName.trim() || validItems.length === 0} className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+              <button type="submit" disabled={busy || !clientName.trim() || validItems.length === 0} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {busy ? tt.facturas.saving : tt.facturas.saveInvoice}
               </button>
               <button type="button" onClick={printCurrent} disabled={validItems.length === 0 || !clientName.trim()} className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
@@ -348,9 +348,9 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
           </p>
           {savedError ? <ApiErrorBanner error={savedError} t={tt} onRetry={savedLoad.reload} /> : null}
           {saved === null && !savedError ? (
-            <p className="py-2 text-sm text-zinc-500">{tt.facturas.loadingInvoices}</p>
+            <p className="py-2 text-sm text-zinc-400">{tt.facturas.loadingInvoices}</p>
           ) : saved === null ? null : saved.length === 0 ? (
-            <p className="py-2 text-sm text-zinc-500">{tt.facturas.emptyInvoices}</p>
+            <p className="py-2 text-sm text-zinc-400">{tt.facturas.emptyInvoices}</p>
           ) : (
             <ul className="divide-y divide-zinc-800/70">
               {saved.map((inv) => {
@@ -360,10 +360,10 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100">{inv.number}</span>
                       <span className="text-sm text-zinc-400">{inv.client_name}</span>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{STATUS_LABEL[inv.status]}</span>
+                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{STATUS_LABEL[inv.status]}</span>
                       <span className="text-sm font-semibold text-emerald-400">{money(it.total)}</span>
                       <span className="ml-auto flex items-center gap-2">
-                        <span className="text-xs text-zinc-500">{fmtDate(inv.created_at, locale)}</span>
+                        <span className="text-xs text-zinc-400">{fmtDate(inv.created_at, locale)}</span>
                         <button onClick={() => printSaved(inv)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                           {tt.facturas.print}
                         </button>

@@ -276,7 +276,7 @@ export function ReferidosPanel() {
         {isAdmin && !showCampaignForm && (
           <button
             onClick={() => { setShowCampaignForm(true); setEditingCampaignId(null); setCampaignForm(emptyCampaignForm); }}
-            className="mb-4 min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            className="mb-4 min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.referidos.newCampaign}
           </button>
@@ -316,7 +316,7 @@ export function ReferidosPanel() {
               </select>
             </label>
             <div className="flex gap-2">
-              <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+              <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 {editingCampaignId !== null ? t.referidos.saveChanges : t.referidos.createCampaign}
               </button>
               <button type="button" onClick={() => { setShowCampaignForm(false); setEditingCampaignId(null); }} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
@@ -394,7 +394,7 @@ export function ReferidosPanel() {
           </div>
 
           {isAdmin && selected.status === "active" && !showReferralForm && (
-            <button onClick={() => setShowReferralForm(true)} className="mb-4 min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            <button onClick={() => setShowReferralForm(true)} className="mb-4 min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {t.referidos.registerReferral}
             </button>
           )}
@@ -412,7 +412,7 @@ export function ReferidosPanel() {
               <Field label={t.referidos.codeAria}><input aria-label={t.referidos.codeAria} className={inputCls} placeholder={t.referidos.codePlaceholder.replace("{codigo}", selected.share_code)} value={referralForm.code} onChange={setR("code")} /></Field>
               <Field label={t.referidos.notesAria}><input aria-label={t.referidos.notesAria} className={inputCls} placeholder={t.referidos.notesPlaceholder} value={referralForm.notes} onChange={setR("notes")} /></Field>
               <div className="flex gap-2">
-                <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.register}</button>
+                <button type="submit" disabled={busy} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.register}</button>
                 <button type="button" onClick={() => setShowReferralForm(false)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{t.referidos.cancel}</button>
               </div>
             </form>
@@ -429,7 +429,7 @@ export function ReferidosPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold text-zinc-100">
-                      {r.referrer_name} <span className="font-normal text-zinc-500">{t.referidos.referredBy}</span> {r.referred_name}
+                      {r.referrer_name} <span className="font-normal text-zinc-400">{t.referidos.referredBy}</span> {r.referred_name}
                     </p>
                     <p className="text-sm text-zinc-400">
                       {t.referidos.codePrefix}<span className="font-mono text-zinc-300">{r.code}</span>

@@ -57,7 +57,7 @@ function ToolCard({ id, num, title, badge, children }: { id: string; num: string
   return (
     <section id={id} aria-label={title} className="scroll-mt-24 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-xs font-bold text-white">{num}</span>
+        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-700 text-xs font-bold text-white">{num}</span>
         <h3 className="min-w-0 flex-1 text-sm font-semibold text-zinc-100">{title}</h3>
         {badge}
       </div>
@@ -193,7 +193,7 @@ function BtcConverter() {
               <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="0" step="any" inputMode="decimal" value={shownUsd} onChange={(e) => { setUsd(e.target.value); setLastEdited("usd"); }} />
             </label>
           </div>
-          <p className={`mt-2 text-xs leading-relaxed ${fresh ? "text-zinc-500" : "text-amber-400"}`}>
+          <p className={`mt-2 text-xs leading-relaxed ${fresh ? "text-zinc-400" : "text-amber-400"}`}>
             1 BTC = {fmtUsd(price, "en-US")} ·{" "}
             {t.clases.convSource.replace("{source}", ticker.source).replace("{time}", new Date(ticker.updated_utc).toLocaleTimeString(locale, { hour12: false }))}
             {!fresh && ` · ${t.clases.convStale}`}
@@ -283,13 +283,13 @@ function BtcChart() {
             <polyline points={pts(ema20)} fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeDasharray="4 3" strokeLinejoin="round" />
             <polyline points={pts(closes.map((v) => v))} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
           </svg>
-          <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500">
+          <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span><span className="text-emerald-400">—</span> {t.clases.chartClose}</span>
             <span><span className="text-amber-400">—</span> {t.clases.chartSma20}</span>
             <span><span className="text-sky-400">—</span> {t.clases.chartSma50}</span>
             <span><span className="text-violet-400">- -</span> {t.clases.chartEma20}</span>
           </p>
-          <p className={`mt-1.5 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-500"}`}>
+          <p className={`mt-1.5 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-400"}`}>
             {t.clases.chartSource.replace("{source}", data.source)} ·{" "}
             {t.clases.chartNewest.replace("{time}", fmtTime(data.newest_candle_utc, locale))}
           </p>
@@ -374,11 +374,11 @@ function IndicatorsStrip() {
               <li key={c.label} className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{c.label}</p>
                 <p className="mt-0.5 text-base font-semibold tabular-nums text-zinc-100">{c.value}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">{c.desc}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">{c.desc}</p>
               </li>
             ))}
           </ul>
-          <p className={`mt-2 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-500"}`}>
+          <p className={`mt-2 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-400"}`}>
             {t.clases.indSource.replace("{source}", data.source).replace("{time}", fmtTime(data.newest_candle_utc, locale))}
             {data.stale && ` · ${t.clases.convStale}`}
           </p>

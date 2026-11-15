@@ -9,7 +9,7 @@ import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, LoadMore, useConfirm, Field } from "./ui";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 /** Inicio: noticias y actualizaciones de la plataforma como posts, con
  * comentarios. La lista de posts del administrador empieza VACÍA — aquí
@@ -203,10 +203,10 @@ export function InicioPanel() {
             <ol className="mt-3 space-y-3 border-l-2 border-emerald-900/60 pl-4">
               {avances.map((n) => (
                 <li key={`avance-${n.date}-${n.title}`}>
-                  <p className="text-xs text-zinc-500">{fmtDate(n.date)}</p>
+                  <p className="text-xs text-zinc-400">{fmtDate(n.date)}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-100">
                     {n.title}
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-300">
                       {t.inicio.systemNews}
                     </span>
                   </p>
@@ -226,7 +226,7 @@ export function InicioPanel() {
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.inicio.saving : editing ? t.inicio.updatePost : t.inicio.publishNews}
             </button>
@@ -244,9 +244,9 @@ export function InicioPanel() {
       {postsError ? <ApiErrorBanner error={postsError} t={t} onRetry={postsLoad.reload} /> : null}
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {posts === null && !postsError ? (
-          <p className="py-2 text-sm text-zinc-500">{t.inicio.loadingPosts}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.inicio.loadingPosts}</p>
         ) : items.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">
+          <p className="py-2 text-sm text-zinc-400">
             {t.inicio.emptyPosts}
           </p>
         ) : (
@@ -308,9 +308,9 @@ export function InicioPanel() {
                         <ApiErrorBanner error={commentsError[p.id]} t={t} onRetry={() => loadComments(p.id)} />
                       ) : null}
                       {rows === undefined ? (
-                        <p className="text-sm text-zinc-500">{t.inicio.loadingComments}</p>
+                        <p className="text-sm text-zinc-400">{t.inicio.loadingComments}</p>
                       ) : rows.length === 0 ? (
-                        <p className="text-sm text-zinc-500">{t.inicio.firstComment}</p>
+                        <p className="text-sm text-zinc-400">{t.inicio.firstComment}</p>
                       ) : (
                         <>
                         <ul className="space-y-2">
@@ -319,9 +319,9 @@ export function InicioPanel() {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-zinc-200">{c.author_name}</span>
                                 {c.author_username && (
-                                  <span className="text-xs text-zinc-500">@{c.author_username}</span>
+                                  <span className="text-xs text-zinc-400">@{c.author_username}</span>
                                 )}
-                                <span className="text-xs text-zinc-500">{fmtDate(c.created_at)}</span>
+                                <span className="text-xs text-zinc-400">{fmtDate(c.created_at)}</span>
                                 {c.can_delete && (
                                   <button
                                     onClick={() => removeComment(p.id, c)}
@@ -357,7 +357,7 @@ export function InicioPanel() {
                         <button
                           onClick={() => sendComment(p.id)}
                           disabled={!(drafts[p.id] ?? "").trim()}
-                          className="min-h-[44px] shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {t.inicio.comment}
                         </button>

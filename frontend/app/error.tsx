@@ -18,7 +18,7 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <button
           onClick={reset}
-          className="inline-flex min-h-[2.75rem] items-center rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500"
+          className="inline-flex min-h-[2.75rem] items-center rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800"
         >
           {t.misc.retry}
         </button>

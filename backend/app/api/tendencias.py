@@ -28,11 +28,11 @@ data, no invented keywords.
 from concurrent.futures import ThreadPoolExecutor, wait
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.rate_limit import tendencias_limiter
+from app.core.rate_limit import tendencias_limiter, too_many_requests
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.tables import TrendSearch, User
@@ -174,9 +174,9 @@ def research_trends(
     # Per-USER limiter (M3): research writes a TrendSearch row AND fans
     # out to Google on every call — it used to be unlimited.
     if not tendencias_limiter.allow(f"tendencias:{user.id}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas investigaciones. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiadas investigaciones. Espera un minuto.",
+            tendencias_limiter.window,
         )
     db.add(TrendSearch(user_id=user.id, keyword=keyword))
     db.commit()

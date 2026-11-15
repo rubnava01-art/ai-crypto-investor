@@ -8,7 +8,7 @@ import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
 const CATEGORY_ORDER: ComplianceCategory[] = [
   "documentos",
@@ -197,7 +197,7 @@ export function PrivacidadPanel() {
             <button
               type="submit"
               disabled={busy || !title.trim()}
-              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t.privacidad.saving : editing ? t.privacidad.updateTask : t.privacidad.saveTask}
             </button>
@@ -215,7 +215,7 @@ export function PrivacidadPanel() {
       <div className="mt-4 flex flex-wrap gap-1.5">
         <button
           onClick={() => setFilter("todas")}
-          className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === "todas" ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+          className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === "todas" ? "bg-emerald-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
         >
           {t.privacidad.allFilter}
         </button>
@@ -223,7 +223,7 @@ export function PrivacidadPanel() {
           <button
             key={c}
             onClick={() => setFilter(c)}
-            className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === c ? "bg-emerald-600 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+            className={`min-h-[44px] rounded-full px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${filter === c ? "bg-emerald-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
           >
             {categoryLabel(c)}
           </button>
@@ -232,9 +232,9 @@ export function PrivacidadPanel() {
 
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {visible === null ? (
-          <p className="py-2 text-sm text-zinc-500">{t.privacidad.loadingTasks}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.privacidad.loadingTasks}</p>
         ) : visible.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-500">{t.privacidad.emptyGroup}</p>
+          <p className="py-2 text-sm text-zinc-400">{t.privacidad.emptyGroup}</p>
         ) : (
           <ul className="space-y-3">
             {visible.map((item) => (
@@ -269,7 +269,7 @@ export function PrivacidadPanel() {
                   )}
                 </div>
                 {item.description && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{item.description}</p>}
-                {item.notes && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-500">{t.privacidad.notesPrefix}{item.notes}</p>}
+                {item.notes && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">{t.privacidad.notesPrefix}{item.notes}</p>}
               </li>
             ))}
           </ul>

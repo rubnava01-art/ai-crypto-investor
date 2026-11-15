@@ -6,7 +6,7 @@ import { useLanguage } from "../lib/i18n";
 import { downloadSvg, downloadSvgAsPng } from "../lib/svgDownload";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-violet-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40";
 
 // Símbolos y paletas: valores/hex fijos; las etiquetas visibles salen del
 // diccionario dentro del componente (t.logo.*).
@@ -41,6 +41,12 @@ export function LogoGenerator() {
 
   const palette = palettes[paletteIdx];
   const symbolDef = symbols.find((s) => s.value === symbol) ?? symbols[0];
+  const styleLabel = style === "monograma" ? t.logo.styleMonogram : style === "insignia" ? t.logo.styleBadge : t.logo.styleSymbol;
+  const styleOptions: { value: Style; label: string }[] = [
+    { value: "simbolo", label: t.logo.styleSymbol },
+    { value: "monograma", label: t.logo.styleMonogram },
+    { value: "insignia", label: t.logo.styleBadge },
+  ];
   const initials = name.trim().slice(0, 2).toUpperCase() || "N";
   const fileBase = `logo-${(name.trim() || "marca").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
@@ -67,29 +73,70 @@ export function LogoGenerator() {
         <div className="space-y-3">
           <input aria-label={t.logo.brandAria} className={inputCls} placeholder={t.logo.brandPlaceholder} value={name} onChange={(e) => setName(e.target.value)} maxLength={24} autoComplete="off" />
           <input aria-label={t.logo.taglineAria} className={inputCls} placeholder={t.logo.taglinePlaceholder} value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={40} autoComplete="off" />
-          <div className="grid grid-cols-2 gap-2">
-            <select className={inputCls} value={style} onChange={(e) => setStyle(e.target.value as Style)} aria-label={t.logo.styleAria}>
-              <option value="simbolo">{t.logo.styleSymbol}</option>
-              <option value="monograma">{t.logo.styleMonogram}</option>
-              <option value="insignia">{t.logo.styleBadge}</option>
-            </select>
-            <select className={inputCls} value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label={t.logo.symbolAria}>
-              {symbols.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.logo.styleAria}</span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label={t.logo.styleAria}>
+              {styleOptions.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={style === o.value}
+                  onClick={() => setStyle(o.value)}
+                  className={`min-h-[44px] rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${style === o.value ? "bg-violet-600 text-white" : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"}`}
+                >
+                  {o.label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
-          <select className={inputCls} value={paletteIdx} onChange={(e) => setPaletteIdx(Number(e.target.value))} aria-label={t.logo.paletteAria}>
-            {palettes.map((p, i) => (
-              <option key={p.name} value={i}>{p.name}</option>
-            ))}
-          </select>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.logo.symbolAria}</span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label={t.logo.symbolAria}>
+              {symbols.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  aria-pressed={symbol === s.value}
+                  aria-label={s.label}
+                  onClick={() => setSymbol(s.value)}
+                  className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${symbol === s.value ? "border-violet-500 bg-violet-500/10 ring-2 ring-violet-500/40" : "border-zinc-700 bg-zinc-900 hover:bg-zinc-800"}`}
+                >
+                  <svg viewBox="0 0 100 100" className="h-7 w-7" aria-hidden="true">
+                    <path d={s.path} fill={palette.accent} />
+                  </svg>
+                  <span className="text-xs font-semibold text-zinc-200">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.logo.paletteAria}</span>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label={t.logo.paletteAria}>
+              {palettes.map((p, i) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  aria-pressed={paletteIdx === i}
+                  aria-label={p.name}
+                  onClick={() => setPaletteIdx(i)}
+                  className={`flex min-h-[44px] items-center gap-2.5 rounded-lg border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${paletteIdx === i ? "border-violet-500 bg-violet-500/10 ring-2 ring-violet-500/40" : "border-zinc-700 bg-zinc-900 hover:bg-zinc-800"}`}
+                >
+                  <span className="flex shrink-0 items-center" aria-hidden="true">
+                    <span className="h-5 w-5 rounded-full border border-white/30" style={{ backgroundColor: p.bg }} />
+                    <span className="-ml-1.5 h-5 w-5 rounded-full border border-white/30" style={{ backgroundColor: p.fg }} />
+                    <span className="-ml-1.5 h-5 w-5 rounded-full border border-white/30" style={{ backgroundColor: p.accent }} />
+                  </span>
+                  <span className="text-xs font-semibold text-zinc-200">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => download(false)}
               disabled={!name.trim()}
-              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.logo.downloadSvg}
             </button>
@@ -97,7 +144,7 @@ export function LogoGenerator() {
               type="button"
               onClick={() => download(true)}
               disabled={!name.trim()}
-              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-violet-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
             >
               {t.logo.downloadPng}
             </button>
@@ -105,7 +152,12 @@ export function LogoGenerator() {
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
         </div>
 
-        <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+        <div>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.logo.previewAria}</p>
+            <p className="text-xs text-zinc-400">{styleLabel} · {palette.name}</p>
+          </div>
+          <div className="flex items-center justify-center rounded-lg border border-zinc-800 bg-zinc-950 p-4">
           <svg ref={svgRef} viewBox="0 0 300 300" className="h-auto w-full max-w-56" role="img" aria-label={t.logo.previewAria}>
             <rect width="300" height="300" fill={palette.bg} />
             {style === "monograma" ? (
@@ -155,6 +207,7 @@ export function LogoGenerator() {
               </>
             )}
           </svg>
+          </div>
         </div>
       </div>
     </Panel>

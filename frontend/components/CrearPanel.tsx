@@ -6,14 +6,14 @@ import {
   type AIStatusResponse, type CopyDraft, type CopyPlatform, type CopyTone, type MeResponse, type TrendNote,
 } from "../lib/api";
 import { Panel } from "./Panel";
-import { useConfirm, Field } from "./ui";
+import { useConfirm, Field, copyTextWithFallback } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { LogoGenerator } from "./LogoGenerator";
 import { ShirtMockupGenerator } from "./ShirtMockupGenerator";
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
 
 const PLATFORMS: { value: CopyPlatform; label: string }[] = [
   { value: "instagram", label: "Instagram" },
@@ -93,6 +93,14 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const copyDraft = async (d: CopyDraft) => {
+    if (await copyTextWithFallback(d.text)) {
+      setCopiedId(d.id);
+      setTimeout(() => setCopiedId((v) => (v === d.id ? null : v)), 2000);
+    }
+  };
+
   return (
     <>
       {dialog}
@@ -131,22 +139,43 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
             maxLength={200}
             autoComplete="off"
           /></Field>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Field label={t.crear.platformAria}><select className={inputCls} value={platform} onChange={(e) => setPlatform(e.target.value as CopyPlatform)} aria-label={t.crear.platformAria}>
+          <p className="text-right text-xs text-zinc-400">{topic.length}/200</p>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.crear.platformAria}</span>
+            <div className="flex gap-2" role="group" aria-label={t.crear.platformAria}>
               {PLATFORMS.map((p) => (
-                <option key={p.value} value={p.value}>{t.crear.platformPrefix}{p.label}</option>
+                <button
+                  key={p.value}
+                  type="button"
+                  aria-pressed={platform === p.value}
+                  onClick={() => setPlatform(p.value)}
+                  className={`min-h-[44px] flex-1 rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${platform === p.value ? "bg-emerald-700 text-white" : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"}`}
+                >
+                  {p.label}
+                </button>
               ))}
-            </select></Field>
-            <Field label={t.crear.toneAria}><select className={inputCls} value={tone} onChange={(e) => setTone(e.target.value as CopyTone)} aria-label={t.crear.toneAria}>
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">{t.crear.toneAria}</span>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label={t.crear.toneAria}>
               {tones.map((tn) => (
-                <option key={tn.value} value={tn.value}>{t.crear.tonePrefix}{tn.label}</option>
+                <button
+                  key={tn.value}
+                  type="button"
+                  aria-pressed={tone === tn.value}
+                  onClick={() => setTone(tn.value)}
+                  className={`min-h-[44px] rounded-lg px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${tone === tn.value ? "bg-emerald-700 text-white" : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"}`}
+                >
+                  {tn.label}
+                </button>
               ))}
-            </select></Field>
+            </div>
           </div>
           <button
             type="submit"
             disabled={busy || !topic.trim()}
-            className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="w-full rounded-lg bg-emerald-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.crear.generateBusy : t.crear.generate}
           </button>
@@ -160,33 +189,50 @@ function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
           {t.crear.saved} ({drafts === null ? "…" : drafts.length})
         </p>
         {drafts === null ? (
-          <p className="py-2 text-sm text-zinc-400">{t.crear.loadingCopies}</p>
+          <div role="status" aria-label={t.crear.loadingCopies} className="space-y-3 py-2">
+            {[0, 1].map((i) => (
+              <div key={i} aria-hidden="true" className="space-y-2">
+                <div className="h-4 w-2/5 animate-pulse rounded bg-zinc-800" />
+                <div className="h-3 w-full animate-pulse rounded bg-zinc-800" />
+                <div className="h-3 w-3/4 animate-pulse rounded bg-zinc-800" />
+              </div>
+            ))}
+          </div>
         ) : drafts.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">{t.crear.emptyCopies}</p>
+          <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
+            <p className="text-sm text-zinc-400">{t.crear.emptyCopies}</p>
+          </div>
         ) : (
-          <ul className="divide-y divide-zinc-800/70">
+          <ul className="space-y-3">
             {drafts.map((d) => (
-              <li key={d.id} className="py-3">
+              <li key={d.id} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300">{platformLabel(d.platform)}</span>
-                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300">{toneLabel(d.tone)}</span>
+                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-xs text-zinc-300">{platformLabel(d.platform)}</span>
+                  <span className="rounded bg-zinc-800 px-1.5 py-1 text-xs text-zinc-300">{toneLabel(d.tone)}</span>
                   {d.demo && (
-                    <span className="rounded bg-amber-500/15 px-1.5 py-1 text-[11px] font-semibold text-amber-300">{t.crear.demoChip}</span>
+                    <span className="rounded bg-amber-500/15 px-1.5 py-1 text-xs font-semibold text-amber-300">{t.crear.demoChip}</span>
                   )}
-                  <span className="text-xs text-zinc-400">{d.topic}</span>
-                  <span className="ml-auto flex items-center gap-2">
-                    <span className="text-xs text-zinc-400">{fmtDate(d.created_at, locale)}</span>
-                    {isAdmin && (
-                      <button
-                        onClick={() => remove(d)}
-                        className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                      >
-                        {t.crear.deleteBtn}
-                      </button>
-                    )}
-                  </span>
                 </div>
-                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-200">{d.text}</p>
+                <p className="mt-2 text-xs font-semibold text-zinc-300">{d.topic}</p>
+                <p className="mt-2 whitespace-pre-wrap rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-3 py-2.5 text-sm leading-relaxed text-zinc-200">{d.text}</p>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  <span className="mr-auto text-xs text-zinc-400">{fmtDate(d.created_at, locale)}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyDraft(d)}
+                    className="min-h-[44px] rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                  >
+                    {copiedId === d.id ? t.crear.copied : t.crear.copy}
+                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => remove(d)}
+                      className="min-h-[44px] rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    >
+                      {t.crear.deleteBtn}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -268,15 +314,25 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       </p>
 
       {trends === null ? (
-        <p className="py-2 text-sm text-zinc-400">{t.crear.loadingTrends}</p>
+        <div role="status" aria-label={t.crear.loadingTrends} className="space-y-3 py-2">
+          {[0, 1].map((i) => (
+            <div key={i} aria-hidden="true" className="space-y-2">
+              <div className="h-4 w-2/5 animate-pulse rounded bg-zinc-800" />
+              <div className="h-3 w-full animate-pulse rounded bg-zinc-800" />
+              <div className="h-3 w-3/4 animate-pulse rounded bg-zinc-800" />
+            </div>
+          ))}
+        </div>
       ) : trends.length === 0 ? (
-        <p className="py-2 text-sm text-zinc-400">
-          {t.crear.emptyTrends}
-        </p>
+        <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
+          <p className="text-sm text-zinc-400">
+            {t.crear.emptyTrends}
+          </p>
+        </div>
       ) : (
-        <ul className="divide-y divide-zinc-800/70">
+        <ul className="space-y-3">
           {trends.map((tr) => (
-            <li key={tr.id} className="py-2.5">
+            <li key={tr.id} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3.5">
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm font-semibold text-zinc-100">{tr.title}</span>
                 {tr.published_on && <span className="text-xs text-zinc-400">{fmtDate(tr.published_on, locale)}</span>}
@@ -289,15 +345,16 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
                   </button>
                 )}
               </div>
-              {tr.source && <p className="mt-0.5 text-xs text-zinc-400">{t.crear.sourceLabel}{tr.source}</p>}
-              {tr.summary && <p className="mt-0.5 text-sm text-zinc-400">{tr.summary}</p>}
+              {tr.source && <p className="mt-1.5"><span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">{t.crear.sourceLabel}{tr.source}</span></p>}
+              {tr.summary && <p className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-3 py-2 text-sm leading-relaxed text-zinc-300">{tr.summary}</p>}
             </li>
           ))}
         </ul>
       )}
 
       {isAdmin && (
-        <form onSubmit={add} className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <form onSubmit={add} className="space-y-3">
           <p className="text-sm font-semibold text-zinc-200">{t.crear.newTrend}</p>
           <Field label={t.crear.trendTitleAria}><input aria-label={t.crear.trendTitleAria} className={inputCls} placeholder={t.crear.trendTitlePlaceholder} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
           <Field label={t.crear.sourceAria}><input aria-label={t.crear.sourceAria} className={inputCls} placeholder={t.crear.sourcePlaceholder} value={source} onChange={(e) => setSource(e.target.value)} maxLength={120} autoComplete="off" /></Field>
@@ -305,12 +362,13 @@ function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-emerald-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="w-full rounded-lg bg-emerald-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.crear.addBusy : t.crear.addTrend}
           </button>
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
+        </div>
       )}
       {!isAdmin && error && <p role="alert" className="mt-2 text-sm text-red-400">{error}</p>}
     </Panel>
@@ -322,6 +380,12 @@ export function CrearPanel() {
   const isCancelled = useCancelled();
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
+  const { t } = useLanguage();
+  const flowSteps = [
+    { n: "1", label: t.crear.trendsTitle },
+    { n: "2", label: t.crear.copyTitle },
+    { n: "3", label: t.nav.crm.label },
+  ];
 
   useEffect(() => {
     api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
@@ -329,6 +393,19 @@ export function CrearPanel() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          {t.crear.flowLabel}
+        </p>
+        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {flowSteps.map((s) => (
+            <li key={s.n} className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">{s.n}</span>
+              <span className="text-sm font-semibold text-zinc-100">{s.label}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
       <CopyGenerator isAdmin={isAdmin} />
       <LogoGenerator />
       <ShirtMockupGenerator />

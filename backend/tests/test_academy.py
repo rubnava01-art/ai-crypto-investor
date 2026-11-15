@@ -22,7 +22,7 @@ def test_academy_catalog_seeded_real_products(client, admin_headers):
     r = client.get("/api/academy/courses", headers=h)
     assert r.status_code == 200, r.text
     courses = r.json()
-    assert len(courses) == 8
+    assert len(courses) == 9
     by_slug = {c["slug"]: c for c in courses}
 
     # The 6 documented Hotmart ebooks.
@@ -43,6 +43,14 @@ def test_academy_catalog_seeded_real_products(client, admin_headers):
     assert aca["price_usd"] == "400.00"
     assert aca["buy_url"] == "https://py.pl/DmZD4WMDLU2VkraMHHo4kg"
     assert "square.link/u/ewarbJoj" in aca["delivery_note"]
+
+    # The free ChatGPT prompts guide (Nov 2026): not an "ebook" kind, so
+    # the 6-ebook assertions above and the Pack (6 downloads) are unaffected.
+    guia = by_slug["guia-comandos-prompts-visuales"]
+    assert guia["kind"] == "guia"
+    assert guia["title"] == "Guía de Comandos y Prompts Visuales"
+    assert guia["price_usd"] == "0.00"
+    assert guia["buy_url"] == ""
     assert all(c["students_count"] == 0 for c in courses)
 
 

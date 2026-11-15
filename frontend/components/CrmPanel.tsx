@@ -268,7 +268,7 @@ export function CrmPanel() {
               {c.tags.length > 0 && (
                 <p className="mt-1 flex flex-wrap gap-1">
                   {c.tags.map((tg) => (
-                    <span key={tg} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{tg}</span>
+                    <span key={tg} className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{tg}</span>
                   ))}
                 </p>
               )}
@@ -325,7 +325,7 @@ export function CrmPanel() {
                   <td className="py-3 pr-3">
                     <span className="flex flex-wrap gap-1">
                       {c.tags.map((t) => (
-                        <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-zinc-200">{t}</span>
+                        <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{t}</span>
                       ))}
                       {c.tags.length === 0 && <span className="text-zinc-500">—</span>}
                     </span>
@@ -389,7 +389,7 @@ export function CrmPanel() {
             <button
               type="submit"
               disabled={busy}
-              className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
             >
               {busy ? t.crm.saving : editingId !== null ? t.crm.saveChanges : t.crm.createContact}
             </button>

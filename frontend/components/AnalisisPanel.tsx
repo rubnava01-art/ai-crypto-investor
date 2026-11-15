@@ -187,7 +187,7 @@ export function AnalisisPanel() {
       </Field>
       <div className="mt-3 flex gap-2">
         <button onClick={() => setResult(parseCompanyText(text))}
-          className="min-h-[44px] flex-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500">
+          className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
           {t.analisis.parse}
         </button>
         <button onClick={() => { setText(""); setResult(null); }}
@@ -220,7 +220,21 @@ export function AnalisisPanel() {
 
           <div className="mt-6">
             <h3 className="mb-3 text-sm font-semibold text-zinc-200">{t.analisis.tableTitle}</h3>
-            <div className="overflow-x-auto">
+            {/* H-8: tarjetas apiladas en teléfono (patrón CRM): la tabla, con
+                min-w de 480 px, obligaba a scroll horizontal para leer un
+                dato; en móvil se muestra la tarjeta y la tabla queda para
+                sm en adelante. Sin claves i18n nuevas: reutiliza etiqueta,
+                original y valor. */}
+            <ul className="space-y-3 sm:hidden">
+              {result.parsed.map((d, i) => (
+                <li key={i} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                  <p className="text-sm font-semibold text-zinc-100">{d.label}</p>
+                  <p className="mt-1 break-words text-sm text-zinc-300">{d.original}</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-100">{fmt(d.value)}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[480px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">

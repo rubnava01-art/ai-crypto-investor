@@ -12,7 +12,7 @@ from app.core.timeframes import (
     timeframe_seconds as _timeframe_seconds,
     validate_timeframe as _validate_timeframe,
 )
-from app.core.rate_limit import strategy_limiter
+from app.core.rate_limit import strategy_limiter, too_many_requests
 from app.core.security import get_current_user
 from app.data import ingest
 from app.database import get_db
@@ -75,9 +75,8 @@ def evaluate(
     # Per-USER limiter (M3): every evaluate writes a Signal +
     # RiskDecision row and reads 200 candles — it used to be unlimited.
     if not strategy_limiter.allow(f"strategy:{user.id}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas evaluaciones. Espera un minuto.",
+        raise too_many_requests(
+            "Demasiadas evaluaciones. Espera un minuto.", strategy_limiter.window
         )
     candles = ingest.latest_candles(db, symbol, timeframe, 200)
     if len(candles) < 60:

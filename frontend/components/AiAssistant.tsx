@@ -68,12 +68,12 @@ export function AiAssistant() {
           onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
           placeholder={t.ai.questionPlaceholder}
           maxLength={2000}
-          className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
         />
         <button
           onClick={ask}
           disabled={asking || !question.trim()}
-          className="min-h-[44px] w-full rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:w-auto sm:shrink-0"
+          className="min-h-[44px] w-full rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:w-auto sm:shrink-0"
         >
           {asking ? t.ai.asking : t.ai.ask}
         </button>
@@ -109,12 +109,12 @@ export function AiAssistant() {
               <ul className="mt-3 space-y-2 text-xs">
                 {lessons.calibration.map((c) => (
                   <li key={c.bucket} className="flex flex-wrap items-center gap-2 font-mono">
-                    <span className="text-zinc-500">{c.bucket}</span>
+                    <span className="text-zinc-400">{c.bucket}</span>
                     <span className="text-zinc-400">
                       {t.ai.calibration.replace("{claimed}", String(c.claimed_avg_pct)).replace("{actual}", String(c.actual_win_pct)).replace("{n}", String(c.n))}
                     </span>
                     {c.miscalibrated && (
-                      <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
+                      <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-xs font-bold text-red-400">
                         {t.ai.miscalibrated}
                       </span>
                     )}

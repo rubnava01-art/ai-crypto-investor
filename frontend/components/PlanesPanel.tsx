@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
+import { paymentUrlForPlan } from "../lib/pagos";
 
 /** Icono de verificación (sin emoji): marca de la lista de funciones. */
 export function Check() {
@@ -26,7 +27,11 @@ export function Check() {
  * Esencial $19/mes, Crecimiento $49/mes, Negocio Total $99/mes, todos
  * con 14 días de prueba gratis. Solo muestra los planes: no hay cobro
  * en línea todavía, la prueba y la suscripción se activan con el
- * administrador (ver activationNote). Sin botones de compra falsos. */
+ * administrador (ver activationNote). Sin botones de compra falsos.
+ * C5 (2026-11-14): el CTA de cada tarjeta pasa por
+ * `paymentUrlForPlan` (lib/pagos.ts): si el plan ya tiene URL de pago
+ * de PayPal, el CTA va directo al pago; si es `null` (hoy, los 3),
+ * sigue el flujo actual de registro con plan elegido. */
 /** Funciones propias de cada plan, como claves de t.planes, en orden
  * Esencial → Crecimiento → Negocio Total. FUENTE ÚNICA: las tarjetas de
  * abajo y la tabla comparativa (<PlanesCompare />) se derivan de aquí
@@ -111,27 +116,39 @@ export function PlanesPanel() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {cards.map((c) => (
+      <div className="grid gap-4 md:grid-cols-3 md:gap-5">
+        {cards.map((c) => {
+          // C5: URL de pago del plan (hoy `null` en los 3: flujo actual).
+          const payUrl = paymentUrlForPlan(c.planKey);
+          return (
           <article
             key={c.name}
             id={c.id}
             className={
               c.popular
-                ? "relative flex scroll-mt-20 flex-col rounded-xl border-2 border-amber-500 bg-zinc-900/60 p-5 shadow-lg"
-                : "flex scroll-mt-20 flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5"
+                ? "relative flex scroll-mt-20 flex-col rounded-xl border-2 border-amber-500 bg-zinc-900/60 p-6 shadow-2xl shadow-amber-500/10 md:scale-[1.02]"
+                : "flex scroll-mt-20 flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-6"
             }
           >
             {/* M1 (2026-11-13): sin badge "El más elegido" — era una
                 afirmación sin fuente. El borde ámbar de la tarjeta central
-                se conserva como distinción visual, sin texto. */}
+                se conserva como distinción visual, sin texto. C5
+                (2026-11-14): la tarjeta central además crece (scale) y
+                gana sombra, para destacar sin inventar ninguna
+                afirmación. */}
             <h2 className="text-lg font-bold text-zinc-100">{c.name}</h2>
             <p className="mt-1 text-sm text-zinc-400">{c.tag}</p>
-            <p className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-zinc-50">{c.price}</span>
-              <span className="text-sm text-zinc-400">{p.perMonth}</span>
+            {/* C5: el precio manda — mucho más grande que el nombre, con
+                la prueba gratis como píldora prominente justo debajo. */}
+            <p className="mt-5 flex items-baseline gap-1.5">
+              <span className="text-5xl font-extrabold tabular-nums tracking-tight text-zinc-50 sm:text-6xl">{c.price}</span>
+              <span className="text-base text-zinc-400">{p.perMonth}</span>
             </p>
-            <p className="mt-1 text-xs font-semibold text-amber-300">{p.trialBadge}</p>
+            <p className="mt-3">
+              <span className="inline-block rounded-full bg-amber-500/15 px-3 py-1 text-sm font-bold text-amber-300">
+                {p.trialBadge}
+              </span>
+            </p>
             <ul className="mt-5 flex-1 space-y-2.5 text-sm text-zinc-200">
               {c.includes && <li className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{c.includes}</li>}
               {c.features.map((f) => (
@@ -142,15 +159,32 @@ export function PlanesPanel() {
               ))}
             </ul>
             {/* A2: CTA propio por tarjeta — la elección de plan viaja en
-                ?plan= hasta el registro y de ahí al admin. */}
-            <Link
-              href={`/login?mode=register&plan=${c.planKey}`}
-              className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              {p.startWith.replace("{plan}", c.name)}
-            </Link>
+                ?plan= hasta el registro y de ahí al admin.
+                C5 (2026-11-14): el CTA pasa por `paymentUrlForPlan`
+                (lib/pagos.ts). Hoy las 3 URLs son `null`, así que el
+                CTA es exactamente el de antes (registro con plan
+                elegido, intacto). Cuando el dueño ponga la URL de pago
+                de PayPal de un plan, ese CTA irá directo al pago. */}
+            {payUrl ? (
+              <a
+                href={payUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              >
+                {p.startWith.replace("{plan}", c.name)}
+              </a>
+            ) : (
+              <Link
+                href={`/login?mode=register&plan=${c.planKey}`}
+                className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              >
+                {p.startWith.replace("{plan}", c.name)}
+              </Link>
+            )}
           </article>
-        ))}
+          );
+        })}
       </div>
 
       <div className="space-y-1 text-sm text-zinc-400">
