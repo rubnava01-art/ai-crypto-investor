@@ -20,6 +20,7 @@ import { Footer } from "../components/Footer";
 import { Landing } from "../components/Landing";
 import { ultimaNovedadSistema } from "../lib/novedades";
 import dynamic from "next/dynamic";
+import { MetricCardSkeleton, Skeleton } from "../components/Skeleton";
 
 // Carga diferida (optimización): los paneles que NO son la vista inicial del
 // dashboard se descargan solo cuando se renderizan — Invertir es solo-admin
@@ -29,8 +30,9 @@ import dynamic from "next/dynamic";
 const panelLoading = () => {
   const { t } = useLanguage();
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-400">
-      {t.dashboard.panelLoading}
+    <div role="status">
+      <span className="sr-only">{t.dashboard.panelLoading}</span>
+      <Skeleton className="h-44 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
     </div>
   );
 };
@@ -221,9 +223,14 @@ export default function DashboardPage() {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div role="status" aria-label={t.dashboard.loading} className="space-y-4">
-          <div aria-hidden="true" className="h-8 w-48 motion-safe:animate-pulse rounded-lg bg-zinc-800" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-zinc-900/70" />
+          <Skeleton className="h-8 w-48 rounded-lg" ariaLabel={t.misc.loadingAria} />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <MetricCardSkeleton key={i} ariaLabel={t.misc.loadingAria} />
+            ))}
+          </div>
+          <Skeleton className="h-40 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
+          <Skeleton className="h-40 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
         </div>
       </main>
     );

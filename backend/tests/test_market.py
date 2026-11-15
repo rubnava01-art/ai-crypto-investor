@@ -153,3 +153,45 @@ def test_market_rejects_unsupported_exchange(client, auth_headers):
         "/api/market/ingest?symbol=BTC/USD&exchange=binance", headers=auth_headers
     )
     assert r.status_code == 422, r.text
+
+
+def test_market_rejects_malformed_timeframe(client, auth_headers):
+    # 2026-11-14: el timeframe se valida (formato <número><m|h|d|w>)
+    # antes de tocar la BD, el exchange o el limitador: "??" caía a 1h
+    # en el guarda de antigüedad y devolvía 503 en vez de 422, y un
+    # valor como "1h30m" llegaba al exchange como timeframe inválido.
+    for bad in ("", "??", "1", "h", "1x", "1h30m", "0.5h", "-1h"):
+        for url in (
+            f"/api/market/candles?symbol=BTC/USD&timeframe={bad}",
+            f"/api/market/indicators?symbol=BTC/USD&timeframe={bad}",
+        ):
+            r = client.get(url, headers=auth_headers)
+            assert r.status_code == 422, (bad, url, r.text)
+        r = client.post(
+            f"/api/market/ingest?symbol=BTC/USD&timeframe={bad}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_market_timeframe_is_normalized_to_lowercase(client, auth_headers):
+    # 2026-11-14: "1H" no encontraba las velas guardadas como "1h"
+    # (el filtro de la BD es exacto); ahora se normaliza a "1h" antes
+    # de consultar nada. Símbolo propio (TF/USD) para no tocar el
+    # conteo de BTC/USD de otros tests (BD compartida).
+    fake_rows = [
+        [1700000000000 + i * 3600000, 100 + i, 101 + i, 99 + i, 100.5 + i, 10 + i]
+        for i in range(10)
+    ]
+    with patch("app.data.exchanges.fetch_ohlcv", return_value=fake_rows):
+        r = client.post(
+            "/api/market/ingest?symbol=TF/USD&timeframe=1h", headers=auth_headers
+        )
+    assert r.status_code == 200, r.text
+
+    r = client.get(
+        "/api/market/candles?symbol=TF/USD&timeframe=1H", headers=auth_headers
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["timeframe"] == "1h"
+    assert len(r.json()["candles"]) == 10

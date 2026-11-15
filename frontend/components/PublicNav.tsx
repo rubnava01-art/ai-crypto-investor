@@ -57,7 +57,7 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
       className={
         onBlue
           ? "sticky top-0 z-40 border-b border-blue-800 bg-blue-800/95 backdrop-blur"
-          : "sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur"
+          : "sticky top-0 z-40 border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur"
       }
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
@@ -65,7 +65,7 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
           href="/"
           aria-label={t.publicNav.brandAria}
           className={`flex min-h-[44px] shrink-0 items-center text-base font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
-            onBlue ? "text-white" : "text-zinc-50"
+            onBlue ? "text-white" : "text-slate-50"
           }`}
         >
           {t.header.brand}
@@ -86,10 +86,10 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
                   active
                     ? onBlue
                       ? "bg-white/15 text-white"
-                      : "bg-zinc-800 text-white"
+                      : "bg-emerald-500/15 text-emerald-300"
                     : onBlue
                       ? "text-blue-100 hover:bg-white/10 hover:text-white"
-                      : "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      : "text-slate-300 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 {item.label}

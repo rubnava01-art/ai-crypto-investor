@@ -96,3 +96,30 @@ def test_timeframe_seconds_parsing():
     assert _timeframe_seconds("1d") == 86400
     assert _timeframe_seconds("1w") == 604800
     assert _timeframe_seconds("??") == 3600  # formato desconocido: 1h
+
+
+def test_evaluate_rejects_malformed_timeframe(client, auth_headers):
+    # 2026-11-14: el timeframe se valida antes de la BD y del
+    # limitador, como el símbolo: "??" caía a 1h en el guarda de
+    # antigüedad mientras la BD devolvía 503, y "1H" no encontraba
+    # las velas guardadas como "1h". Sin siembra: el 422 llega antes
+    # de consultar nada.
+    for bad in ("", "??", "1", "h", "1x", "1h30m"):
+        r = client.post(
+            f"/api/strategy/evaluate?symbol=FRESH/USD&timeframe={bad}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_evaluate_timeframe_is_normalized_to_lowercase(client, auth_headers):
+    # 2026-11-14: "1H" se normaliza a "1h" antes de consultar las
+    # velas. Reutiliza las velas frescas de NORM/USD (BD compartida).
+    now = time.time()
+    _seed(client, auth_headers, "NRMT/USD", now)
+    r = client.post(
+        "/api/strategy/evaluate?symbol=NRMT/USD&timeframe=1H",
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["symbol"] == "NRMT/USD"

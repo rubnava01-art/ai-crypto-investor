@@ -6,6 +6,8 @@ import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { apiErrorText } from "./ui";
+import { MetricCard } from "./MetricCard";
+import { MetricCardSkeleton } from "./Skeleton";
 
 // URL del WebSocket público de Kraken por variable de entorno (Fase 4,
 // FE12), con el valor actual como fallback y aviso ruidoso si falta (sin
@@ -36,7 +38,7 @@ const PAIR_TO_SYMBOL: Record<string, string> = {
 };
 
 function Sparkline({ data, up }: { data: number[]; up: boolean }) {
-  if (data.length < 2) return <span className="text-xs text-zinc-600">—</span>;
+  if (data.length < 2) return <span className="text-xs text-slate-600">—</span>;
   const w = 96;
   const h = 32;
   const min = Math.min(...data);
@@ -189,22 +191,59 @@ export function MarketPanel() {
       {t.market.live}
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-700/40 px-2.5 py-1 text-xs font-semibold text-zinc-400">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-400">
       {t.market.updating}
     </span>
   );
 
+  // Formato de precio compartido por MetricCard y por la lista detallada.
+  const fmtPrice = (price: number | null | undefined) =>
+    price == null
+      ? "—"
+      : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: price < 10 ? 4 : 2 })}`;
+
   return (
     <Panel title={t.market.title} badge={liveBadge}>
       {error && <p role="alert" className="py-6 text-center text-sm leading-relaxed text-amber-400">{error}</p>}
-      {!error && !prices && <p className="py-6 text-center text-sm text-zinc-400">{t.market.loadingPrices}</p>}
+      {/* Franja de MetricCards con los precios reales (REST o tick WS en
+          vivo): mismo dato que la lista detallada, en formato tarjeta.
+          Mientras carga, skeletons con la misma forma; en error, el
+          aviso de arriba (sin skeletons ni tarjetas vacías). */}
+      {!error && !prices && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="status" aria-label={t.market.loadingPrices}>
+          {[0, 1, 2, 3].map((i) => (
+            <MetricCardSkeleton key={i} ariaLabel={t.misc.loadingAria} />
+          ))}
+          <span className="sr-only">{t.market.loadingPrices}</span>
+        </div>
+      )}
       {prices && (
         <>
-          <div aria-hidden="true" className="flex items-center justify-between border-b border-zinc-800/70 pb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {prices.map((c) => {
+              // MetricCard muestra `change` en crudo: redondear a 2
+              // decimales para no enseñar "+2.345678".
+              const change = c.change_24h_pct == null ? null : Math.round(c.change_24h_pct * 100) / 100;
+              const liveEntry = live[c.symbol];
+              return (
+                <MetricCard
+                  key={c.symbol}
+                  label={c.name}
+                  value={fmtPrice(liveEntry?.price ?? c.price_usd)}
+                  change={change}
+                  changeLabel="% · 24 h"
+                  tone={change == null ? "neutral" : change >= 0 ? "up" : "down"}
+                  loading={loading && !prices}
+                  loadingAriaLabel={t.misc.loadingAria}
+                />
+              );
+            })}
+          </div>
+          <div aria-hidden="true" className="mt-5 flex items-center justify-between border-b border-white/5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <span>{t.market.colAsset}</span>
             <span>{t.market.colPrice24h}</span>
           </div>
-          <ul className="divide-y divide-zinc-800/70">
+          <ul className="divide-y divide-white/5">
           {prices.map((c) => {
             const style = COIN_STYLE[c.symbol] ?? { bg: "#52525b", glyph: c.symbol.slice(0, 1) };
             const up = (c.change_24h_pct ?? 0) >= 0;
@@ -222,17 +261,15 @@ export function MarketPanel() {
                   {style.glyph}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-zinc-100">{c.name}</p>
-                  <p className="text-xs uppercase tracking-wide text-zinc-400">{c.symbol}</p>
+                  <p className="truncate text-base font-semibold text-slate-100">{c.name}</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">{c.symbol}</p>
                 </div>
                 <div className="hidden sm:block">
                   <Sparkline data={c.sparkline_24h} up={up} />
                 </div>
                 <div className="w-[7.5rem] shrink-0 text-right sm:w-36">
-                  <p className={`text-base font-semibold tabular-nums ${priceStale ? "text-zinc-400 opacity-60" : "text-zinc-100"}`} title={priceStale ? t.reliability.stalePrice : undefined}>
-                    {price == null
-                      ? "—"
-                      : `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: price < 10 ? 4 : 2 })}`}
+                  <p className={`text-base font-semibold tabular-nums ${priceStale ? "text-slate-400 opacity-60" : "text-slate-100"}`} title={priceStale ? t.reliability.stalePrice : undefined}>
+                    {fmtPrice(price)}
                   </p>
                   <p className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-rose-400"}`}>
                     <span className="sr-only">{up ? t.market.directionUp : t.market.directionDown} </span>
@@ -247,7 +284,7 @@ export function MarketPanel() {
       )}
       {meta && (
         <p
-          className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-zinc-500"}`}
+          className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-slate-500"}`}
           role={!wsFresh && (meta.stale || lastTickAt > 0) ? "status" : undefined}
         >
           {wsFresh
@@ -261,7 +298,7 @@ export function MarketPanel() {
         type="button"
         onClick={() => load(true)}
         disabled={loading}
-        className="mt-3 min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:border-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 min-h-[44px] w-full rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors duration-200 hover:border-slate-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {loading ? t.market.refreshing : t.market.refresh}
       </button>

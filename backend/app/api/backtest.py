@@ -17,6 +17,7 @@ from app.backtest.engine import (
 from app.core.rate_limit import backtest_limiter
 from app.core.security import get_current_user
 from app.core.symbols import validate_symbol as _validate_symbol
+from app.core.timeframes import validate_timeframe as _validate_timeframe
 from app.data import ingest
 from app.database import get_db
 from app.models.tables import User
@@ -58,6 +59,10 @@ def run(
     # guardadas como "BTC/USD" (filtro exacto) y un símbolo mal
     # formado llegaba a usarse en el run_id (nombre de archivo).
     symbol = _validate_symbol(symbol)
+    # 2026-11-14: lo mismo para el timeframe — "1H" no encontraba las
+    # velas de "1h" y el valor crudo llegaba al run_id (nombre de
+    # archivo en data/backtests). 422 antes del limitador.
+    timeframe = _validate_timeframe(timeframe)
     # Trabajo pesado síncrono: límite por usuario antes de tocar la BD.
     if not backtest_limiter.allow(f"backtest:{user.id}"):
         raise HTTPException(

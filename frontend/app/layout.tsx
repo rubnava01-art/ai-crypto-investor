@@ -28,16 +28,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Color de la barra del navegador móvil: mismo zinc-950 del fondo,
+  // Color de la barra del navegador móvil: mismo #030712 del fondo,
   // para que la app no parpadee en blanco al abrirla (optimización
   // 2026-11-06; sin cambios de UI ni textos nuevos).
-  themeColor: "#09090b",
+  themeColor: "#030712",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className="dark">
-      <body className="min-h-dvh bg-zinc-950 text-zinc-100 antialiased">
+      <body className="min-h-dvh bg-[#030712] text-zinc-100 antialiased">
         <Analytics />
         <LanguageProvider>{children}</LanguageProvider>
       </body>

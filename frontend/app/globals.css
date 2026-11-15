@@ -103,3 +103,237 @@ input[type="file"]::file-selector-button:hover {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Sistema de diseño fintech — Grow Business Platform (2026-11-14,    */
+/* rediseño Agente 1). Tokens + utilidades compartidas; los           */
+/* componentes Hero / MetricCard / Skeleton / TrustStrip los usan.    */
+/* Sin next/font en el proyecto: la pila es Inter / Plus Jakarta Sans */
+/* con fallback del sistema, sin descargas nuevas en build.           */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* ---- Color: una sola escala (slate + esmeralda + azul) ---- */
+  /* Fondo: negro profundo / gris espacial. */
+  --fintech-bg: #030712;
+  --fintech-bg-elevated: #0b0f19;
+  --fintech-surface: rgb(15 23 42 / 0.6); /* slate-900/60 glass */
+  --fintech-surface-solid: #0f172a; /* slate-900 */
+  --fintech-surface-hover: #1e293b; /* slate-800 */
+  /* Acentos: esmeralda (ganancias/éxito) y azul (marca/enlaces). */
+  --fintech-emerald: #10b981;
+  --fintech-emerald-hover: #34d399; /* emerald-400 */
+  --fintech-emerald-deep: #059669; /* emerald-600 */
+  --fintech-blue: #3b82f6;
+  --fintech-blue-hover: #60a5fa; /* blue-400 */
+  --fintech-blue-deep: #2563eb; /* blue-600 */
+  --fintech-danger: #ef4444; /* red-500 */
+  --fintech-danger-deep: #b91c1c; /* red-700 */
+  --fintech-warning: #f59e0b; /* amber-500, avisos demo/simulación */
+  /* Texto: principal casi blanco, secundario slate-400. Contraste AA
+   * sobre #030712 en ambos casos (medido por QA 2026-11-14: #f9fafb
+   * 19,27:1; #94a3b8 7,85:1). El terciario slate-500 (#64748b,
+   * 4,23:1) NO llegaba a AA 4,5:1 y su único uso era el placeholder
+   * del .fintech-input sin uso: token y clase eliminados (B-2), no
+   * reutilizar #64748b para texto. */
+  --fintech-text: #f9fafb;
+  --fintech-text-muted: #94a3b8;
+  /* Bordes: un solo gris (slate-800) + variante suave. */
+  --fintech-border: #1e293b; /* slate-800 */
+  --fintech-border-soft: rgb(30 41 59 / 0.6);
+  /* ---- Tipografía ---- */
+  --font-sans: "Inter", "Plus Jakarta Sans", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* ---- Radios: una sola escala ---- */
+  --fintech-radius-sm: 0.5rem; /* 8px: botones, inputs, badges */
+  --fintech-radius-md: 0.75rem; /* 12px: tarjetas pequeñas */
+  --fintech-radius-lg: 1rem; /* 16px: tarjetas estándar */
+  --fintech-radius-xl: 1.5rem; /* 24px: hero, paneles grandes */
+  /* ---- Sombras ---- */
+  --fintech-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --fintech-shadow-md: 0 8px 24px rgb(0 0 0 / 0.45);
+  --fintech-shadow-lg: 0 20px 48px rgb(0 0 0 / 0.55);
+  --fintech-shadow-glow-blue: 0 0 0 1px rgb(59 130 246 / 0.25),
+    0 8px 32px rgb(59 130 246 / 0.18);
+  --fintech-shadow-glow-emerald: 0 0 0 1px rgb(16 185 129 / 0.25),
+    0 8px 32px rgb(16 185 129 / 0.18);
+  /* ---- Movimiento: una sola curva y duración ---- */
+  --fintech-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fintech-duration: 180ms;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--fintech-bg);
+    color: var(--fintech-text);
+    /* Sin desbordamiento horizontal: los glows decorativos usan
+     * overflow-hidden en su sección, pero esto es la red de seguridad. */
+    overflow-x: clip;
+  }
+
+  /* Titulares: tracking ajustado y peso alto en toda la web. */
+  h1, h2, h3 {
+    letter-spacing: -0.02em;
+  }
+
+  /* Enlaces del contenido: azul de marca, subrayado solo al hover. */
+  a {
+    text-underline-offset: 3px;
+  }
+}
+
+@layer components {
+  /* Tarjeta translúcida glassmorphism: fondo slate-900/60 + blur +
+   * borde slate-800. Es la superficie estándar del rediseño. */
+  .fintech-card {
+    border-radius: var(--fintech-radius-lg);
+    border: 1px solid var(--fintech-border);
+    background-color: var(--fintech-surface);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: var(--fintech-shadow-sm);
+  }
+
+  /* Variante sólida (listas densas, menús) y elevada (diálogos). */
+  .fintech-card-solid {
+    border-radius: var(--fintech-radius-lg);
+    border: 1px solid var(--fintech-border);
+    background-color: var(--fintech-surface-solid);
+    box-shadow: var(--fintech-shadow-md);
+  }
+  .fintech-card-elevated {
+    border-radius: var(--fintech-radius-xl);
+    border: 1px solid var(--fintech-border);
+    background-color: var(--fintech-surface-solid);
+    box-shadow: var(--fintech-shadow-lg);
+  }
+
+  /* Números financieros: ancho tabular para que no salten al cambiar. */
+  .fintech-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Botones: una sola base + 4 variantes ---- */
+  .fintech-btn {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--fintech-radius-sm);
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.25;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition:
+      background-color var(--fintech-duration) var(--fintech-ease),
+      border-color var(--fintech-duration) var(--fintech-ease),
+      color var(--fintech-duration) var(--fintech-ease),
+      box-shadow var(--fintech-duration) var(--fintech-ease),
+      transform var(--fintech-duration) var(--fintech-ease);
+  }
+  /* Estado de presión: leve compresión en todos los botones. */
+  .fintech-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  .fintech-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .fintech-btn-primary {
+    background-color: var(--fintech-blue-deep);
+    color: #fff;
+  }
+  .fintech-btn-primary:hover:not(:disabled) {
+    background-color: var(--fintech-blue);
+    box-shadow: var(--fintech-shadow-glow-blue);
+  }
+  .fintech-btn-success {
+    background-color: var(--fintech-emerald-deep);
+    color: #fff;
+  }
+  .fintech-btn-success:hover:not(:disabled) {
+    background-color: var(--fintech-emerald);
+    box-shadow: var(--fintech-shadow-glow-emerald);
+  }
+  .fintech-btn-secondary {
+    background-color: var(--fintech-surface);
+    border-color: var(--fintech-border);
+    color: var(--fintech-text);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .fintech-btn-secondary:hover:not(:disabled) {
+    background-color: var(--fintech-surface-hover);
+  }
+  .fintech-btn-ghost {
+    background-color: transparent;
+    color: var(--fintech-blue-hover);
+  }
+  .fintech-btn-ghost:hover:not(:disabled) {
+    background-color: rgb(59 130 246 / 0.1);
+    text-decoration: underline;
+  }
+  .fintech-btn-danger {
+    background-color: var(--fintech-danger-deep);
+    color: #fff;
+  }
+  .fintech-btn-danger:hover:not(:disabled) {
+    background-color: #dc2626;
+  }
+
+  /* ---- Micro-interacción compartida: elevación suave al hover ---- */
+  .fintech-lift {
+    transition:
+      transform var(--fintech-duration) var(--fintech-ease),
+      box-shadow var(--fintech-duration) var(--fintech-ease),
+      border-color var(--fintech-duration) var(--fintech-ease);
+  }
+  .fintech-lift:hover {
+    transform: translateY(-2px);
+    border-color: #334155; /* slate-700 */
+    box-shadow: var(--fintech-shadow-md);
+  }
+
+  /* Eyebrow / kicker: etiqueta pequeña en mayúsculas, azul de marca. */
+  .fintech-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--fintech-blue-hover);
+  }
+
+  /* Badge / chip: mismo radio y peso en toda la web. */
+  .fintech-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Los skeletons usan animate-pulse de Tailwind; con movimiento
+   * reducido se quedan estáticos en vez de pulsar. */
+  .fintech-skeleton {
+    animation: none !important;
+  }
+  /* Micro-interacciones apagadas: sin transiciones ni compresión. */
+  .fintech-btn,
+  .fintech-lift,
+  .fintech-card {
+    transition: none !important;
+  }
+  .fintech-btn:active:not(:disabled),
+  .fintech-lift:hover {
+    transform: none !important;
+  }
+}

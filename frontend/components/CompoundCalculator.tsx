@@ -39,35 +39,35 @@ export function CompoundCalculator({ idPrefix = "calc" }: { idPrefix?: string })
   const resultOverflow = rawResult !== null && !Number.isFinite(rawResult);
   const hintId = `${idPrefix}-rate-hint`;
   const inputClass =
-    "mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
+    "mt-1 w-full min-h-[44px] rounded-lg border border-slate-700 bg-[#0B0F19] px-3.5 py-2.5 text-sm text-slate-100 tabular-nums placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40";
   return (
     <div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <label className="text-xs text-zinc-400">{t.clases.calcInitial}
+        <label className="text-xs text-slate-400">{t.clases.calcInitial}
           <input data-no-swipe className={inputClass} type="number" min="0" max="1000000000000" step="any" inputMode="decimal" value={principal} onChange={(e) => setPrincipal(e.target.value)} placeholder="1000" />
         </label>
-        <label className="text-xs text-zinc-400">{t.clases.calcRate}
+        <label className="text-xs text-slate-400">{t.clases.calcRate}
           <input data-no-swipe className={inputClass} type="number" min="0" step="any" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="—" aria-describedby={hintId} />
         </label>
-        <label className="text-xs text-zinc-400">{t.clases.calcYears}
+        <label className="text-xs text-slate-400">{t.clases.calcYears}
           <input data-no-swipe className={inputClass} type="number" min="1" max="100" step="1" inputMode="numeric" value={years} onChange={(e) => setYears(e.target.value)} />
         </label>
       </div>
-      <p id={hintId} className="mt-1.5 text-xs text-zinc-400">{t.clases.calcRateHint}</p>
+      <p id={hintId} className="mt-1.5 text-xs text-slate-400">{t.clases.calcRateHint}</p>
       {result !== null ? (
-        <p className="mt-2 text-sm text-zinc-100">
-          {t.clases.calcResult}: <strong className="tabular-nums">{fmtUsd(result, locale)}</strong>
+        <p className="mt-2 text-sm text-slate-100">
+          {t.clases.calcResult}: <strong className="tabular-nums text-emerald-400">{fmtUsd(result, locale)}</strong>
         </p>
       ) : resultOverflow ? (
         <p role="alert" className="mt-2 text-sm text-amber-400">{t.clases.calcOutOfRange}</p>
       ) : valid && !rateValid ? (
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-slate-400">
           {rate.trim() !== "" && Number.isFinite(r) && r < 0 ? t.clases.calcRateNegative : t.clases.calcEnterRate}
         </p>
       ) : principal.trim() !== "" && !yearsValid ? (
-        <p className="mt-2 text-sm text-zinc-400">{t.clases.calcYearsRange}</p>
+        <p className="mt-2 text-sm text-slate-400">{t.clases.calcYearsRange}</p>
       ) : (
-        <p className="mt-2 text-sm text-zinc-400">{principal.trim() === "" && rate.trim() === "" ? t.clases.calcEnterAll : t.clases.calcInvalid}</p>
+        <p className="mt-2 text-sm text-slate-400">{principal.trim() === "" && rate.trim() === "" ? t.clases.calcEnterAll : t.clases.calcInvalid}</p>
       )}
       <p className="mt-1.5 text-xs font-medium text-amber-400">{t.clases.calcHypothetical}</p>
     </div>

@@ -23,21 +23,21 @@ export function PlanesCompare() {
 
   return (
     <div className="mt-8">
-      <h3 className="text-lg font-bold text-zinc-50">{l.compareTitle}</h3>
-      <p className="mt-1 text-sm leading-relaxed text-zinc-400">{l.compareIntro}</p>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-800">
+      <h3 className="text-lg font-bold text-slate-50">{l.compareTitle}</h3>
+      <p className="mt-1 text-sm leading-relaxed text-slate-400">{l.compareIntro}</p>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur">
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <caption className="sr-only">{l.compareTitle}</caption>
           <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-900/60">
-              <th scope="col" className="px-4 py-3 text-left font-semibold text-zinc-200">
+            <tr className="border-b border-white/10 bg-white/[0.04]">
+              <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-200">
                 {l.compareFeatureCol}
               </th>
               {planNames.map((name, i) => (
-                <th key={name} scope="col" className="px-4 py-3 text-center font-semibold text-zinc-200">
+                <th key={name} scope="col" className="px-4 py-3 text-center font-semibold text-slate-200">
                   <a
                     href={`#${PLAN_CARD_IDS[i]}`}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded px-1 py-1 text-zinc-100 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded px-1 py-1 text-slate-100 hover:text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                   >
                     {name}
                   </a>
@@ -47,23 +47,23 @@ export function PlanesCompare() {
           </thead>
           <tbody>
             {allKeys.map((key) => (
-              <tr key={key} className="border-b border-zinc-800/60 last:border-b-0">
-                <th scope="row" className="px-4 py-3 text-left font-medium text-zinc-200">
+              <tr key={key} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.02]">
+                <th scope="row" className="px-4 py-3 text-left font-medium text-slate-200">
                   {p[key]}
                 </th>
                 {includedByPlan.map((included, i) => (
                   <td key={planNames[i]} className="px-4 py-3 text-center">
                     {included.has(key) ? (
-                      <span className="inline-flex items-center justify-center gap-1.5 text-zinc-100">
+                      <span className="inline-flex items-center justify-center gap-1.5 text-emerald-400">
                         <Check />
                         <span className="sr-only">{l.compareYes}</span>
-                        <span aria-hidden="true" className="text-xs font-semibold text-zinc-400">
+                        <span aria-hidden="true" className="text-xs font-semibold text-slate-400">
                           {l.compareYes}
                         </span>
                       </span>
                     ) : (
                       <span>
-                        <span aria-hidden="true" className="text-zinc-500">—</span>
+                        <span aria-hidden="true" className="text-slate-600">—</span>
                         <span className="sr-only">{l.compareNo}</span>
                       </span>
                     )}

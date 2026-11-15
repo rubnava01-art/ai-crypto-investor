@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.rate_limit import market_limiter
 from app.core.security import get_current_user, require_admin
 from app.core.symbols import validate_symbol as _validate_symbol
+from app.core.timeframes import validate_timeframe as _validate_timeframe
 from app.data import exchanges, ingest
 from app.database import get_db
 from app.indicators import technical as ind
@@ -22,6 +23,8 @@ from app.indicators import technical as ind
 # 2026-11-06): /candles e /indicators la reutilizan para marcar sus
 # datos como stale en vez de presentarlos como actuales.
 from app.api.strategy import _STALE_CANDLES, _as_utc, _timeframe_seconds
+# 2026-11-14: _timeframe_seconds vive en app.core.timeframes; market lo
+# sigue importando de strategy por compatibilidad (alias reexportado).
 from app.models.tables import User
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -194,6 +197,10 @@ def get_candles(
 ):
     _validate_exchange(exchange)
     symbol = _validate_symbol(symbol)
+    # 2026-11-14: el timeframe se valida y normaliza antes de la BD y
+    # del limitador, como el símbolo: "1H" no encontraba las velas
+    # guardadas como "1h" y "??" devolvía 503 en vez de 422.
+    timeframe = _validate_timeframe(timeframe)
     _check_market_limit(user)
     candles = ingest.latest_candles(db, symbol, timeframe, limit)
     if not candles:
@@ -269,6 +276,7 @@ def get_indicators(
 ):
     _validate_exchange(exchange)
     symbol = _validate_symbol(symbol)
+    timeframe = _validate_timeframe(timeframe)
     _check_market_limit(user)
     candles = ingest.latest_candles(db, symbol, timeframe, 200)
     if len(candles) < 35:
@@ -301,6 +309,7 @@ def trigger_ingest(
     """Manually trigger one ingestion cycle (also runs on the scanner loop)."""
     _validate_exchange(exchange)
     symbol = _validate_symbol(symbol)
+    timeframe = _validate_timeframe(timeframe)
     _check_market_limit(user)
     try:
         n = ingest.ingest_ohlcv(db, exchange, symbol, timeframe)

@@ -1,6 +1,5 @@
 """Strategy endpoints (Phase 3): evaluate trend+momentum and run the risk guard."""
 import datetime as dt
-import re
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,6 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.symbols import validate_symbol as _validate_symbol
+from app.core.timeframes import (
+    timeframe_seconds as _timeframe_seconds,
+    validate_timeframe as _validate_timeframe,
+)
 from app.core.rate_limit import strategy_limiter
 from app.core.security import get_current_user
 from app.data import ingest
@@ -23,19 +26,10 @@ from app.strategy import engine
 # muertos y quedaría persistida como si fuera actual. El umbral es 2
 # velas: da margen a un ciclo de ingesta perdido sin aceptar datos
 # de hace medio día en 1h.
-_TIMEFRAME_RE = re.compile(r"^(\d+)([mhdw])$")
-_TIMEFRAME_SECONDS = {"m": 60, "h": 3600, "d": 86400, "w": 604800}
+# 2026-11-14: _timeframe_seconds vive en app.core.timeframes (junto a
+# validate_timeframe); aquí queda el alias para no romper la importación
+# de market.py y de los tests.
 _STALE_CANDLES = 2
-
-
-def _timeframe_seconds(timeframe: str) -> int:
-    """Segundos de una vela ('15m', '1h', '4h', '1d'...). Formato
-    desconocido -> 1h: nunca bloquear la evaluación por no entender
-    el timeframe, el guarda de antigüedad sigue aplicando con 2h."""
-    m = _TIMEFRAME_RE.match(timeframe.strip().lower())
-    if not m:
-        return 3600
-    return int(m.group(1)) * _TIMEFRAME_SECONDS[m.group(2)]
 
 
 def _as_utc(moment: dt.datetime) -> dt.datetime:
@@ -74,6 +68,10 @@ def evaluate(
     # las velas guardadas como "BTC/USD" y un símbolo mal formado
     # llegaba a la BD y consumía el limitador. 422 antes del limitador.
     symbol = _validate_symbol(symbol)
+    # 2026-11-14: mismo patrón para el timeframe — "1H" no encontraba
+    # las velas guardadas como "1h" y "??" caía a 1h en el guarda de
+    # antigüedad mientras la BD devolvía 503. 422 antes del limitador.
+    timeframe = _validate_timeframe(timeframe)
     # Per-USER limiter (M3): every evaluate writes a Signal +
     # RiskDecision row and reads 200 candles — it used to be unlimited.
     if not strategy_limiter.allow(f"strategy:{user.id}"):

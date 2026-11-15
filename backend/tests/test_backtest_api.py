@@ -1,10 +1,13 @@
-"""Endpoint /api/backtest/run: validación de symbol (2026-11-13).
+"""Endpoint /api/backtest/run: validación de symbol (2026-11-13) y de
+timeframe (2026-11-14).
 
 Último endpoint con símbolo libre: /api/market lo valida desde el
 2026-11-11 y /api/strategy/evaluate desde el 2026-11-12. Sin la
 validación, "btc/usd" devolvía 503 (las velas se guardan como
 "BTC/USD" y el filtro de la BD es exacto) y el símbolo crudo se
-usaba en el run_id (nombre de archivo en data/backtests).
+usaba en el run_id (nombre de archivo en data/backtests). Lo mismo
+valía para el timeframe: "1H" no encontraba las velas de "1h" y el
+valor crudo llegaba al run_id.
 """
 import time
 from unittest.mock import patch
@@ -52,3 +55,28 @@ def test_backtest_run_symbol_is_normalized_to_uppercase(client, auth_headers):
     )
     assert r.status_code == 200, r.text
     assert r.json()["symbol"] == "BTST/USD"
+
+
+def test_backtest_run_rejects_malformed_timeframe(client, auth_headers):
+    # 2026-11-14: mismo patrón que el símbolo — 422 antes de tocar la
+    # BD o el limitador. "??" caía a 1h en el guarda y el valor crudo
+    # llegaba al run_id (nombre de archivo).
+    for bad in ("", "??", "1", "h", "1x", "1h30m"):
+        r = client.post(
+            f"/api/backtest/run?symbol=BTC/USD&timeframe={bad}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)
+
+
+def test_backtest_run_timeframe_is_normalized_to_lowercase(client, auth_headers):
+    # Símbolo propio (BTTF/USD) para no contaminar el conteo exacto
+    # de velas BTC/USD que espera test_market (BD compartida).
+    _seed(client, auth_headers, "BTTF/USD")
+    r = client.post(
+        "/api/backtest/run?symbol=BTTF/USD&timeframe=1H",
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["timeframe"] == "1h"
+    assert r.json()["run_id"].startswith("BTTFUSD-1h-")

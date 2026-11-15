@@ -35,23 +35,23 @@ export function LandingAi() {
   const classToolsAuth = [t.clases.convTitle, t.clases.chartTitle, t.clases.indTitle];
 
   return (
-    <section id="ia" aria-label={l.aiTitle} className="scroll-mt-20 border-t border-zinc-800 py-10 sm:py-12">
-      <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{l.aiTitle}</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+    <section id="ia" aria-label={l.aiTitle} className="scroll-mt-20 border-t border-slate-800/80 py-10 sm:py-12">
+      <h2 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">{l.aiTitle}</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
         {l.aiIntro}
       </p>
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c, i) => (
-          <article key={c.title} className="flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-            <h3 className="text-lg font-bold text-zinc-50">{c.title}</h3>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-400">{c.desc}</p>
+          <article key={c.title} className="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+            <h3 className="text-lg font-bold text-slate-50">{c.title}</h3>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">{c.desc}</p>
             {i === 6 && (
               <div className="mt-3 space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{l.ai7GroupOpen}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{l.ai7GroupOpen}</p>
                   <ul className="mt-1 space-y-1">
                     {classToolsOpen.map((tool) => (
-                      <li key={tool} className="flex items-start gap-2 text-sm text-zinc-200">
+                      <li key={tool} className="flex items-start gap-2 text-sm text-slate-200">
                         <span aria-hidden="true" className="mt-0.5 text-blue-400">•</span>
                         <span>{tool}</span>
                       </li>
@@ -59,10 +59,10 @@ export function LandingAi() {
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{l.ai7GroupAuth}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{l.ai7GroupAuth}</p>
                   <ul className="mt-1 space-y-1">
                     {classToolsAuth.map((tool) => (
-                      <li key={tool} className="flex items-start gap-2 text-sm text-zinc-200">
+                      <li key={tool} className="flex items-start gap-2 text-sm text-slate-200">
                         <span aria-hidden="true" className="mt-0.5 text-blue-400">•</span>
                         <span>{tool}</span>
                       </li>
@@ -71,7 +71,7 @@ export function LandingAi() {
                 </div>
               </div>
             )}
-            <p className="mt-3 border-t border-zinc-800 pt-3 text-sm leading-relaxed text-amber-300/90">
+            <p className="mt-3 border-t border-white/10 pt-3 text-sm leading-relaxed text-amber-300/90">
               {c.limit}
             </p>
           </article>
