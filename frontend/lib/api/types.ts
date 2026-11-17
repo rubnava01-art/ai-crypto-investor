@@ -231,6 +231,12 @@ export interface UserProfile {
   address: string | null;
   avatar_data_url: string | null;
   created_at: string | null;
+  // Rediseño perfil 2026-11-17 (tarjeta de red): todo opcional.
+  bio: string | null;
+  location: string | null;
+  business_handle: string | null;
+  business_description: string | null;
+  skills: string[] | null;
 }
 
 export interface UserProfileInput {
@@ -238,6 +244,11 @@ export interface UserProfileInput {
   email?: string;
   address?: string;
   avatar_data_url?: string;
+  bio?: string;
+  location?: string;
+  business_handle?: string;
+  business_description?: string;
+  skills?: string[];
 }
 
 // ---------- Chat en vivo ----------

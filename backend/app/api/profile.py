@@ -40,6 +40,12 @@ class ProfileOut(BaseModel):
     address: str | None = None
     avatar_data_url: str | None = None
     created_at: str | None = None
+    # Rediseño perfil 2026-11-17 (tarjeta de red): todo opcional.
+    bio: str | None = None
+    location: str | None = None
+    business_handle: str | None = None
+    business_description: str | None = None
+    skills: list[str] | None = None
 
 
 class ProfileUpdate(BaseModel):
@@ -51,6 +57,51 @@ class ProfileUpdate(BaseModel):
     # 1,000,000 chars ≈ 750 KiB raw — comfortably above any valid avatar
     # (500 KiB raw ≈ 667K chars + header) and closed to abuse.
     avatar_data_url: str | None = Field(default=None, max_length=1_000_000)
+    bio: str | None = Field(default=None, max_length=280)
+    location: str | None = Field(default=None, max_length=120)
+    business_handle: str | None = Field(default=None, max_length=64)
+    business_description: str | None = Field(default=None, max_length=500)
+    skills: list[str] | None = Field(default=None, max_length=8)
+
+
+def _clean_skills(raw: list[str] | None) -> list[str] | None:
+    """Limpia la lista de habilidades: recorta, quita vacías y duplica-
+    dos, y rechaza más de 8 o cualquiera de más de 40 caracteres."""
+    if raw is None:
+        return None
+    cleaned: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            raise HTTPException(status_code=422, detail="Cada habilidad debe ser texto.")
+        value = item.strip()
+        if not value:
+            continue
+        if len(value) > 40:
+            raise HTTPException(
+                status_code=422, detail="Cada habilidad tiene como máximo 40 caracteres."
+            )
+        if value not in cleaned:
+            cleaned.append(value)
+    if len(cleaned) > 8:
+        raise HTTPException(
+            status_code=422, detail="Como máximo 8 habilidades."
+        )
+    return cleaned
+
+
+def _clean_handle(raw: str | None) -> str | None:
+    """Handle del negocio: sin @ inicial, solo letras, números, _ . -."""
+    if raw is None:
+        return None
+    value = raw.strip().lstrip("@")
+    if not value:
+        return None
+    if any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-" for ch in value):
+        raise HTTPException(
+            status_code=422,
+            detail="El handle solo admite letras, números, _ . -",
+        )
+    return value
 
 
 def _out(u: User, db: Session) -> ProfileOut:
@@ -64,6 +115,11 @@ def _out(u: User, db: Session) -> ProfileOut:
         address=u.address,
         avatar_data_url=u.avatar_data_url,
         created_at=u.created_at.isoformat() if u.created_at else None,
+        bio=u.bio,
+        location=u.location,
+        business_handle=u.business_handle,
+        business_description=u.business_description,
+        skills=list(u.skills) if u.skills else None,
     )
 
 
@@ -144,6 +200,17 @@ def update_my_profile(
     if payload.avatar_data_url is not None:
         cleaned = payload.avatar_data_url.strip()
         user.avatar_data_url = _validate_avatar(cleaned) if cleaned else None
+    if payload.bio is not None:
+        user.bio = payload.bio.strip() or None
+    if payload.location is not None:
+        user.location = payload.location.strip() or None
+    if payload.business_handle is not None:
+        user.business_handle = _clean_handle(payload.business_handle)
+    if payload.business_description is not None:
+        user.business_description = payload.business_description.strip() or None
+    if payload.skills is not None:
+        cleaned_skills = _clean_skills(payload.skills)
+        user.skills = cleaned_skills if cleaned_skills else None
     db.commit()
     db.refresh(user)
     return _out(user, db)

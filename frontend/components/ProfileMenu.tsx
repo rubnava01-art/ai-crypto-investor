@@ -9,8 +9,9 @@ const inputCls =
 
 const MAX_AVATAR_BYTES = 500 * 1024;
 
-/** Profile editor: nombre, correo, dirección y foto. All fields optional
- * and empty at first — nothing is ever invented for the user. */
+/** Profile editor: nombre, correo, dirección, bio, ubicación, negocio,
+ * habilidades y foto. All fields optional and empty at first — nothing
+ * is ever invented for the user. */
 export function ProfileEditor({
   initial,
   onClose,
@@ -24,6 +25,11 @@ export function ProfileEditor({
   const [displayName, setDisplayName] = useState(initial.display_name ?? "");
   const [email, setEmail] = useState(initial.email ?? "");
   const [address, setAddress] = useState(initial.address ?? "");
+  const [bio, setBio] = useState(initial.bio ?? "");
+  const [location, setLocation] = useState(initial.location ?? "");
+  const [businessHandle, setBusinessHandle] = useState(initial.business_handle ?? "");
+  const [businessDescription, setBusinessDescription] = useState(initial.business_description ?? "");
+  const [skillsText, setSkillsText] = useState((initial.skills ?? []).join(", "));
   const [avatar, setAvatar] = useState<string | null>(initial.avatar_data_url ?? null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -70,6 +76,13 @@ export function ProfileEditor({
         email,
         address,
         avatar_data_url: avatarRemoved ? "" : avatar ?? "",
+        bio,
+        location,
+        business_handle: businessHandle,
+        business_description: businessDescription,
+        skills: Array.from(
+          new Set(skillsText.split(",").map((s) => s.trim()).filter(Boolean)),
+        ).slice(0, 8),
       });
       setMsg(t.perfil.saved);
       onSaved(saved);
@@ -152,6 +165,27 @@ export function ProfileEditor({
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.address}</span>
           <textarea className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} rows={2} placeholder={t.perfil.addressPlaceholder} autoComplete="street-address" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.bio}</span>
+          <textarea className={inputCls} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={280} rows={2} placeholder={t.perfil.bioPlaceholder} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.location}</span>
+          <input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} maxLength={120} placeholder={t.perfil.locationPlaceholder} autoComplete="address-level2" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.businessHandle}</span>
+          <input className={inputCls} value={businessHandle} onChange={(e) => setBusinessHandle(e.target.value)} maxLength={64} placeholder={t.perfil.businessHandlePlaceholder} autoComplete="off" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.businessDescription}</span>
+          <textarea className={inputCls} value={businessDescription} onChange={(e) => setBusinessDescription(e.target.value)} maxLength={500} rows={2} placeholder={t.perfil.businessDescriptionPlaceholder} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.skills}</span>
+          <input className={inputCls} value={skillsText} onChange={(e) => setSkillsText(e.target.value)} placeholder={t.perfil.skillsPlaceholder} autoComplete="off" />
+          <span className="mt-1 block text-xs text-zinc-500">{t.perfil.skillsHint}</span>
         </label>
 
         {msg && <p role="status" className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm leading-relaxed text-emerald-400">{msg}</p>}

@@ -45,6 +45,14 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     avatar_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Perfil rediseño 2026-11-17 (tarjeta de red): bio, ubicación,
+    # negocio (handle + descripción) y habilidades. Todo opcional y
+    # vacío al inicio — nunca se inventa contenido.
+    bio: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    business_handle: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    business_description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    skills: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-17",
+    title: "Mi perfil nuevo: avatar con anillo, código QR, Mi negocio y barra inferior",
+    body: "Publicado el 17 de noviembre: la página Mi perfil ahora tiene diseño estilo tarjeta — avatar grande con anillo e insignia de rol real, estadísticas reales de contactos, clientes y referidos, botones para compartir la tarjeta y ver su código QR, tarjeta Mi negocio con habilidades editables, Invitar y acceso directo a Crear, y barra inferior flotante con el asistente de IA en el centro. La bio, la ubicación, el negocio y las habilidades empiezan vacíos y se llenan en Editar perfil. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-17",
     title: "Estudiar carga más rápido, filtro nuevo en Talento y registro más claro",
     body: "Publicado el 17 de noviembre: en Estudiar, las listas de cursos y clases ahora se cargan más rápido y sin repetir consultas; en Talento humano puedes filtrar al personal por Todos, Activos o Inactivos; y en el registro, el medidor de fortaleza de la contraseña aparece solo al crear la cuenta. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

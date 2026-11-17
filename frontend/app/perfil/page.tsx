@@ -19,7 +19,7 @@ export default function PerfilPage() {
   const { t } = useLanguage();
   return (
     <ModuleShell moduleTitle={t.nav.perfil.label} subtitle={t.nav.perfil.hint}>
-      <div className="space-y-5">
+      <div className="space-y-5 pb-28">
         <PerfilPanel />
         <AnalisisPersonalPanel />
       </div>

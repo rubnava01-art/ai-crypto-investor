@@ -58,26 +58,28 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * OJO: al anteponer entradas nuevas, todos los índices existentes
  * se desplazan; este mapa se actualizó con las 6 entradas del 2026-11-10
  * (fluidez [0], usuarios [1], caché [2, sin mapear], Invertir [3, 4],
- * Estudiar [5]) — todos los índices anteriores +6. */
+ * Estudiar [5]) — todos los índices anteriores +6 — y con la entrada
+ * de Mi perfil del 2026-11-17 antepuesta: todos los índices +1 y la
+ * entrada nueva (perfil) en [0]. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  planes: [8],
-  terminal: [9],
-  flujos: [2, 9],
-  analizador: [9],
-  auditor: [9, 12],
-  ajustador: [19],
-  crear: [11],
-  estudiar: [0, 7, 9, 17, 19, 22, 23],
-  inicio: [9, 20, 28],
-  perfil: [21],
-  talento: [0, 24],
-  riesgos: [24],
-  planillas: [24],
-  crm: [24],
-  analisis: [24],
-  invertir: [1, 5, 6, 10, 25, 27],
-  usuarios: [3, 27, 28],
-  espacio: [28],
+  planes: [9],
+  terminal: [10],
+  flujos: [3, 10],
+  analizador: [10],
+  auditor: [10, 13],
+  ajustador: [20],
+  crear: [12],
+  estudiar: [1, 8, 10, 18, 20, 23, 24],
+  inicio: [10, 21, 29],
+  perfil: [0, 22],
+  talento: [1, 25],
+  riesgos: [25],
+  planillas: [25],
+  crm: [25],
+  analisis: [25],
+  invertir: [2, 6, 7, 11, 26, 28],
+  usuarios: [4, 28, 29],
+  espacio: [29],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,
