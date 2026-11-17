@@ -29,12 +29,17 @@ def validate_timeframe(timeframe: str) -> str:
     completo: un timeframe malicioso puede ser largo.
     """
     normalized = timeframe.strip().lower()
-    if not _TIMEFRAME_RE.match(normalized):
+    m = _TIMEFRAME_RE.match(normalized)
+    # 2026-11-16: una vela de 0 segundos no existe: "0m"/"00h" pasaban
+    # el formato y luego /candles devolvía 503 ("No candle data") e
+    # /ingest mandaba el timeframe inválido al exchange, en vez de 422.
+    if not m or int(m.group(1)) == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 f"Timeframe no válido: {timeframe.strip()[:32]!r}. Usa el "
-                "formato <número><m|h|d|w>, por ejemplo 15m, 1h, 4h, 1d."
+                "formato <número><m|h|d|w> con número mayor que 0, por "
+                "ejemplo 15m, 1h, 4h, 1d."
             ),
         )
     return normalized

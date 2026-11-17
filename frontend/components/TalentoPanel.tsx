@@ -24,6 +24,9 @@ export function TalentoPanel() {
   const [rows, setRows] = useState<Empleado[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState("");
+  // Filtro por estado (2026-11-17): el directorio ya tenía búsqueda por
+  // texto, pero no forma de ver solo activos o solo inactivos.
+  const [estadoFilter, setEstadoFilter] = useState<"todos" | EmpleadoEstado>("todos");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [nombre, setNombre] = useState("");
   const [puesto, setPuesto] = useState("");
@@ -53,6 +56,7 @@ export function TalentoPanel() {
   }, [load, isCancelled]);
 
   const visible = (rows ?? []).filter((r) => {
+    if (estadoFilter !== "todos" && r.estado !== estadoFilter) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return [r.nombre, r.puesto, r.contacto].join(" ").toLowerCase().includes(q);
@@ -143,6 +147,19 @@ export function TalentoPanel() {
             <input className={inputCls} placeholder={t.talento.searchPlaceholder} value={query}
               onChange={(e) => setQuery(e.target.value)} aria-label={t.talento.searchAria} />
           </Field>
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={t.talento.filterAria}>
+            {(["todos", "activo", "inactivo"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={estadoFilter === f}
+                onClick={() => setEstadoFilter(f)}
+                className={`min-h-[44px] rounded-full px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${estadoFilter === f ? "bg-emerald-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+              >
+                {f === "todos" ? t.talento.filterAll : f === "activo" ? t.talento.filterActive : t.talento.filterInactive}
+              </button>
+            ))}
+          </div>
         </div>
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (

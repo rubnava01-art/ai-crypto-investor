@@ -1,13 +1,25 @@
 // Dominio academy del API (extraído de lib/api.ts en Fase 4, sin cambios de comportamiento).
 import { request, getToken, fetchTimed, API_URL, errorDetail, handleUnauthorized, ApiError, DEFAULT_TIMEOUT_MS, uiLang } from "./client";
+import { catalogMemo } from "./memo";
 import type { AcademyCourse, AcademyEnrollment, CourseKind } from "./types";
 
 export const academyApi = {
-  listCourses: () => request<AcademyCourse[]>("/api/academy/courses", { auth: true }),
+  // Catálogo casi estático (2026-11-17): memo 60 s en cliente; el
+  // backend además lo marca Cache-Control private max-age=60, pero el
+  // cliente envía no-store, así que este memo es lo que evita el viaje
+  // al navegar dentro de /estudiar. updateCourse invalida el prefijo.
+  listCourses: () =>
+    catalogMemo.get<AcademyCourse[]>("/api/academy/courses", () =>
+      request<AcademyCourse[]>("/api/academy/courses", { auth: true }),
+    ),
   updateCourse: (
     id: number,
     body: { title?: string; description?: string; price_usd?: string; kind?: CourseKind; buy_url?: string; delivery_note?: string },
-  ) => request<AcademyCourse>(`/api/academy/courses/${id}`, { method: "PUT", auth: true, body }),
+  ) =>
+    request<AcademyCourse>(`/api/academy/courses/${id}`, { method: "PUT", auth: true, body }).then((res) => {
+      catalogMemo.invalidate("/api/academy/courses");
+      return res;
+    }),
   listStudents: (courseId: number) =>
     request<AcademyEnrollment[]>(`/api/academy/courses/${courseId}/students`, { auth: true }),
   createEnrollment: (body: { contact_id: number; course_id: number; purchased?: boolean; delivered?: boolean; notes?: string }) =>

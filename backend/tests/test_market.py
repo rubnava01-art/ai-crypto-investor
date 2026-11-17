@@ -174,6 +174,26 @@ def test_market_rejects_malformed_timeframe(client, auth_headers):
         assert r.status_code == 422, (bad, r.text)
 
 
+def test_market_rejects_zero_timeframe(client, auth_headers):
+    # 2026-11-16: una vela de 0 segundos no existe: "0m"/"00h"/"0d"
+    # pasaban el formato y /candles devolvía 503 ("No candle data") e
+    # /ingest mandaba el timeframe inválido al exchange, en vez de 422.
+    # validate_timeframe es compartido, así que /strategy/evaluate y
+    # /backtest/run heredan el mismo 422.
+    for bad in ("0m", "00h", "0d"):
+        for url in (
+            f"/api/market/candles?symbol=BTC/USD&timeframe={bad}",
+            f"/api/market/indicators?symbol=BTC/USD&timeframe={bad}",
+        ):
+            r = client.get(url, headers=auth_headers)
+            assert r.status_code == 422, (bad, url, r.text)
+        r = client.post(
+            f"/api/market/ingest?symbol=BTC/USD&timeframe={bad}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (bad, r.text)
+
+
 def test_market_timeframe_is_normalized_to_lowercase(client, auth_headers):
     # 2026-11-14: "1H" no encontraba las velas guardadas como "1h"
     # (el filtro de la BD es exacto); ahora se normaliza a "1h" antes

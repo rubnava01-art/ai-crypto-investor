@@ -27,6 +27,22 @@ type SignalsPanelProps = {
  */
 export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
   const { t } = useLanguage();
+  // 2026-11-16: lado y estado se mostraban en inglés crudo ("BUY",
+  // "demo") en la interfaz en español; ahora se traducen con las claves
+  // dashboard.signal* y un estado desconocido cae al valor crudo.
+  const sideLabel: Record<SignalSide, string> = {
+    buy: t.dashboard.signalBuy,
+    sell: t.dashboard.signalSell,
+    hold: t.dashboard.signalHold,
+  };
+  const statusLabel: Record<string, string> = {
+    generated: t.dashboard.signalStatusGenerated,
+    approved: t.dashboard.signalStatusApproved,
+    rejected: t.dashboard.signalStatusRejected,
+    executed: t.dashboard.signalStatusExecuted,
+    expired: t.dashboard.signalStatusExpired,
+    demo: t.dashboard.signalStatusDemo,
+  };
   return (
     <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge quiet />}>
       {signals ? (
@@ -38,7 +54,7 @@ export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
               <li key={sig.id} className="rounded-lg border border-zinc-800 p-3.5 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono font-semibold">{sig.symbol}</span>
-                  <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sig.side}</span>
+                  <span className={`shrink-0 font-bold uppercase ${sideColor[sig.side]}`}>{sideLabel[sig.side]}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-1 gap-1 font-mono text-xs text-zinc-400 sm:grid-cols-3">
                   <span>{t.dashboard.entry} {money(sig.entry_price)}</span>
@@ -47,7 +63,7 @@ export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  {sig.status} · {time(sig.created_utc)}
+                  {statusLabel[sig.status] ?? sig.status} · {time(sig.created_utc)}
                 </p>
               </li>
             ))}

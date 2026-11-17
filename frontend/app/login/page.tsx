@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken, ApiError } from "../../lib/api";
 import { safeNext } from "../../lib/session";
+import { passwordStrength } from "../../lib/passwordStrength";
 import { isPlanKey, planNameForKey, type PlanKey } from "../../components/PlanesPanel";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
@@ -72,6 +73,25 @@ function LoginPageInner() {
   const [registeredPlan, setRegisteredPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Medidor de seguridad (2026-11-17, solo registro): pista visual, no
+  // bloquea nada — el backend sigue exigiendo ≥12 caracteres. Se calcula
+  // en cada render: es una función pura y barata.
+  const strength = passwordStrength(password);
+  const strengthLabelText =
+    strength.level === "weak" ? t.login.strengthWeak
+    : strength.level === "fair" ? t.login.strengthFair
+    : strength.level === "good" ? t.login.strengthGood
+    : t.login.strengthStrong;
+  const strengthBarCls =
+    strength.level === "weak" ? "bg-red-500"
+    : strength.level === "fair" ? "bg-amber-500"
+    : strength.level === "good" ? "bg-lime-500"
+    : "bg-emerald-600";
+  const strengthTextCls =
+    strength.level === "weak" ? "text-red-700"
+    : strength.level === "fair" ? "text-amber-700"
+    : strength.level === "good" ? "text-lime-700"
+    : "text-emerald-700";
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
 
@@ -311,6 +331,21 @@ function LoginPageInner() {
               de la plataforma tienen al menos 12 caracteres). */}
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">{t.login.passwordMinHint}</p>
         </label>
+
+        {/* Medidor de seguridad (solo registro y con algo escrito): 4
+            segmentos + etiqueta; no bloquea el envío. */}
+        {mode === "register" && password.length > 0 && (
+          <div className="mb-5 -mt-3" aria-live="polite">
+            <div className="flex gap-1" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className={`h-1.5 flex-1 rounded-full ${i < strength.segments ? strengthBarCls : "bg-zinc-200"}`} />
+              ))}
+            </div>
+            <p className={`mt-1.5 text-xs font-semibold ${strengthTextCls}`}>
+              {t.login.strengthLabel}: {strengthLabelText}
+            </p>
+          </div>
+        )}
 
         {mode === "register" && (
           <div className="mb-5">

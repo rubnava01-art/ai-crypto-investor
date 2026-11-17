@@ -26,6 +26,16 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-17",
+    title: "Estudiar carga más rápido, filtro nuevo en Talento y registro más claro",
+    body: "Publicado el 17 de noviembre: en Estudiar, las listas de cursos y clases ahora se cargan más rápido y sin repetir consultas; en Talento humano puedes filtrar al personal por Todos, Activos o Inactivos; y en el registro, el medidor de fortaleza de la contraseña aparece solo al crear la cuenta. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-16",
+    title: "Invertir: las señales ahora se leen completamente en español",
+    body: "Publicado el 16 de noviembre: en Invertir, las señales ya no se muestran en inglés: ahora dicen Comprar, Vender o Mantener, con su estado en español (Generada, Aprobada, Rechazada, Ejecutada o Expirada). En el servidor, los intervalos de tiempo inválidos como '0m' ahora se rechazan con un error claro en vez de fallar. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-10",
     title: "Flujos, Correos, Acceso y menús más fluidos",
     body: "Publicado el 10 de noviembre: Flujos ya no re-renderiza todo el panel al arrastrar un nodo, con puertos táctiles más grandes para el celular; Correos carga las listas bajo demanda y guarda el borrador aunque expire la sesión; Acceso precarga el reto anti-bots con spinner; y cambiar de módulo ya no recarga el menú completo. En el servidor, la primera petición tras la inactividad ya no falla y Correos tiene límite de 30 por minuto. Trading real sigue apagado y las etiquetas de simulación intactas.",
