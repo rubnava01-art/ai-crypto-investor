@@ -1474,3 +1474,39 @@ class BusinessCost(Base):
     )
 
 
+class BrandBrief(Base):
+    """Test exprés para Brief de Marca (NEST 2026-11-17).
+
+    Una fila por contacto del CRM: las 8 respuestas del test, texto
+    libre, vacías al inicio. `contact_id` UNIQUE: un contacto tiene
+    como máximo un brief. El brief alimenta la generación de contenido
+    (personalidad Q2, cliente ideal Q3, valores Q5) como contexto
+    visible; nunca se inventan respuestas ni resúmenes.
+    """
+
+    __tablename__ = "brand_briefs"
+    __table_args__ = (
+        Index("ix_brand_briefs_contact_id", "contact_id"),
+        UniqueConstraint("contact_id", name="uq_brand_briefs_contact_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    q1: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q2: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q3: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q4: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q5: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q6: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q7: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    q8: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

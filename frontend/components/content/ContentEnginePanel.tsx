@@ -15,13 +15,15 @@ import { ShirtMockupGenerator } from "../ShirtMockupGenerator";
 import { IdeasBank } from "./IdeasBank";
 import { ContentCalendar } from "./ContentCalendar";
 import { CopyTemplatePicker } from "./CopyTemplatePicker";
+import { BrandBriefTab } from "./BrandBriefTab";
 
-type Tab = "ideas" | "calendario" | "plantillas" | "copies" | "tendencias" | "creatividades";
+type Tab = "brief" | "ideas" | "calendario" | "plantillas" | "copies" | "tendencias" | "creatividades";
 
 export function ContentEnginePanel({ me, isAdmin }: { me: MeResponse | null; isAdmin: boolean }) {
   const { t } = useLanguage();
-  const [tab, setTab] = useState<Tab>("ideas");
+  const [tab, setTab] = useState<Tab>("brief");
   const tabs: { value: Tab; label: string }[] = [
+    { value: "brief", label: t.contenido.tabsBrief },
     { value: "ideas", label: t.contenido.tabsIdeas },
     { value: "calendario", label: t.contenido.tabsCalendar },
     { value: "plantillas", label: t.contenido.tabsTemplates },
@@ -49,6 +51,7 @@ export function ContentEnginePanel({ me, isAdmin }: { me: MeResponse | null; isA
           </button>
         ))}
       </div>
+      {tab === "brief" && <BrandBriefTab isAdmin={isAdmin} surface="engine" />}
       {tab === "ideas" && <IdeasBank isAdmin={isAdmin} />}
       {tab === "calendario" && <ContentCalendar isAdmin={isAdmin} />}
       {tab === "plantillas" && <CopyTemplatePicker isAdmin={isAdmin} />}

@@ -19,11 +19,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.api.portal import linked_contact_for
+from app.api.portal import (
+    BRIEF_FIELDS,
+    BriefUpdate,
+    brief_out,
+    linked_contact_for,
+    upsert_brief,
+)
 from app.core.hardening import audit
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import (
+    BrandBrief,
     ContentIdea,
     ContentItem,
     ContentTemplate,
@@ -597,3 +604,79 @@ def delete_calendar_item(
     db.delete(item)
     db.commit()
     return None
+
+
+# ------------------------------------------------------- brief de marca ----
+
+@router.get("/briefs")
+def list_briefs(
+    admin: User = Depends(require_admin),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Admin: progreso del brief por cliente (un registro por
+    contacto; sin fila guardada, 0/8). El punto de partida del
+    Content Engine: desde aquí se elige el cliente cuyo brief
+    alimenta la generación."""
+    contacts = (
+        db.query(Contact)
+        .order_by(Contact.id.asc())
+        .offset(offset).limit(limit).all()
+    )
+    briefs = {
+        b.contact_id: b
+        for b in db.query(BrandBrief).all()
+    }
+    out = []
+    for contact in contacts:
+        summary = brief_out(briefs.get(contact.id), contact)
+        out.append(
+            {
+                "contact_id": contact.id,
+                "contact_name": contact.name,
+                "answered": summary["answered"],
+                "missing": summary["missing"],
+                "updated_at": summary["updated_at"],
+            }
+        )
+    return out
+
+
+@router.get("/briefs/{contact_id}")
+def get_brief(
+    contact_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin: brief completo de un cliente (respuestas vacías si no
+    hay fila guardada). 404 si el contacto no existe."""
+    contact = db.get(Contact, contact_id)
+    if contact is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    brief = (
+        db.query(BrandBrief)
+        .filter(BrandBrief.contact_id == contact.id)
+        .first()
+    )
+    return brief_out(brief, contact)
+
+
+@router.put("/briefs/{contact_id}")
+def put_brief(
+    contact_id: int,
+    payload: BriefUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin: guarda (parcial o completo) el brief de un cliente.
+    Q2 con != 3 palabras avisa en la respuesta, nunca bloquea."""
+    contact = db.get(Contact, contact_id)
+    if contact is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    brief = upsert_brief(db, contact, payload)
+    db.flush()
+    audit(db, admin, "contenido.brief.update", "brand_brief",
+          str(contact.id), details={"contact_id": contact.id})
+    db.refresh(brief)
+    return brief_out(brief, contact)

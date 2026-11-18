@@ -20,11 +20,12 @@ import { PortalTasks } from "./PortalTasks";
 import { PortalReports } from "./PortalReports";
 import { PortalMetrics } from "./PortalMetrics";
 import { PortalClientPicker } from "./PortalClientPicker";
+import { BrandBriefTab } from "../content/BrandBriefTab";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
-type Tab = "campanas" | "facturas" | "tareas" | "reportes" | "metricas" | "vinculos";
+type Tab = "campanas" | "facturas" | "tareas" | "reportes" | "metricas" | "brief" | "vinculos";
 
 function VinculosManager() {
   const { t } = useLanguage();
@@ -175,6 +176,7 @@ export function ClientPortalPanel({ me, isAdmin }: { me: MeResponse | null; isAd
     { value: "tareas", label: t.portal.tabsTasks },
     { value: "reportes", label: t.portal.tabsReports },
     { value: "metricas", label: t.portal.tabsMetrics },
+    { value: "brief", label: t.portal.tabsBrief },
     ...(isAdmin ? [{ value: "vinculos" as Tab, label: t.portal.tabsLinks }] : []),
   ];
 
@@ -247,6 +249,9 @@ export function ClientPortalPanel({ me, isAdmin }: { me: MeResponse | null; isAd
           {tab === "tareas" && contact && <PortalTasks contactId={contactId} />}
           {tab === "reportes" && contact && <PortalReports contactId={contactId} />}
           {tab === "metricas" && contact && <PortalMetrics contactId={contactId} />}
+          {tab === "brief" && contact && (
+            <BrandBriefTab isAdmin={isAdmin} surface="portal" previewContactId={previewId ?? undefined} />
+          )}
           {tab === "vinculos" && isAdmin && <VinculosManager />}
         </>
       )}

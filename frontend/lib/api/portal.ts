@@ -5,7 +5,7 @@
 // usuario↔contacto; solo el admin pasa ?contact_id= para la vista previa.
 import { request } from "./client";
 import type {
-  Appointment, PortalCampaignsResponse, PortalInvoice, PortalMeResponse,
+  Appointment, BrandBrief, BrandBriefInput, PortalCampaignsResponse, PortalInvoice, PortalMeResponse,
   PortalResumen, PortalTasksResponse, PortalVinculo, PortalVinculoInput,
 } from "./types";
 
@@ -38,6 +38,17 @@ export const portalApi = {
   getPortalResumen: (contactId?: number, opts?: { signal?: AbortSignal }) =>
     request<PortalResumen>(`/api/business/marketing/portal/resumen${previewQs(contactId)}`, {
       auth: true, retry: true, signal: opts?.signal,
+    }),
+  // ---------- Brief de marca (test exprés, 8 preguntas) ----------
+  // Cliente: su propio brief (el servidor deriva el contacto del
+  // vínculo). Admin: ?contact_id= para la vista previa.
+  getPortalBrief: (contactId?: number, opts?: { signal?: AbortSignal }) =>
+    request<BrandBrief>(`/api/business/marketing/portal/brief${previewQs(contactId)}`, {
+      auth: true, retry: true, signal: opts?.signal,
+    }),
+  savePortalBrief: (body: BrandBriefInput, contactId?: number) =>
+    request<BrandBrief>(`/api/business/marketing/portal/brief${previewQs(contactId)}`, {
+      method: "PUT", auth: true, body,
     }),
   // ---------- Vínculos usuario↔cliente (solo admin) ----------
   listVinculos: (opts?: { signal?: AbortSignal }) =>

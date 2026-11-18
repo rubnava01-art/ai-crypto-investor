@@ -24,6 +24,7 @@ from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import (
     Appointment,
+    BrandBrief,
     Contact,
     DigitalProject,
     DigitalTask,
@@ -341,6 +342,103 @@ def portal_summary(
 
 
 # ------------------------------------------------- gestión admin de vínculos --
+
+# ------------------------------------------------------ brief de marca ----
+
+BRIEF_FIELDS = ("q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8")
+
+
+def count_brief_words(text: str) -> int:
+    """Palabras de una respuesta (tokens separados por espacios)."""
+    return len((text or "").split())
+
+
+def brief_out(brief: BrandBrief | None, contact: Contact) -> dict:
+    """Serializa el brief de un contacto; sin fila guardada, las 8
+    respuestas son "" (el brief empieza vacío, nunca se inventa)."""
+    answers = {
+        f: (getattr(brief, f) or "") if brief is not None else ""
+        for f in BRIEF_FIELDS
+    }
+    missing = [i + 1 for i, f in enumerate(BRIEF_FIELDS) if not answers[f].strip()]
+    q2_words = count_brief_words(answers["q2"])
+    return {
+        "contact_id": contact.id,
+        "contact_name": contact.name,
+        "answers": answers,
+        "answered": 8 - len(missing),
+        "missing": missing,
+        # Q2 pide 3 palabras: aviso, nunca bloqueo (el guardado no
+        # depende de que sean exactamente 3).
+        "q2_words": q2_words,
+        "q2_warning": bool(answers["q2"].strip()) and q2_words != 3,
+        "updated_at": _iso(brief.updated_at) if brief is not None else None,
+    }
+
+
+def upsert_brief(
+    db: Session, contact: Contact, payload: "BriefUpdate"
+) -> BrandBrief:
+    """Crea la fila del brief si no existe y aplica solo las
+    respuestas enviadas (guardado parcial por pregunta)."""
+    brief = (
+        db.query(BrandBrief)
+        .filter(BrandBrief.contact_id == contact.id)
+        .first()
+    )
+    if brief is None:
+        brief = BrandBrief(contact_id=contact.id)
+        db.add(brief)
+    for f in BRIEF_FIELDS:
+        value = getattr(payload, f)
+        if value is not None:
+            setattr(brief, f, value.strip())
+    return brief
+
+
+class BriefUpdate(BaseModel):
+    q1: str | None = Field(default=None, max_length=5000)
+    q2: str | None = Field(default=None, max_length=5000)
+    q3: str | None = Field(default=None, max_length=5000)
+    q4: str | None = Field(default=None, max_length=5000)
+    q5: str | None = Field(default=None, max_length=5000)
+    q6: str | None = Field(default=None, max_length=5000)
+    q7: str | None = Field(default=None, max_length=5000)
+    q8: str | None = Field(default=None, max_length=5000)
+
+
+@router.get("/brief")
+def portal_brief_get(
+    contact: Contact = Depends(get_client_contact),
+    db: Session = Depends(get_db),
+):
+    """Brief de marca del cliente vinculado (admin: vista previa con
+    ?contact_id=). Sin fila guardada devuelve las 8 vacías."""
+    brief = (
+        db.query(BrandBrief)
+        .filter(BrandBrief.contact_id == contact.id)
+        .first()
+    )
+    return brief_out(brief, contact)
+
+
+@router.put("/brief")
+def portal_brief_put(
+    payload: BriefUpdate,
+    contact: Contact = Depends(get_client_contact),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Guarda (parcial o completo) el brief del cliente vinculado
+    (admin: vista previa con ?contact_id=). Q2 con != 3 palabras
+    avisa en la respuesta, nunca bloquea."""
+    brief = upsert_brief(db, contact, payload)
+    db.flush()
+    audit(db, user, "portal.brief.update", "brand_brief", str(contact.id),
+          details={"contact_id": contact.id})
+    db.refresh(brief)
+    return brief_out(brief, contact)
+
 
 class VinculoCreate(BaseModel):
     user_id: int

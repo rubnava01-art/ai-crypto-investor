@@ -4,7 +4,7 @@
 // nunca con el modelo de IA.
 import { request } from "./client";
 import type {
-  ContentIdea, ContentIdeaInput, ContentIdeaStatus, ContentItem, ContentItemInput,
+  BrandBrief, BrandBriefInput, BrandBriefSummary, ContentIdea, ContentIdeaInput, ContentIdeaStatus, ContentItem, ContentItemInput,
   ContentItemUpdate, ContentTemplate, ContentTemplateInput, TemplateGeneration,
 } from "./types";
 
@@ -70,4 +70,18 @@ export const contenidoApi = {
     request<ContentItem>(`/api/business/marketing/contenido/calendario/${id}`, { method: "PATCH", auth: true, body }),
   deleteCalendarItem: (id: number) =>
     request<void>(`/api/business/marketing/contenido/calendario/${id}`, { method: "DELETE", auth: true }),
+
+  // ---------- Brief de marca (test exprés, solo admin) ----------
+  listBriefs: (opts?: { signal?: AbortSignal }) =>
+    request<BrandBriefSummary[]>("/api/business/marketing/contenido/briefs", {
+      auth: true, retry: true, signal: opts?.signal,
+    }),
+  getBrief: (contactId: number, opts?: { signal?: AbortSignal }) =>
+    request<BrandBrief>(`/api/business/marketing/contenido/briefs/${contactId}`, {
+      auth: true, retry: true, signal: opts?.signal,
+    }),
+  saveBrief: (contactId: number, body: BrandBriefInput) =>
+    request<BrandBrief>(`/api/business/marketing/contenido/briefs/${contactId}`, {
+      method: "PUT", auth: true, body,
+    }),
 };

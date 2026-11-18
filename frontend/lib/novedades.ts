@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-17",
+    title: "Brief de Marca: test exprés de 8 preguntas en Content Engine y Portal cliente",
+    body: "Publicado el 17 de noviembre: dentro de Negocio, el área de Marketing ahora tiene el Test exprés para Brief de Marca — 8 preguntas con su ayuda 'Qué buscamos' para entender el propósito, la personalidad, el cliente ideal, los competidores, los valores, los objetivos, las referencias visuales y los retos de cada marca. El cliente responde su propio brief en el Portal cliente y el admin lo ve en Content Engine, donde las respuestas de personalidad, cliente ideal y valores aparecen como contexto visible en el generador de copies. Todas las respuestas empiezan vacías. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-17",
     title: "Negocio > Marketing: Citas, Portal cliente, Contenido e Inteligencia",
     body: "Publicado el 17 de noviembre: dentro de Negocio, el área de Marketing ahora tiene cuatro módulos nuevos — Citas con calendario mes/semana/lista y estados pendiente, confirmada, completada o cancelada; Portal cliente, donde cada cliente ve solo sus propias campañas, facturas, tareas y citas; Content Engine con banco de ideas, calendario de contenido y plantillas por reglas (etiquetadas como plantillas, no como IA); e Inteligencia de negocio con ventas de facturas pagadas, publicidad, clientes, costos registrados a mano y rentabilidad. Todas las listas empiezan vacías y solo muestran datos reales. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

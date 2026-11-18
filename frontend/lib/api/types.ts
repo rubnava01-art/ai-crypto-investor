@@ -951,6 +951,33 @@ export interface PortalVinculoInput {
   contact_id: number;
 }
 
+/** Brief de marca tal como lo devuelven /portal/brief y
+ * /contenido/briefs/{contact_id}: las 8 respuestas (vacías al inicio),
+ * progreso X/8 y aviso de la Q2 (no son 3 palabras). */
+export interface BrandBrief {
+  contact_id: number;
+  contact_name: string;
+  answers: Record<string, string>;
+  answered: number;
+  missing: number[];
+  q2_words: number;
+  q2_warning: boolean;
+  updated_at: string | null;
+}
+
+export type BrandBriefInput = Partial<
+  Record<"q1" | "q2" | "q3" | "q4" | "q5" | "q6" | "q7" | "q8", string>
+>;
+
+/** Progreso del brief por cliente (GET /contenido/briefs, solo admin). */
+export interface BrandBriefSummary {
+  contact_id: number;
+  contact_name: string;
+  answered: number;
+  missing: number[];
+  updated_at: string | null;
+}
+
 // ---------- Nest Content Engine (NEST, 2026-11-17) ----------
 
 export type ContentIdeaSource = "manual" | "tendencia" | "cliente";

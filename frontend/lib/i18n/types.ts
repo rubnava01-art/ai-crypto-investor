@@ -124,4 +124,6 @@ export type Dictionary = {
   portal: Record<string, string>;
   contenido: Record<string, string>;
   bi: Record<string, string>;
+  // NEST (2026-11-17): Test exprés para Brief de Marca.
+  brief: Record<string, string>;
 };

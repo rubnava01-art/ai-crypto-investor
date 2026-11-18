@@ -7,12 +7,13 @@
 import { useState } from "react";
 import {
   api, ApiError,
-  type ContentPlatform, type ContentTemplate, type TemplateGeneration,
+  type BrandBrief, type BrandBriefSummary, type ContentPlatform, type ContentTemplate, type TemplateGeneration,
 } from "../../lib/api";
 import { Panel } from "../Panel";
 import { ApiErrorBanner, Field, copyTextWithFallback, useConfirm } from "../ui";
 import { useLanguage } from "../../lib/i18n";
 import { useAsyncLoad } from "../../lib/useLoad";
+import { BriefContextCard } from "./BriefContextCard";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -50,6 +51,32 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
     [],
   );
   const templates = load.data ?? [];
+
+  // Brief de marca como contexto visible para generar: el admin elige
+  // el cliente; el cliente vinculado ve su propio brief. Sin vínculo
+  // (403) o sin brief, el bloque no estorba: no se muestra.
+  const briefListLoad = useAsyncLoad<BrandBriefSummary[]>(
+    (signal) => (isAdmin ? api.listBriefs({ signal }) : Promise.resolve([])),
+    [isAdmin],
+  );
+  const briefSummaries = briefListLoad.data ?? [];
+  const [briefContactId, setBriefContactId] = useState("");
+  const briefLoad = useAsyncLoad<BrandBrief | null>(
+    async (signal) => {
+      if (isAdmin) {
+        if (!briefContactId) return null;
+        return api.getBrief(Number(briefContactId), { signal });
+      }
+      try {
+        return await api.getPortalBrief(undefined, { signal });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 403) return null;
+        throw err;
+      }
+    },
+    [isAdmin, briefContactId],
+  );
+  const brief = briefLoad.data ?? null;
 
   const platformLabel = (p: ContentPlatform) =>
     p === "instagram" ? t.contenido.platformInstagram
@@ -242,6 +269,34 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
                 </div>
               </form>
             )}
+          </div>
+        )}
+
+        {templates.length > 0 && (
+          <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+            <p className="text-sm font-semibold text-zinc-200">{t.brief.contextTitle}</p>
+            {isAdmin && briefSummaries.length > 0 && (
+              <Field label={t.brief.pickClient}>
+                <select
+                  aria-label={t.brief.pickClient}
+                  className={inputCls}
+                  value={briefContactId}
+                  onChange={(e) => setBriefContactId(e.target.value)}
+                >
+                  <option value="">{t.brief.pickClientOption}</option>
+                  {briefSummaries.map((s) => (
+                    <option key={s.contact_id} value={s.contact_id}>
+                      {s.contact_name} ({s.answered}/8)
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {briefLoad.loading ? (
+              <p role="status" className="text-sm text-zinc-400">{t.brief.loading}</p>
+            ) : brief ? (
+              <BriefContextCard brief={brief} onUseAsTema={(text) => setTema(text)} />
+            ) : null}
           </div>
         )}
 
