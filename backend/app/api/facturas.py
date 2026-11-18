@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
-from app.models.tables import Invoice, User
+from app.models.tables import Contact, Invoice, User
 
 router = APIRouter(prefix="/api/facturas", tags=["facturas"])
 
@@ -40,6 +40,7 @@ class InvoiceItem(BaseModel):
 class InvoiceOut(BaseModel):
     id: int
     number: str
+    contact_id: int | None = None
     client_name: str
     client_email: str
     client_phone: str
@@ -52,6 +53,7 @@ class InvoiceOut(BaseModel):
 
 class InvoiceCreate(BaseModel):
     number: str = Field(default="", max_length=40)
+    contact_id: int | None = None  # NEST: opcional, validado contra el CRM
     client_name: str = Field(min_length=1, max_length=200)
     client_email: str = Field(default="", max_length=200)
     client_phone: str = Field(default="", max_length=64)
@@ -68,6 +70,7 @@ def _inv_out(inv: Invoice) -> InvoiceOut:
     return InvoiceOut(
         id=inv.id,
         number=inv.number,
+        contact_id=inv.contact_id,
         client_name=inv.client_name,
         client_email=inv.client_email or "",
         client_phone=inv.client_phone or "",
@@ -115,8 +118,12 @@ def create_invoice(
                 break
         else:
             raise HTTPException(status_code=409, detail="Could not allocate an invoice number")
+    # NEST: contact_id opcional, validado contra el CRM (404 si no existe).
+    if payload.contact_id is not None and db.get(Contact, payload.contact_id) is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
     row = Invoice(
         number=number,
+        contact_id=payload.contact_id,
         client_name=payload.client_name.strip(),
         client_email=payload.client_email.strip(),
         client_phone=payload.client_phone.strip(),

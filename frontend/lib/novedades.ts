@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-17",
+    title: "Negocio > Marketing: Citas, Portal cliente, Contenido e Inteligencia",
+    body: "Publicado el 17 de noviembre: dentro de Negocio, el área de Marketing ahora tiene cuatro módulos nuevos — Citas con calendario mes/semana/lista y estados pendiente, confirmada, completada o cancelada; Portal cliente, donde cada cliente ve solo sus propias campañas, facturas, tareas y citas; Content Engine con banco de ideas, calendario de contenido y plantillas por reglas (etiquetadas como plantillas, no como IA); e Inteligencia de negocio con ventas de facturas pagadas, publicidad, clientes, costos registrados a mano y rentabilidad. Todas las listas empiezan vacías y solo muestran datos reales. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-17",
     title: "Mi perfil nuevo: avatar con anillo, código QR, Mi negocio y barra inferior",
     body: "Publicado el 17 de noviembre: la página Mi perfil ahora tiene diseño estilo tarjeta — avatar grande con anillo e insignia de rol real, estadísticas reales de contactos, clientes y referidos, botones para compartir la tarjeta y ver su código QR, tarjeta Mi negocio con habilidades editables, Invitar y acceso directo a Crear, y barra inferior flotante con el asistente de IA en el centro. La bio, la ubicación, el negocio y las habilidades empiezan vacíos y se llenan en Editar perfil. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

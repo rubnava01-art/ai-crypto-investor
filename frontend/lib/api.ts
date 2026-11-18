@@ -27,6 +27,10 @@ import { tendenciasApi } from "./api/tendencias";
 import { auditorApi } from "./api/auditor";
 import { analizadorApi } from "./api/analizador";
 import { privacidadApi } from "./api/privacidad";
+import { marketingApi } from "./api/marketing";
+import { portalApi } from "./api/portal";
+import { contenidoApi } from "./api/contenido";
+import { biApi } from "./api/bi";
 
 export const api = {
   ...systemApi,
@@ -51,4 +55,8 @@ export const api = {
   ...auditorApi,
   ...analizadorApi,
   ...privacidadApi,
+  ...marketingApi,
+  ...portalApi,
+  ...contenidoApi,
+  ...biApi,
 };

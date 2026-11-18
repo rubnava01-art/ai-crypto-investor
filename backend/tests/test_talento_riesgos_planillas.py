@@ -286,10 +286,10 @@ def test_migration_single_head_and_new_tables(tmp_path):
     heads = script.get_heads()
     assert len(heads) == 1, heads
     head_rev = script.get_revision(heads[0])
-    # 2026-11-17 (rediseño de perfil): la migración de bio/ubicación/
-    # negocio/skills es la nueva cabeza.
-    assert head_rev.revision == "4ee0458a0ceb"
-    assert head_rev.down_revision == "88f6de1c6bb9"
+    # 2026-11-17 (NEST): la migración de vínculo usuario↔cliente +
+    # facturas por cliente + 6 tablas nuevas es la nueva cabeza.
+    assert head_rev.revision == "7df4aeb666c6"
+    assert head_rev.down_revision == "4ee0458a0ceb"
 
     # Fresh DB: upgrade head creates the three tables with model columns.
     db_file = tmp_path / "fresh.db"

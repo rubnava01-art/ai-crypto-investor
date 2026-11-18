@@ -236,7 +236,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import academy, ajustador, analizador, auth, auditor, backtest, business, chat, clases, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, misc, portfolio, privacidad, profile, recomendaciones, referrals, signals, strategy, system, talento_riesgos_planillas, tendencias, users
+    from app.api import academy, ajustador, analizador, auth, auditor, backtest, bi, business, chat, clases, contenido, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, marketing, misc, portfolio, portal, privacidad, profile, recomendaciones, referrals, signals, strategy, system, talento_riesgos_planillas, tendencias, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -317,6 +317,13 @@ def create_app() -> FastAPI:
     app.include_router(crear.router)
     app.include_router(referrals.router)
     app.include_router(business.router)
+    # NEST 2026-11-17: 4 módulos dentro de Negocio > Marketing, paraguas
+    # /api/business/marketing/* (plan conjunto §3). Registrados junto a
+    # business.router; nada de rutas de nivel superior.
+    app.include_router(marketing.router)
+    app.include_router(portal.router)
+    app.include_router(contenido.router)
+    app.include_router(bi.router)
     app.include_router(espacio.router)
     app.include_router(facturas.router)
     app.include_router(clases.router)

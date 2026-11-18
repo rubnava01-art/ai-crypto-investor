@@ -1,18 +1,45 @@
+// Business — shell (NEST, 2026-11-17): conserva las pestañas de área y las
+// notas/tareas por área. Cuando el área es Marketing, aparece una segunda
+// fila de sub-pestañas: Notas y tareas (la vista actual, sin cambios) ·
+// Marketing y citas · Portal cliente · Contenido · Inteligencia. Cada
+// sub-sección vive en su propio archivo y se carga con dynamic(); el shell
+// pasa `me`/`isAdmin` por props (un solo /me). Las áreas ventas/legal/
+// administrativo no cambian. Sin entradas nuevas en ModuleNav, sin rutas
+// nuevas en app/.
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import {
   api, ApiError,
   type BusinessArea, type BusinessNote, type BusinessTask, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
-import { useConfirm, Field } from "./ui";
+import { useConfirm, Field, PanelLoading } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+
+const MarketingPanel = dynamic(
+  () => import("./marketing/MarketingPanel").then((m) => m.MarketingPanel),
+  { loading: () => <PanelLoading /> },
+);
+const ClientPortalPanel = dynamic(
+  () => import("./portal/ClientPortalPanel").then((m) => m.ClientPortalPanel),
+  { loading: () => <PanelLoading /> },
+);
+const ContentEnginePanel = dynamic(
+  () => import("./content/ContentEnginePanel").then((m) => m.ContentEnginePanel),
+  { loading: () => <PanelLoading /> },
+);
+const BusinessIntelligencePanel = dynamic(
+  () => import("./bi/BusinessIntelligencePanel").then((m) => m.BusinessIntelligencePanel),
+  { loading: () => <PanelLoading /> },
+);
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
+type MarketingSub = "notas" | "marketing" | "portal" | "contenido" | "bi";
 
 export function BusinessPanel() {
   const isCancelled = useCancelled();
@@ -25,6 +52,7 @@ export function BusinessPanel() {
     { value: "administrativo", label: tt.business.areaAdministrativo, hint: tt.business.hintAdministrativo },
   ];
   const [area, setArea] = useState<BusinessArea>("marketing");
+  const [sub, setSub] = useState<MarketingSub>("notas");
   const [me, setMe] = useState<MeResponse | null>(null);
   const [notes, setNotes] = useState<BusinessNote[]>([]);
   const [tasks, setTasks] = useState<BusinessTask[]>([]);
@@ -112,6 +140,128 @@ export function BusinessPanel() {
 
   const areaLabel = AREAS.find((a) => a.value === area)?.label ?? area;
 
+  const SUBS: { value: MarketingSub; label: string }[] = [
+    { value: "notas", label: tt.business.subNotas },
+    { value: "marketing", label: tt.business.subMarketing },
+    { value: "portal", label: tt.business.subPortal },
+    { value: "contenido", label: tt.business.subContenido },
+    { value: "bi", label: tt.business.subBi },
+  ];
+
+  const notesTasksView = loading ? (
+    <p className="text-sm text-zinc-400">{tt.business.loading.replace("{area}", areaLabel)}</p>
+  ) : (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Panel title={tt.business.notesTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
+        {notes.length === 0 && (
+          <p className="text-sm text-zinc-400">{tt.business.emptyNotes.replace("{area}", areaLabel)}</p>
+        )}
+        <ul className="space-y-3">
+          {notes.map((n) => (
+            <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+              {editingNote?.id === n.id ? (
+                <div className="space-y-3">
+                  <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></Field>
+                  <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
+                    <button onClick={() => setEditingNote(null)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-zinc-100">{n.title}</p>
+                  {n.body && <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{n.body}</p>}
+                  {isAdmin && (
+                    <div className="mt-3 flex gap-2 text-xs">
+                      <button
+                        className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-emerald-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                        onClick={() => { setEditingNote(n); setEditTitle(n.title); setEditBody(n.body); }}
+                      >
+                        {tt.business.edit}
+                      </button>
+                      <button
+                        className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                        onClick={async () => { if (!(await confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title)))) return; await api.deleteBusinessNote(n.id); refresh(); }}
+                      >
+                        {tt.business.delete}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+        {isAdmin && (
+          <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+            <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria}
+              className={inputCls}
+              placeholder={tt.business.noteTitlePlaceholder}
+              value={noteTitle}
+              onChange={(e) => setNoteTitle(e.target.value)}
+            /></Field>
+            <Field label={tt.business.noteBodyAria}><textarea aria-label={tt.business.noteBodyAria}
+              className={inputCls}
+              rows={3}
+              placeholder={tt.business.noteBodyPlaceholder}
+              value={noteBody}
+              onChange={(e) => setNoteBody(e.target.value)}
+            /></Field>
+            <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+              {tt.business.saveNote}
+            </button>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title={tt.business.tasksTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
+        {tasks.length === 0 && (
+          <p className="text-sm text-zinc-400">{tt.business.emptyTasks.replace("{area}", areaLabel)}</p>
+        )}
+        <ul className="space-y-2">
+          {tasks.map((t) => (
+            <li key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="h-5 w-5 shrink-0 accent-emerald-500"
+                checked={t.done}
+                disabled={!isAdmin}
+                onChange={() => toggleTask(t)}
+                aria-label={tt.business.markTask.replace("{titulo}", t.title)}
+              />
+              <span className={`flex-1 text-sm ${t.done ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
+                {t.title}
+              </span>
+              {isAdmin && (
+                <button
+                  className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-xs text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                  onClick={async () => { if (!(await confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title)))) return; await api.deleteBusinessTask(t.id); refresh(); }}
+                >
+                  {tt.business.delete}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {isAdmin && (
+          <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
+            <Field label={tt.business.newTaskAria} className="flex-1"><input aria-label={tt.business.newTaskAria}
+              className={inputCls}
+              placeholder={tt.business.newTaskPlaceholder}
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
+            /></Field>
+            <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+              {tt.business.add}
+            </button>
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+
   return (
     <>
       {dialog}
@@ -138,119 +288,31 @@ export function BusinessPanel() {
         <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{error}</p>
       )}
 
-      {loading ? (
-        <p className="text-sm text-zinc-400">{tt.business.loading.replace("{area}", areaLabel)}</p>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          <Panel title={tt.business.notesTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
-            {notes.length === 0 && (
-              <p className="text-sm text-zinc-400">{tt.business.emptyNotes.replace("{area}", areaLabel)}</p>
-            )}
-            <ul className="space-y-3">
-              {notes.map((n) => (
-                <li key={n.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-                  {editingNote?.id === n.id ? (
-                    <div className="space-y-3">
-                      <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria} className={inputCls} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></Field>
-                      <textarea aria-label={tt.business.noteBodyAria} className={inputCls} rows={3} value={editBody} onChange={(e) => setEditBody(e.target.value)} />
-                      <div className="flex gap-2">
-                        <button onClick={saveEdit} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.save}</button>
-                        <button onClick={() => setEditingNote(null)} className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">{tt.business.cancel}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-sm font-semibold text-zinc-100">{n.title}</p>
-                      {n.body && <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{n.body}</p>}
-                      {isAdmin && (
-                        <div className="mt-3 flex gap-2 text-xs">
-                          <button
-                            className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-emerald-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                            onClick={() => { setEditingNote(n); setEditTitle(n.title); setEditBody(n.body); }}
-                          >
-                            {tt.business.edit}
-                          </button>
-                          <button
-                            className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
-                            onClick={async () => { if (!(await confirm(tt.business.confirmDeleteNote.replace("{titulo}", n.title)))) return; await api.deleteBusinessNote(n.id); refresh(); }}
-                          >
-                            {tt.business.delete}
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {isAdmin && (
-              <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
-                <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria}
-                  className={inputCls}
-                  placeholder={tt.business.noteTitlePlaceholder}
-                  value={noteTitle}
-                  onChange={(e) => setNoteTitle(e.target.value)}
-                /></Field>
-                <Field label={tt.business.noteBodyAria}><textarea aria-label={tt.business.noteBodyAria}
-                  className={inputCls}
-                  rows={3}
-                  placeholder={tt.business.noteBodyPlaceholder}
-                  value={noteBody}
-                  onChange={(e) => setNoteBody(e.target.value)}
-                /></Field>
-                <button onClick={createNote} className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
-                  {tt.business.saveNote}
-                </button>
-              </div>
-            )}
-          </Panel>
-
-          <Panel title={tt.business.tasksTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
-            {tasks.length === 0 && (
-              <p className="text-sm text-zinc-400">{tt.business.emptyTasks.replace("{area}", areaLabel)}</p>
-            )}
-            <ul className="space-y-2">
-              {tasks.map((t) => (
-                <li key={t.id} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0 accent-emerald-500"
-                    checked={t.done}
-                    disabled={!isAdmin}
-                    onChange={() => toggleTask(t)}
-                    aria-label={tt.business.markTask.replace("{titulo}", t.title)}
-                  />
-                  <span className={`flex-1 text-sm ${t.done ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
-                    {t.title}
-                  </span>
-                  {isAdmin && (
-                    <button
-                      className="min-h-[44px] inline-flex items-center rounded px-1 py-1 text-xs text-red-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
-                      onClick={async () => { if (!(await confirm(tt.business.confirmDeleteTask.replace("{titulo}", t.title)))) return; await api.deleteBusinessTask(t.id); refresh(); }}
-                    >
-                      {tt.business.delete}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {isAdmin && (
-              <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
-                <Field label={tt.business.newTaskAria} className="flex-1"><input aria-label={tt.business.newTaskAria}
-                  className={inputCls}
-                  placeholder={tt.business.newTaskPlaceholder}
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
-                /></Field>
-                <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
-                  {tt.business.add}
-                </button>
-              </div>
-            )}
-          </Panel>
+      {area === "marketing" && (
+        <div className="flex flex-wrap gap-2 overflow-x-auto" role="tablist" aria-label={tt.business.subAria}>
+          {SUBS.map((s) => (
+            <button
+              key={s.value}
+              role="tab"
+              aria-selected={sub === s.value}
+              onClick={() => setSub(s.value)}
+              className={
+                sub === s.value
+                  ? "min-h-[44px] shrink-0 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                  : "min-h-[44px] shrink-0 rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+              }
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
       )}
+
+      {area === "marketing" && sub === "marketing" && <MarketingPanel me={me} isAdmin={isAdmin} />}
+      {area === "marketing" && sub === "portal" && <ClientPortalPanel me={me} isAdmin={isAdmin} />}
+      {area === "marketing" && sub === "contenido" && <ContentEnginePanel me={me} isAdmin={isAdmin} />}
+      {area === "marketing" && sub === "bi" && <BusinessIntelligencePanel me={me} isAdmin={isAdmin} />}
+      {(area !== "marketing" || sub === "notas") && notesTasksView}
       {!isAdmin && me && (
         <p className="text-xs text-zinc-400">{tt.business.viewerNote}</p>
       )}

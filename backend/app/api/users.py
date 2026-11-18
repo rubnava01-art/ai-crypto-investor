@@ -216,7 +216,7 @@ def update_user(
             status_code=403, detail="Only a super admin can change a super admin's account"
         )
     role_changed = False
-    role_downgrade = False
+    role_effective_changed = False
     if payload.role is not None:
         want_super = payload.role.strip().lower() == "super_admin"
         if want_super and not caller_super:
@@ -229,6 +229,11 @@ def update_user(
             )
         role_changed = True
         if want_super:
+            # Promoción a super admin: también revoca tokens viejos
+            # (D12, NEST 2026-11-17): un token pre-promoción no debe
+            # seguir valiendo con el rol nuevo.
+            if not target_super:
+                role_effective_changed = True
             user.is_admin = True
             _set_super(db, user, True)
         else:
@@ -239,16 +244,17 @@ def update_user(
                 admins = db.query(User).filter(User.is_admin.is_(True)).count()
                 if admins <= 1:
                     raise HTTPException(status_code=400, detail="Cannot demote the last admin")
-            # Perder super, o pasar de admin a prueba, es una degradación:
-            # los tokens viejos de esa cuenta mueren (B1).
-            if target_super or (was_admin and not new_admin):
-                role_downgrade = True
+            # Perder super, o pasar de admin a prueba, es una degradación;
+            # pasar de prueba a admin es una promoción: cualquier cambio
+            # efectivo de rol revoca los tokens viejos (B1 + D12).
+            if target_super or (was_admin != new_admin):
+                role_effective_changed = True
             _set_super(db, user, False)
             user.is_admin = new_admin
     password_changed = bool(payload.password)
     if payload.password:
         user.password_hash = hash_password(payload.password)
-    if password_changed or role_downgrade:
+    if password_changed or role_effective_changed:
         revoke_user_tokens(user)
     db.commit()
     db.refresh(user)

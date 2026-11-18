@@ -436,6 +436,14 @@ class Contact(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     email: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     phone: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    # Vínculo usuario↔cliente (NEST 2026-11-17, D1/D2): el usuario
+    # (prueba) que es este cliente en el portal. UNIQUE nullable:
+    # 1 usuario ↔ 1 contacto como máximo; un contacto sin usuario es
+    # un lead normal. Backfill NULL: el admin liga a mano, nunca se
+    # empareja por email. Llega por migración Alembic.
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, unique=True, index=True
+    )
     source: Mapped[str] = mapped_column(
         String(32), default="manual", nullable=False
     )  # manual|academia|cohley|rivgoods|otro
@@ -547,9 +555,22 @@ class Invoice(Base):
     """
 
     __tablename__ = "invoices"
+    __table_args__ = (
+        Index("ix_invoices_created_at", "created_at"),
+        Index("ix_invoices_status", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     number: Mapped[str] = mapped_column(String(40), nullable=False)
+    # Cliente del CRM (NEST 2026-11-17, D1): nullable, SET NULL al
+    # borrar el contacto; la factura conserva su snapshot de
+    # nombre/email. Backfill NULL. Llega por migración Alembic.
+    contact_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     client_name: Mapped[str] = mapped_column(String(200), nullable=False)
     client_email: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     client_phone: Mapped[str] = mapped_column(String(64), default="", nullable=False)
@@ -1212,6 +1233,244 @@ class VideoEducativo(Base):
     titulo: Mapped[str] = mapped_column(String(200), nullable=False)
     added_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# NEST — 4 módulos dentro de Negocio > Marketing (2026-11-17, plan conjunto)
+# Tablas nuevas: create_all las crea al arrancar; la migración
+# 7df4aeb666c6 también las crea (guardada) para que el esquema migrado
+# desde cero sea idéntico a los modelos (test_fase2_backend lo exige).
+# Listas vacías al inicio; dinero con Numeric/Decimal, nunca float.
+# ---------------------------------------------------------------------------
+
+
+class Appointment(Base):
+    """Una cita con un cliente (Marketing + Citas).
+
+    `contact_id` FK nullable SET NULL + snapshot `client_name` (el
+    nombre sobrevive al borrado del contacto). `status`:
+    pendiente|confirmada|completada|cancelada, máquina forward-only
+    en la API (nunca reabrir completada/cancelada).
+    """
+
+    __tablename__ = "appointments"
+    __table_args__ = (
+        Index("ix_appointments_contact_id", "contact_id"),
+        Index("ix_appointments_starts_at", "starts_at"),
+        Index("ix_appointments_status_starts_at", "status", "starts_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    client_name: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    service_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    starts_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    duration_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default="pendiente", nullable=False
+    )  # pendiente|confirmada|completada|cancelada
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class MarketingCampaign(Base):
+    """Campaña de publicidad (Marketing + Citas). Distinta de
+    ReferralCampaign (referidos): esta sí tiene canal, presupuesto,
+    gasto y fechas. `status`:
+    borrador|activa|pausada|finalizada."""
+
+    __tablename__ = "marketing_campaigns"
+    __table_args__ = (
+        Index("ix_marketing_campaigns_contact_id", "contact_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    channel: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # instagram|threads|facebook|google|otro
+    status: Mapped[str] = mapped_column(
+        String(16), default="borrador", nullable=False
+    )  # borrador|activa|pausada|finalizada
+    budget: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    spend: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0"), nullable=False
+    )
+    contact_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    starts_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    ends_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ContentIdea(Base):
+    """Idea del banco de ideas (Nest Content Engine). `source`:
+    manual|tendencia|cliente. `status`:
+    idea|en_produccion|descartada."""
+
+    __tablename__ = "content_ideas"
+    __table_args__ = (
+        Index("ix_content_ideas_contact_id", "contact_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(16), default="manual", nullable=False
+    )  # manual|tendencia|cliente
+    status: Mapped[str] = mapped_column(
+        String(16), default="idea", nullable=False
+    )  # idea|en_produccion|descartada
+    trend_note_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("trend_notes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contact_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ContentTemplate(Base):
+    """Plantilla de contenido por REGLAS (Nest Content Engine).
+
+    El cuerpo usa solo las variables {{tema}} {{negocio}} {{llamada}};
+    la generación por plantilla sustituye por texto, nunca llama al
+    modelo de IA y se etiqueta "Plantilla (reglas), no IA".
+    """
+
+    __tablename__ = "content_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    platform: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # instagram|threads|facebook
+    tone: Mapped[str] = mapped_column(String(32), default="directo", nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    max_chars: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ContentItem(Base):
+    """Elemento del calendario de contenido (Nest Content Engine).
+    `status`: borrador|programado|publicado (publicado solo desde
+    borrador|programado, sin retroceso)."""
+
+    __tablename__ = "content_items"
+    __table_args__ = (
+        Index("ix_content_items_scheduled_at", "scheduled_at"),
+        Index("ix_content_items_status_scheduled_at", "status", "scheduled_at"),
+        Index("ix_content_items_contact_id", "contact_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    scheduled_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    platform: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # instagram|threads|facebook
+    status: Mapped[str] = mapped_column(
+        String(16), default="borrador", nullable=False
+    )  # borrador|programado|publicado
+    idea_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("content_ideas.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    copy_draft_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("copy_drafts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    template_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("content_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contact_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("crm_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class BusinessCost(Base):
+    """Costo del negocio (Nest Business Intelligence). `category`:
+    publicidad|herramientas|servicios|otro. La rentabilidad es
+    ventas pagadas − costos; sin costos, rentabilidad es "sin datos",
+    nunca ventas."""
+
+    __tablename__ = "business_costs"
+    __table_args__ = (
+        Index("ix_business_costs_date", "date"),
+        Index("ix_business_costs_date_category", "date", "category"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # publicidad|herramientas|servicios|otro
+    concept: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
 
 

@@ -66,7 +66,8 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def revoke_user_tokens(user: User) -> None:
     """Invalidate every token issued before this point (that carries a
-    `tv` claim). Call it on password change and on role downgrade."""
+    `tv` claim). Call it on password change and on ANY role change
+    (promotion or downgrade, D12 NEST 2026-11-17)."""
     user.token_version = (user.token_version or 0) + 1
 
 

@@ -119,4 +119,9 @@ export type Dictionary = {
   reliability: Record<string, string>;
   // Terminal (consola simulada, solo admin): mismo patrón.
   terminal: Record<string, string>;
+  // NEST (2026-11-17): módulos dentro de Negocio > Marketing.
+  citas: Record<string, string>;
+  portal: Record<string, string>;
+  contenido: Record<string, string>;
+  bi: Record<string, string>;
 };

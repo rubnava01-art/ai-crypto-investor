@@ -8,6 +8,8 @@ Permissions follow the platform RBAC:
 - any authenticated user (admin or "prueba") can READ contacts;
 - only admins can create, update or delete (require_admin -> 403 for prueba).
 """
+import datetime as dt
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import or_
@@ -15,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
-from app.models.tables import Contact, User
+from app.models.tables import Appointment, Contact, User
 
 router = APIRouter(prefix="/api/crm/contacts", tags=["crm"])
 
@@ -175,6 +177,30 @@ def delete_contact(
     contact = db.get(Contact, contact_id)
     if contact is None:
         raise HTTPException(status_code=404, detail="Contact not found")
+    # NEST 2026-11-17: no borrar un contacto vinculado al portal ni
+    # con citas futuras (el vínculo y la agenda lo necesitan vivo).
+    # Desvincular primero (/portal/vinculos) y cancelar/reprogramar
+    # las citas; el resto de hijos se comporta como antes.
+    if contact.user_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Contact is linked to a portal user; unlink it first",
+        )
+    now = dt.datetime.now(dt.timezone.utc)
+    future = (
+        db.query(Appointment)
+        .filter(
+            Appointment.contact_id == contact.id,
+            Appointment.status.in_(("pendiente", "confirmada")),
+            Appointment.starts_at > now,
+        )
+        .first()
+    )
+    if future is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Contact has future appointments; cancel them first",
+        )
     db.delete(contact)
     db.commit()
     return None

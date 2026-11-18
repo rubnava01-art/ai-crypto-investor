@@ -786,3 +786,325 @@ export interface BusinessTask {
   created_at: string | null;
   updated_at: string | null;
 }
+
+// ---------- Marketing + Citas (NEST, 2026-11-17) ----------
+// Prefijo /api/business/marketing. Las horas son ISO UTC; el render usa
+// America/Los_Angeles explícito (lib/dates.ts).
+
+export type AppointmentStatus = "pendiente" | "confirmada" | "completada" | "cancelada";
+
+export interface Appointment {
+  id: number;
+  contact_id: number | null;
+  /** Nombre del cliente guardado al crear la cita (snapshot). */
+  client_name: string;
+  service_type: string;
+  starts_at: string;
+  duration_min: number;
+  status: AppointmentStatus;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AppointmentInput {
+  contact_id?: number | null;
+  client_name?: string;
+  service_type: string;
+  starts_at: string;
+  duration_min?: number;
+  notes?: string;
+}
+
+export interface AppointmentUpdate {
+  service_type?: string;
+  starts_at?: string;
+  duration_min?: number;
+  status?: AppointmentStatus;
+  notes?: string;
+}
+
+export type MarketingChannel = "instagram" | "threads" | "facebook" | "google" | "otro";
+export type MarketingCampaignStatus = "borrador" | "activa" | "pausada" | "finalizada";
+
+export interface MarketingCampaign {
+  id: number;
+  name: string;
+  channel: MarketingChannel;
+  status: MarketingCampaignStatus;
+  /** El backend devuelve números (float); el render usa formatMoney. */
+  budget: string | number | null;
+  spend: string | number;
+  contact_id: number | null;
+  /** El backend v1 no lo envía (no hay join con el CRM en la salida). */
+  contact_name?: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MarketingCampaignInput {
+  name: string;
+  channel?: MarketingChannel;
+  status?: MarketingCampaignStatus;
+  budget?: number | null;
+  spend?: number;
+  contact_id?: number | null;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  notes?: string;
+}
+
+// ---------- Nest Client Portal (NEST, 2026-11-17) ----------
+// Solo endpoints /api/business/marketing/portal/*: el frontend del portal
+// NUNCA importa crmApi/facturasApi/referidosApi.
+
+export interface PortalContact {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  status: string;
+  tags: string[];
+}
+
+export interface PortalMeResponse {
+  contact: PortalContact;
+}
+
+/** Campañas de referidos tal como las devuelve /portal/campanas
+ * (forma reducida del backend: sin contadores ni fechas). */
+export interface PortalReferralCampaign {
+  id: number;
+  name: string;
+  share_code: string;
+  status: string;
+  reward_type: string;
+  reward_value: string | number;
+}
+
+/** Campañas de marketing tal como las devuelve /portal/campanas. */
+export interface PortalMarketingCampaign {
+  id: number;
+  name: string;
+  channel: string;
+  status: string;
+  budget: string | number | null;
+  spend: string | number;
+  starts_on: string | null;
+  ends_on: string | null;
+}
+
+export interface PortalCampaignsResponse {
+  referidos: PortalReferralCampaign[];
+  campanas: PortalMarketingCampaign[];
+}
+
+/** Factura tal como la devuelve /portal/facturas (forma reducida del
+ * backend, con el total ya computado por el servidor). */
+export interface PortalInvoice {
+  id: number;
+  number: string;
+  contact_id: number | null;
+  client_name: string;
+  client_email: string;
+  status: InvoiceStatus;
+  total: string | number;
+  created_at: string | null;
+}
+
+export interface PortalTaskItem {
+  id: number;
+  project_id: number | null;
+  project_title: string | null;
+  title: string;
+  done: boolean;
+  created_at: string | null;
+}
+
+export interface PortalTasksResponse {
+  tasks: PortalTaskItem[];
+  proximas_citas: Appointment[];
+}
+
+export interface PortalResumen {
+  facturas: { por_estado: Record<string, number>; total_pagado: string | number };
+  citas_proximas: number;
+  campanas_activas: number;
+  proyectos_activos: number;
+}
+
+/** Vínculo tal como lo devuelve GET /portal/vinculos: un contacto con su
+ * user_id vinculado (o null). Sin username: el nombre de usuario se
+ * resuelve en el cliente desde /api/users cuando hace falta. */
+export interface PortalVinculo {
+  id: number;
+  name: string;
+  email: string;
+  user_id: number | null;
+}
+
+export interface PortalVinculoInput {
+  user_id: number;
+  contact_id: number;
+}
+
+// ---------- Nest Content Engine (NEST, 2026-11-17) ----------
+
+export type ContentIdeaSource = "manual" | "tendencia" | "cliente";
+export type ContentIdeaStatus = "idea" | "en_produccion" | "descartada";
+
+export interface ContentIdea {
+  id: number;
+  title: string;
+  notes: string;
+  source: ContentIdeaSource;
+  status: ContentIdeaStatus;
+  trend_note_id: number | null;
+  contact_id: number | null;
+  /** El backend v1 no lo envía (no hay join con el CRM en la salida). */
+  contact_name?: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ContentIdeaInput {
+  title: string;
+  notes?: string;
+  source?: ContentIdeaSource;
+  status?: ContentIdeaStatus;
+  trend_note_id?: number | null;
+  contact_id?: number | null;
+}
+
+export type ContentPlatform = "instagram" | "threads" | "facebook";
+
+export interface ContentTemplate {
+  id: number;
+  name: string;
+  platform: ContentPlatform;
+  tone: string;
+  /** Variables cerradas: {{tema}} {{negocio}} {{llamada}}. */
+  body: string;
+  max_chars: number;
+  /** Etiqueta del backend: "Plantilla (reglas), no IA". */
+  etiqueta?: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ContentTemplateInput {
+  name: string;
+  platform: ContentPlatform;
+  tone?: string;
+  body: string;
+  max_chars?: number;
+}
+
+/** Generación por reglas desde plantilla: nunca llama al modelo de IA,
+ * no persiste y no usa `demo`. Etiqueta obligatoria: "Plantilla (reglas),
+ * no IA". */
+export interface TemplateGeneration {
+  text: string;
+  source: "plantilla";
+  template_id: number;
+  platform: string;
+  tone: string;
+  truncated: boolean;
+}
+
+export type ContentItemStatus = "borrador" | "programado" | "publicado";
+
+export interface ContentItem {
+  id: number;
+  title: string;
+  text: string;
+  scheduled_at: string;
+  platform: ContentPlatform;
+  status: ContentItemStatus;
+  idea_id: number | null;
+  copy_draft_id: number | null;
+  template_id: number | null;
+  contact_id: number | null;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ContentItemInput {
+  title: string;
+  text?: string;
+  scheduled_at: string;
+  platform?: ContentPlatform;
+  status?: ContentItemStatus;
+  idea_id?: number | null;
+  copy_draft_id?: number | null;
+  template_id?: number | null;
+  contact_id?: number | null;
+  notes?: string;
+}
+
+export interface ContentItemUpdate {
+  title?: string;
+  text?: string;
+  scheduled_at?: string;
+  platform?: ContentPlatform;
+  status?: ContentItemStatus;
+  notes?: string;
+}
+
+// ---------- Nest Business Intelligence (NEST, 2026-11-17) ----------
+// Todo require_admin en el backend. Ventas = facturas PAGADAS; sin costos
+// registrados, rentabilidad es null + costos_sin_datos: true.
+
+export interface BiResumen {
+  ventas: { total_pagado: string | number; total_enviado: string | number; n_facturas: number; por_estado: Record<string, number> };
+  costos: { total: string | number; por_categoria: Record<string, string | number> };
+  rentabilidad: string | number | null;
+  costos_sin_datos: boolean;
+  clientes: { total: number; nuevos_en_periodo: number; por_status: Record<string, number> };
+  publicidad: { campanas_activas: number; gasto_total: string | number; referidos_activos: number };
+}
+
+export interface BiVentasPoint {
+  mes: string;
+  total_pagado: string | number;
+  n_facturas: number;
+}
+
+export interface BiClientes {
+  por_status: Record<string, number>;
+  top_por_total_pagado: { contact_id: number; name: string; total_pagado: string | number }[];
+}
+
+export type BusinessCostCategory = "publicidad" | "herramientas" | "servicios" | "otro";
+
+export interface BusinessCost {
+  id: number;
+  date: string;
+  category: BusinessCostCategory;
+  concept: string;
+  /** El backend devuelve float; el render usa formatMoney. */
+  amount: string | number;
+  notes: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface BusinessCostInput {
+  date: string;
+  category?: BusinessCostCategory;
+  concept: string;
+  amount: number;
+  notes?: string;
+}
+
+export interface BusinessCostUpdate {
+  date?: string;
+  category?: BusinessCostCategory;
+  concept?: string;
+  amount?: number;
+  notes?: string;
+}
