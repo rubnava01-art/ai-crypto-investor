@@ -90,13 +90,6 @@ export function ModuleShell({
       </div>
 
       <div id="contenido" tabIndex={-1} className="outline-none">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mb-5 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-        >
-          <span aria-hidden="true">←</span> {t.common.back}
-        </button>
         {children}
       </div>
 

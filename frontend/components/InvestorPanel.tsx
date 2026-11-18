@@ -45,11 +45,20 @@ export function InvestorPanel({
 
   // Precio con guarda de cancelación: una carga en vuelo de un símbolo
   // anterior (o de un panel ya desmontado) no debe escribir su precio.
+  // P2 (2026-11-17): cada carga lleva su AbortSignal y aborta la
+  // anterior — un solo sondeo vivo por panel. marketPrices ya lleva
+  // retry: true por dentro, así que este es el segundo sondeo de la
+  // página (el otro es MarketPanel) con cancelación real; el WebSocket
+  // de MarketPanel no se toca.
+  const priceAbortRef = useRef<AbortController | null>(null);
   const loadPrice = useCallback(
     async (cancelled: () => boolean) => {
+      priceAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      priceAbortRef.current = ctrl;
       try {
-        const res = await api.marketPrices();
-        if (cancelled()) return;
+        const res = await api.marketPrices({ signal: ctrl.signal });
+        if (cancelled() || ctrl.signal.aborted) return;
         const coin = res.prices.find((p) => p.pair === symbol);
         if (coin?.price_usd) {
           priceRef.current = coin.price_usd;
@@ -58,8 +67,11 @@ export function InvestorPanel({
           setPriceStale(res.stale === true);
           setPriceError(false);
         }
-      } catch {
-        if (cancelled()) return;
+      } catch (e) {
+        if (cancelled() || ctrl.signal.aborted) return;
+        // Un abort no es un error que mostrar.
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (e instanceof Error && e.name === "AbortError") return;
         // Con precio previo se conserva y su hora ya marca la
         // antigüedad; sin precio, avisar en vez de dejar "cargando…".
         if (priceRef.current == null) setPriceError(true);
@@ -90,6 +102,7 @@ export function InvestorPanel({
     return () => {
       cancelled = true;
       clearInterval(t);
+      priceAbortRef.current?.abort();
     };
   }, [loadPrice]);
 

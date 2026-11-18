@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api, ApiError,
   type CrmContact, type Invoice, type InvoiceItem, type InvoiceStatus, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
-import { ApiErrorBanner, useConfirm, Field } from "./ui";
+import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
 import { formatDate, formatMoney } from "../lib/format";
 import { buildInvoiceHtml, invoiceTotals } from "../lib/invoiceHtml";
 
@@ -161,6 +162,9 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
   const savedLoad = useAsyncLoad<Invoice[]>((signal) => api.listInvoices({ signal }), []);
   const saved = savedLoad.data;
   const savedError = savedLoad.error;
+  // H1 (2026-11-17): cliente vinculado → 403 (S1): estado amable en vez
+  // del banner rojo, sin reintento.
+  const savedForbidden = isAdminOnlyForbidden(savedError, isAdmin);
   const isCancelled = useCancelled();
   const { confirm, dialog } = useConfirm(tt);
   const [sellerName, setSellerName] = useState("Rubén Navarrete");
@@ -175,6 +179,15 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Filtro por estado (2026-11-18): la lista guardada no tenía forma de
+  // ver solo borradores, enviadas o pagadas; mismo patrón que el filtro
+  // de estado del CRM. Solo filtra en cliente: sin cambios de endpoints
+  // ni de datos.
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "">("");
+  const visibleSaved = useMemo(
+    () => (saved === null ? null : statusFilter ? saved.filter((inv) => inv.status === statusFilter) : saved),
+    [saved, statusFilter],
+  );
 
   const load = savedLoad.reload;
 
@@ -298,7 +311,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
               </select></Field>
             )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field label={tt.facturas.clientAria}><input aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} /></Field>
+              <Field label={tt.facturas.clientAria}><input id="factura-cliente" aria-label={tt.facturas.clientAria} className={inputCls} placeholder={tt.facturas.clientPlaceholder} value={clientName} onChange={(e) => setClientName(e.target.value)} required maxLength={200} /></Field>
               <Field label={tt.facturas.clientEmailAria}><input aria-label={tt.facturas.clientEmailAria} className={inputCls} placeholder={tt.facturas.clientEmailPlaceholder} value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} maxLength={200} /></Field>
               <Field label={tt.facturas.clientPhoneAria}><input aria-label={tt.facturas.clientPhoneAria} className={inputCls} placeholder={tt.facturas.clientPhonePlaceholder} value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} maxLength={64} /></Field>
             </div>
@@ -344,16 +357,48 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="mt-5 border-t border-zinc-800 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-            {tt.facturas.savedHeading} ({saved === null ? "…" : saved.length})
+            {tt.facturas.savedHeading} ({visibleSaved === null ? "…" : visibleSaved.length})
           </p>
-          {savedError ? <ApiErrorBanner error={savedError} t={tt} onRetry={savedLoad.reload} /> : null}
-          {saved === null && !savedError ? (
+          {saved !== null && saved.length > 0 && (
+            <div className="mt-3">
+              <Field label={tt.facturas.filterAria}>
+                <select
+                  className={inputCls}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as InvoiceStatus | "")}
+                  aria-label={tt.facturas.filterAria}
+                >
+                  <option value="">{tt.facturas.allStatuses}</option>
+                  {(Object.keys(STATUS_LABEL) as InvoiceStatus[]).map((s) => (
+                    <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          )}
+          {savedForbidden ? (
+            <EmptyState text={tt.reliability.adminOnlySection} />
+          ) : savedError ? (
+            <ApiErrorBanner error={savedError} t={tt} onRetry={savedLoad.reload} />
+          ) : null}
+          {visibleSaved === null && !savedError ? (
             <p className="py-2 text-sm text-zinc-400">{tt.facturas.loadingInvoices}</p>
-          ) : saved === null ? null : saved.length === 0 ? (
-            <p className="py-2 text-sm text-zinc-400">{tt.facturas.emptyInvoices}</p>
+          ) : visibleSaved === null ? null : visibleSaved.length === 0 ? (
+            <EmptyState
+              text={saved !== null && saved.length > 0 ? tt.facturas.emptyFiltered : tt.facturas.emptyInvoices}
+              actionLabel={isAdmin ? tt.facturas.createFirstInvoice : undefined}
+              onAction={
+                isAdmin
+                  ? () => {
+                      document.getElementById("factura-form")?.scrollIntoView({ behavior: "smooth" });
+                      document.getElementById("factura-cliente")?.focus();
+                    }
+                  : undefined
+              }
+            />
           ) : (
             <ul className="divide-y divide-zinc-800/70">
-              {saved.map((inv) => {
+              {visibleSaved.map((inv) => {
                 const it = totals(inv.items, inv.tax_rate);
                 return (
                   <li key={inv.id} className="py-3">

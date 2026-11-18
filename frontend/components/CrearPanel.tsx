@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
@@ -17,10 +18,13 @@ export function CrearPanel() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
   const { t } = useLanguage();
+  // Flujo 1-2-3 clicable (2026-11-17): los pasos 1 y 2 son anclas a su
+  // generador en esta página; el paso 3 enlaza al módulo CRM. El orden
+  // de montaje sigue la numeración: Tendencias arriba, Copies después.
   const flowSteps = [
-    { n: "1", label: t.crear.trendsTitle },
-    { n: "2", label: t.crear.copyTitle },
-    { n: "3", label: t.nav.crm.label },
+    { n: "1", label: t.crear.trendsTitle, href: "#crear-tendencias", external: false },
+    { n: "2", label: t.crear.copyTitle, href: "#crear-copies", external: false },
+    { n: "3", label: t.nav.crm.label, href: "/crm", external: true },
   ];
 
   useEffect(() => {
@@ -35,17 +39,32 @@ export function CrearPanel() {
         </p>
         <ol className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {flowSteps.map((s) => (
-            <li key={s.n} className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
-              <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">{s.n}</span>
-              <span className="text-sm font-semibold text-zinc-100">{s.label}</span>
+            <li key={s.n}>
+              {s.external ? (
+                <Link href={s.href} className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-3 transition-colors hover:border-emerald-700 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">{s.n}</span>
+                  <span className="text-sm font-semibold text-zinc-100">{s.label}</span>
+                  <span aria-hidden="true" className="ml-auto text-zinc-400">→</span>
+                </Link>
+              ) : (
+                <a href={s.href} className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-3 transition-colors hover:border-emerald-700 hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">{s.n}</span>
+                  <span className="text-sm font-semibold text-zinc-100">{s.label}</span>
+                  <span aria-hidden="true" className="ml-auto text-zinc-400">↓</span>
+                </a>
+              )}
             </li>
           ))}
         </ol>
       </div>
-      <CopyGenerator isAdmin={isAdmin} />
+      <section id="crear-tendencias" className="scroll-mt-4">
+        <TrendsPanel isAdmin={isAdmin} />
+      </section>
+      <section id="crear-copies" className="scroll-mt-4">
+        <CopyGenerator isAdmin={isAdmin} />
+      </section>
       <LogoGenerator />
       <ShirtMockupGenerator />
-      <TrendsPanel isAdmin={isAdmin} />
     </div>
   );
 }

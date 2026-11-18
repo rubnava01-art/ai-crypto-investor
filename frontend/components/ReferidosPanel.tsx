@@ -8,9 +8,10 @@ import {
   type ReferralRewardType, type ReferralStatus,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
-import { ApiErrorBanner, copyTextWithFallback, Field } from "./ui";
+import { ApiErrorBanner, copyTextWithFallback, isAdminOnlyForbidden, Field } from "./ui";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -91,7 +92,11 @@ export function ReferidosPanel() {
   const campaignsLoad = useAsyncLoad<ReferralCampaign[]>((signal) => api.listReferralCampaigns(undefined, { signal }), []);
   const campaigns = campaignsLoad.data;
   const campaignsError = campaignsLoad.error;
+  // H1 (2026-11-17): cliente vinculado → 403 (S1): estado amable en vez
+  // del banner rojo, sin reintento.
+  const campaignsForbidden = isAdminOnlyForbidden(campaignsError, isAdmin);
   const [referralsError, setReferralsError] = useState<unknown>(null);
+  const referralsForbidden = isAdminOnlyForbidden(referralsError, isAdmin);
   const isCancelled = useCancelled();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -326,7 +331,11 @@ export function ReferidosPanel() {
           </form>
         )}
 
-        {campaignsError ? <ApiErrorBanner error={campaignsError} t={t} onRetry={campaignsLoad.reload} /> : null}
+        {campaignsForbidden ? (
+          <EmptyState text={t.reliability.adminOnlySection} />
+        ) : campaignsError ? (
+          <ApiErrorBanner error={campaignsError} t={t} onRetry={campaignsLoad.reload} />
+        ) : null}
         {campaigns === null && !campaignsError && <p className="text-sm text-zinc-400">{t.referidos.loadingCampaigns}</p>}
         {campaigns !== null && campaigns.length === 0 && (
           <p className="text-sm text-zinc-400">{t.referidos.emptyCampaigns}</p>
@@ -418,7 +427,11 @@ export function ReferidosPanel() {
             </form>
           )}
 
-          {referralsError ? <ApiErrorBanner error={referralsError} t={t} onRetry={loadReferrals} /> : null}
+          {referralsForbidden ? (
+            <EmptyState text={t.reliability.adminOnlySection} />
+          ) : referralsError ? (
+            <ApiErrorBanner error={referralsError} t={t} onRetry={loadReferrals} />
+          ) : null}
           {referrals === null && !referralsError && <p className="text-sm text-zinc-400">{t.referidos.loadingReferrals}</p>}
           {referrals !== null && referrals.length === 0 && (
             <p className="text-sm text-zinc-400">{t.referidos.emptyReferrals}</p>

@@ -150,6 +150,15 @@ export function apiErrorText(err: unknown, t: Dictionary): string {
   return t.reliability.errorUnknown;
 }
 
+/** H1 (2026-11-17): un cliente vinculado recibe 403 del servidor en las
+ * superficies no-portal (S1, deny_linked_reader) — no es un error de
+ * carga: se muestra un estado amable en vez del banner rojo, sin
+ * reintento. Solo para no-admin; un 403 de admin u otro estatus sigue
+ * siendo banner de error. */
+export function isAdminOnlyForbidden(error: unknown, isAdmin: boolean): boolean {
+  return !isAdmin && error instanceof ApiError && error.status === 403;
+}
+
 /** Banner de error con el patrón del dashboard (role=alert): texto mapeado,
  * detalle crudo solo en una línea "detalles" colapsable, y reintento opcional. */
 export function ApiErrorBanner({

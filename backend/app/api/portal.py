@@ -110,6 +110,21 @@ def linked_contact_for(db: Session, user: User) -> Contact | None:
     return db.query(Contact).filter(Contact.user_id == user.id).first()
 
 
+def deny_linked_reader(db: Session, user: User) -> None:
+    """S1 (2026-11-17): un usuario con vínculo a un cliente NO puede
+    leer por las rutas no-portal (CRM, facturas, correos, referidos,
+    desarrollo, crear, business, plantillas de contenido): esas rutas
+    sirven datos de TODOS los clientes y el cliente vinculado solo
+    tiene su vista en el portal. Devuelve 403; admin (linked es None)
+    y no-admin sin vínculo (cuenta `prueba`, D3 pendiente) no cambian.
+    El llamador lo invoca al inicio de cada lectura no-portal."""
+    if linked_contact_for(db, user) is not None:
+        raise HTTPException(
+            status_code=403,
+            detail="Tu cuenta está vinculada a un cliente: usa el portal del cliente.",
+        )
+
+
 def _appt_out(a: Appointment) -> dict:
     return {
         "id": a.id,

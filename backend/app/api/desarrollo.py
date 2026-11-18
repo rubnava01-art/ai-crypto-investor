@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, DigitalProject, DigitalTask, User
@@ -134,6 +135,8 @@ def list_projects(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     rows = db.query(DigitalProject).order_by(DigitalProject.id.desc()).offset(offset).limit(limit).all()
     # Contactos en un solo IN + conteos de tareas con GROUP BY (antes: 2N consultas).
     contact_ids = {p.contact_id for p in rows if p.contact_id}
@@ -226,6 +229,8 @@ def list_tasks(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     if db.get(DigitalProject, project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found")
     rows = (

@@ -47,6 +47,30 @@ export function StatusDot({
   );
 }
 
-export function EmptyState({ text }: { text: string }) {
-  return <p className="px-4 py-8 text-center text-sm leading-relaxed text-zinc-400">{text}</p>;
+/** Estado vacío con acción opcional (2026-11-17): recuadro punteado +
+ * frase + un botón que hace algo (crear el primer elemento, enfocar el
+ * campo de creación…). Sin acción sigue siendo solo texto centrado. */
+export function EmptyState({
+  text,
+  actionLabel,
+  onAction,
+}: {
+  text: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-8 text-center">
+      <p className="text-sm leading-relaxed text-zinc-400">{text}</p>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-4 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
 }

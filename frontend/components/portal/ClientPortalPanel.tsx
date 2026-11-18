@@ -5,12 +5,13 @@
 // El portal usa SOLO endpoints /api/business/marketing/portal/*.
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   api, ApiError,
   type AdminUser, type MeResponse, type PortalMeResponse, type PortalVinculo,
 } from "../../lib/api";
 import { Panel } from "../Panel";
+import { EmptyState } from "../badges";
 import { ApiErrorBanner, Field, useConfirm } from "../ui";
 import { useLanguage } from "../../lib/i18n";
 import { useAsyncLoad } from "../../lib/useLoad";
@@ -20,12 +21,13 @@ import { PortalTasks } from "./PortalTasks";
 import { PortalReports } from "./PortalReports";
 import { PortalMetrics } from "./PortalMetrics";
 import { PortalClientPicker } from "./PortalClientPicker";
+import { AppointmentsPanel } from "../marketing/AppointmentsPanel";
 import { BrandBriefTab } from "../content/BrandBriefTab";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
-type Tab = "campanas" | "facturas" | "tareas" | "reportes" | "metricas" | "brief" | "vinculos";
+type Tab = "campanas" | "facturas" | "tareas" | "reportes" | "metricas" | "citas" | "brief" | "vinculos";
 
 function VinculosManager() {
   const { t } = useLanguage();
@@ -36,6 +38,9 @@ function VinculosManager() {
   const [msg, setMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Ref al selector de usuario: el EmptyState "Vincular cliente" enfoca
+  // el formulario de vínculo en vez de dejar una frase.
+  const userSelectRef = useRef<HTMLSelectElement | null>(null);
 
   const load = useAsyncLoad<{ vinculos: PortalVinculo[]; users: AdminUser[] }>(
     async (signal) => {
@@ -96,7 +101,14 @@ function VinculosManager() {
         ) : (
           <>
             {vinculos.length === 0 ? (
-              <p className="text-sm text-zinc-400">{t.portal.emptyLinks}</p>
+              <EmptyState
+                text={t.portal.emptyLinks}
+                actionLabel={t.portal.linkClient}
+                onAction={() => {
+                  userSelectRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  userSelectRef.current?.focus();
+                }}
+              />
             ) : (
               <ul className="space-y-2">
                 {vinculos.map((v) => (
@@ -117,7 +129,7 @@ function VinculosManager() {
             <form onSubmit={submit} className="mt-4 space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={t.portal.userAria}>
-                  <select aria-label={t.portal.userAria} className={inputCls} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                  <select aria-label={t.portal.userAria} ref={userSelectRef} className={inputCls} value={userId} onChange={(e) => setUserId(e.target.value)}>
                     <option value="">{t.portal.userAria}…</option>
                     {users.map((u) => (
                       <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
@@ -176,6 +188,7 @@ export function ClientPortalPanel({ me, isAdmin }: { me: MeResponse | null; isAd
     { value: "tareas", label: t.portal.tabsTasks },
     { value: "reportes", label: t.portal.tabsReports },
     { value: "metricas", label: t.portal.tabsMetrics },
+    { value: "citas", label: t.portal.tabsAppointments },
     { value: "brief", label: t.portal.tabsBrief },
     ...(isAdmin ? [{ value: "vinculos" as Tab, label: t.portal.tabsLinks }] : []),
   ];
@@ -236,8 +249,9 @@ export function ClientPortalPanel({ me, isAdmin }: { me: MeResponse | null; isAd
                 onClick={() => setTab(tb.value)}
                 className={
                   tab === tb.value
-                    ? "min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                    : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    // Nivel 3 (regla en BusinessPanel.tsx): sky oscuro.
+                    ? "min-h-[44px] rounded-lg bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                    : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
                 }
               >
                 {tb.label}
@@ -249,6 +263,15 @@ export function ClientPortalPanel({ me, isAdmin }: { me: MeResponse | null; isAd
           {tab === "tareas" && contact && <PortalTasks contactId={contactId} />}
           {tab === "reportes" && contact && <PortalReports contactId={contactId} />}
           {tab === "metricas" && contact && <PortalMetrics contactId={contactId} />}
+          {tab === "citas" && contact && (
+            <AppointmentsPanel
+              me={me}
+              isAdmin={isAdmin}
+              portalContactId={contactId}
+              clientName={contact.name}
+              allowCreate={!isAdmin}
+            />
+          )}
           {tab === "brief" && contact && (
             <BrandBriefTab isAdmin={isAdmin} surface="portal" previewContactId={previewId ?? undefined} />
           )}

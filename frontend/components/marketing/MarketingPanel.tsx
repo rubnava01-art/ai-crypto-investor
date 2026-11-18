@@ -22,8 +22,9 @@ export function MarketingPanel({ me, isAdmin }: { me: MeResponse | null; isAdmin
             onClick={() => setTab(v)}
             className={
               tab === v
-                ? "min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                // Nivel 3 (regla en BusinessPanel.tsx): sky oscuro.
+                ? "min-h-[44px] rounded-lg bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
             }
           >
             {v === "citas" ? t.citas.tabsAppointments : t.citas.tabsCampaigns}

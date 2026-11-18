@@ -4,7 +4,7 @@
 // logo/mockup tal cual; el flujo 1-2-3 de /crear no se toca.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MeResponse } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
 import { Panel } from "../Panel";
@@ -22,6 +22,10 @@ type Tab = "brief" | "ideas" | "calendario" | "plantillas" | "copies" | "tendenc
 export function ContentEnginePanel({ me, isAdmin }: { me: MeResponse | null; isAdmin: boolean }) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("brief");
+  // Estado del brief que se está viendo (lo reporta BrandBriefTab): el
+  // chip de la pestaña Brief lo lee sin entrar. null = sin brief en vista.
+  const [briefStatus, setBriefStatus] = useState<{ answered: number } | null>(null);
+  const tabsRowRef = useRef<HTMLDivElement | null>(null);
   const tabs: { value: Tab; label: string }[] = [
     { value: "brief", label: t.contenido.tabsBrief },
     { value: "ideas", label: t.contenido.tabsIdeas },
@@ -31,10 +35,17 @@ export function ContentEnginePanel({ me, isAdmin }: { me: MeResponse | null; isA
     { value: "tendencias", label: t.contenido.tabsTrends },
     { value: "creatividades", label: t.contenido.tabsCreatives },
   ];
+  // La pestaña activa siempre queda a la vista dentro del scroll
+  // horizontal de una fila (en móvil las 7 no caben a la vez).
+  useEffect(() => {
+    tabsRowRef.current
+      ?.querySelector('[aria-selected="true"]')
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [tab]);
   return (
     <div className="space-y-4">
       <p className="text-sm leading-relaxed text-zinc-400">{t.contenido.intro}</p>
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t.contenido.panelTitle}>
+      <div ref={tabsRowRef} className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={t.contenido.panelTitle}>
         {tabs.map((tb) => (
           <button
             key={tb.value}
@@ -43,15 +54,31 @@ export function ContentEnginePanel({ me, isAdmin }: { me: MeResponse | null; isA
             onClick={() => setTab(tb.value)}
             className={
               tab === tb.value
-                ? "min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                : "min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                // Nivel 3 (regla en BusinessPanel.tsx): sky oscuro.
+                ? "flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+                : "flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
             }
           >
             {tb.label}
+            {tb.value === "brief" && (
+              <span
+                className={
+                  briefStatus && briefStatus.answered > 0
+                    ? "rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300"
+                    : "rounded-full bg-zinc-500/20 px-2 py-0.5 text-xs font-semibold text-zinc-400"
+                }
+              >
+                {!briefStatus || briefStatus.answered === 0
+                  ? t.brief.noBrief
+                  : briefStatus.answered >= 8
+                    ? t.brief.complete
+                    : t.brief.progressCount.replace("{n}", String(briefStatus.answered))}
+              </span>
+            )}
           </button>
         ))}
       </div>
-      {tab === "brief" && <BrandBriefTab isAdmin={isAdmin} surface="engine" />}
+      {tab === "brief" && <BrandBriefTab isAdmin={isAdmin} surface="engine" onBriefStatus={setBriefStatus} />}
       {tab === "ideas" && <IdeasBank isAdmin={isAdmin} />}
       {tab === "calendario" && <ContentCalendar isAdmin={isAdmin} />}
       {tab === "plantillas" && <CopyTemplatePicker isAdmin={isAdmin} />}

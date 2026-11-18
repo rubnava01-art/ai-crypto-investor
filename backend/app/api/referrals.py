@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, Referral, ReferralCampaign, User
@@ -212,6 +213,8 @@ def list_campaigns(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     query = db.query(ReferralCampaign)
     if status_filter:
         query = query.filter(ReferralCampaign.status == _check_campaign_status(status_filter))
@@ -274,6 +277,8 @@ def get_campaign(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     return _out_campaign(db, _get_campaign_or_404(db, campaign_id))
 
 
@@ -315,6 +320,8 @@ def list_referrals(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     _get_campaign_or_404(db, campaign_id)
     query = db.query(Referral).filter(Referral.campaign_id == campaign_id)
     if status_filter:

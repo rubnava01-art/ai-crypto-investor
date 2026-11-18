@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Appointment, Contact, User
@@ -100,6 +101,8 @@ def list_contacts(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     query = db.query(Contact)
     if q and q.strip():
         # Escape LIKE wildcards (M10): a user's % or _ used to act as

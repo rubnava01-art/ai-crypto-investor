@@ -27,6 +27,11 @@ export function PlanillasPanel() {
   const [empleados, setEmpleados] = useState<{ id: number; nombre: string }[]>([]);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [periodoFilter, setPeriodoFilter] = useState("");
+  // Filtro por estado (2026-11-18): mismo patrón de botones con
+  // aria-pressed que Talento (ayer); se combina con el filtro de
+  // periodo. Solo filtra en cliente: sin cambios de endpoints ni de
+  // datos.
+  const [estadoFilter, setEstadoFilter] = useState<"" | PlanillaEstado>("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [periodo, setPeriodo] = useState("");
   const [empleadoId, setEmpleadoId] = useState("");
@@ -62,9 +67,12 @@ export function PlanillasPanel() {
 
   const visible = useMemo(() => {
     const q = periodoFilter.trim();
-    if (!q) return rows ?? [];
-    return (rows ?? []).filter((r) => r.periodo.includes(q));
-  }, [rows, periodoFilter]);
+    return (rows ?? []).filter((r) => {
+      if (q && !r.periodo.includes(q)) return false;
+      if (estadoFilter && r.estado !== estadoFilter) return false;
+      return true;
+    });
+  }, [rows, periodoFilter, estadoFilter]);
 
   const totals = useMemo(() => {
     const list = rows ?? [];
@@ -171,6 +179,19 @@ export function PlanillasPanel() {
             <input className={inputCls} placeholder={t.planillas.filterPlaceholder} value={periodoFilter}
               onChange={(e) => setPeriodoFilter(e.target.value)} aria-label={t.planillas.filterAria} />
           </Field>
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={t.planillas.filterEstadoAria}>
+            {(["", "pendiente", "pagado"] as const).map((f) => (
+              <button
+                key={f || "todos"}
+                type="button"
+                aria-pressed={estadoFilter === f}
+                onClick={() => setEstadoFilter(f)}
+                className={`min-h-[44px] rounded-full px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${estadoFilter === f ? "bg-emerald-700 text-white" : "border border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+              >
+                {f === "" ? t.planillas.filterAll : f === "pendiente" ? t.planillas.filterPendiente : t.planillas.filterPagado}
+              </button>
+            ))}
+          </div>
         </div>
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (

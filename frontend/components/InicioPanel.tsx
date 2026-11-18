@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
-import { novedadesOrdenadas, type NovedadSistema } from "../lib/novedades";
+import { novedadesOrdenadas } from "../lib/novedades";
 import { Panel } from "./Panel";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, LoadMore, useConfirm, Field } from "./ui";
@@ -15,10 +15,10 @@ const inputCls =
  * comentarios. La lista de posts del administrador empieza VACÍA — aquí
  * nada se inventa. Solo el administrador publica y edita posts; cualquier
  * usuario autenticado comenta, y borra solo sus propios comentarios
- * (el admin, cualquiera). ADEMÁS, la lista mezcla tarjetas del sistema
- * (lib/novedades.ts): avances reales de la app que viajan dentro del
- * frontend publicado, sin autor, sin comentarios y sin botones de
- * editar/borrar — nunca se atribuyen al administrador ni al dueño. */
+ * (el admin, cualquiera). Las novedades del sistema (lib/novedades.ts)
+ * viven SOLO en la línea de tiempo "Avance de la plataforma" de arriba:
+ * desde 2026-11-17 ya no se repiten como tarjetas en esta lista, y el
+ * contador cuenta solo posts del administrador. */
 export function InicioPanel() {
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
@@ -154,18 +154,12 @@ export function InicioPanel() {
     return d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
   };
 
-  // Lista mezclada: posts del administrador + novedades del sistema, de
-  // lo más reciente a lo más antiguo. Si el arreglo del sistema está
-  // vacío, no aparece ninguna sección del sistema.
-  type ItemLista =
-    | { kind: "admin"; post: HomePost }
-    | { kind: "system"; entry: NovedadSistema };
-  const items: ItemLista[] = [
-    ...(posts ?? []).map((p): ItemLista => ({ kind: "admin", post: p })),
-    ...novedadesOrdenadas().map((entry): ItemLista => ({ kind: "system", entry })),
-  ].sort((a, b) => {
-    const fa = a.kind === "admin" ? a.post.created_at ?? "" : a.entry.date;
-    const fb = b.kind === "admin" ? b.post.created_at ?? "" : b.entry.date;
+  // Lista SOLO con posts del administrador, de lo más reciente a lo más
+  // antiguo. Las novedades del sistema NO se mezclan aquí: ya están en la
+  // línea de tiempo "Avance de la plataforma" de arriba.
+  const items: HomePost[] = [...(posts ?? [])].sort((a, b) => {
+    const fa = a.created_at ?? "";
+    const fb = b.created_at ?? "";
     return fa < fb ? 1 : fa > fb ? -1 : 0;
   });
 
@@ -251,23 +245,7 @@ export function InicioPanel() {
           </p>
         ) : (
           <ul className="space-y-4">
-            {items.map((item) => {
-              if (item.kind === "system") {
-                const n = item.entry;
-                return (
-                  <li key={`sistema-${n.date}-${n.title}`} className="rounded-lg border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-lg font-semibold leading-snug text-zinc-100">{n.title}</span>
-                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-                        {t.inicio.systemNews}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-zinc-400">{fmtDate(n.date)}</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{n.body}</p>
-                  </li>
-                );
-              }
-              const p = item.post;
+            {items.map((p) => {
               const open = expanded.has(p.id);
               const rows = comments[p.id];
               return (

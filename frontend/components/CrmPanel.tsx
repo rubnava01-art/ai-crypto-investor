@@ -7,9 +7,10 @@ import {
   type CrmContact, type CrmContactInput, type CrmSource, type CrmStatus, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
-import { ApiErrorBanner, useConfirm, Field } from "./ui";
+import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
 
 // Carga diferida (optimización): Historial y Asistente van debajo del panel
 // principal del CRM, fuera de la vista inicial — se descargan solo cuando
@@ -104,6 +105,9 @@ export function CrmPanel() {
   // Tri-estado (Fase 4, FE3): un fallo de carga ya no se ve como "sin
   // contactos" — se conserva la lista anterior y se muestra el banner.
   const [loadError, setLoadError] = useState<unknown>(null);
+  // H1 (2026-11-17): cliente vinculado → 403 (S1) en vez del banner rojo:
+  // estado amable "solo para administradores", sin reintento.
+  const forbidden = isAdminOnlyForbidden(loadError, isAdmin);
   const isCancelled = useCancelled();
   const { confirm, dialog } = useConfirm(t);
 
@@ -208,7 +212,7 @@ export function CrmPanel() {
       title={t.crm.panelTitle}
       badge={
         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-          {contacts === null ? t.crm.badgeLoading : `${contacts.length} ${contacts.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
+          {contacts === null ? (forbidden ? "—" : t.crm.badgeLoading) : `${contacts.length} ${contacts.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
         </span>
       }
     >
@@ -217,7 +221,10 @@ export function CrmPanel() {
         {isAdmin ? t.crm.introAdmin : t.crm.introViewer}
       </p>
 
-      {/* Search + filter */}
+      {/* Search + filter: sin datos no tienen sentido para el cliente
+        vinculado (cada tecla re-dispararía el 403); se ocultan con el
+        estado amable. */}
+      {!forbidden && (
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
         <Field label={t.crm.searchAria}><input
           className={inputCls}
@@ -238,9 +245,14 @@ export function CrmPanel() {
           ))}
         </select></Field>
       </div>
+      )}
 
       {/* List */}
-      {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
+      {forbidden ? (
+        <EmptyState text={t.reliability.adminOnlySection} />
+      ) : loadError ? (
+        <ApiErrorBanner error={loadError} t={t} onRetry={load} />
+      ) : null}
       {contacts === null ? (
         loadError ? null : (
           <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>

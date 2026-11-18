@@ -407,6 +407,14 @@ export function ModuleNav() {
   // /me falla, se asume "prueba" (tampoco se muestra lo admin).
   const [role, setRole] = useState<"loading" | "admin" | "prueba">("loading");
   const isAdmin = role === "admin";
+  // Móvil: todo el menú vive detrás de un único botón "Menú" (2026-11-17):
+  // antes las 6 familias + Inicio ocupaban ~400 px antes del contenido.
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Cerrar el menú móvil al navegar: el contenido del módulo destino es
+  // lo primero que se ve, sin hacer scroll.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
   // Móvil: solo la familia de la ruta actual empieza abierta.
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const o: Record<string, boolean> = {};
@@ -440,6 +448,13 @@ export function ModuleNav() {
   const byHref = useMemo(() => new Map(visible.map((m) => [m.href, m])), [visible]);
   // Inicio es un botón independiente, no parte de ninguna familia.
   const inicio = byHref.get("/inicio");
+  // Módulo actual para el botón "Menú" en móvil: etiqueta + punto de su
+  // familia; si la ruta no está en el menú (p. ej. un manual), la familia.
+  const currentModule = byHref.get(pathname);
+  const currentAccent = FAMILY_ACCENT[familyForHref(pathname)] ?? FAMILY_ACCENT.invertir;
+  const currentLabel = currentModule
+    ? (t.nav[KEY_BY_HREF[currentModule.href]]?.label ?? currentModule.label)
+    : (t.navGroups[familyForHref(pathname)] ?? familyForHref(pathname));
 
   const link = useCallback(
     (m: (typeof MODULES)[number]) => {
@@ -477,61 +492,90 @@ export function ModuleNav() {
 
   return (
     <nav aria-label={t.header.navAria}>
-      {/* Inicio: botón independiente siempre visible (móvil y escritorio),
-          encima de las familias — nunca dentro de un grupo colapsable. */}
-      {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
-      {/* Mientras /me resuelve, indicador neutro (fail-closed): no se
-          listan entradas admin ni se habla de "solo lectura"; las entradas
-          adminOnly aparecen solo cuando /me confirma admin. */}
-      {role === "loading" && (
-        <p role="status" className="px-1 py-2 text-xs text-zinc-400">
-          {t.nav.checkingRole}
-        </p>
+      {/* Móvil: un solo botón "Menú" con el módulo actual; el resto del
+          menú (Inicio + familias) solo se despliega al tocarlo. */}
+      <div className="sm:hidden">
+        <button
+          type="button"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${currentAccent.dot}`} />
+            {t.nav.menu}
+            <span className="truncate font-normal text-zinc-400">· {currentLabel}</span>
+          </span>
+          <span aria-hidden="true" className="shrink-0 text-zinc-400">{menuOpen ? "▾" : "▸"}</span>
+        </button>
+      </div>
+      {menuOpen && (
+        <div className="mt-2 sm:hidden">
+          {/* Inicio: botón independiente siempre visible (móvil y escritorio),
+              encima de las familias — nunca dentro de un grupo colapsable. */}
+          {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
+          {/* Mientras /me resuelve, indicador neutro (fail-closed): no se
+              listan entradas admin ni se habla de "solo lectura"; las entradas
+              adminOnly aparecen solo cuando /me confirma admin. */}
+          {role === "loading" && (
+            <p role="status" className="px-1 py-2 text-xs text-zinc-400">
+              {t.nav.checkingRole}
+            </p>
+          )}
+          {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
+          <div className="space-y-2">
+            {GROUPS.map((g) => {
+              const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
+              if (items.length === 0) return null;
+              const isOpen = !!open[g.key];
+              const groupLabel = t.navGroups[g.key] ?? g.key;
+              const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+              return (
+                <div key={g.key} className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpen((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
+                    className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
+                      {groupLabel}
+                    </span>
+                    <span aria-hidden="true" className="text-zinc-400">{isOpen ? "▾" : "▸"}</span>
+                  </button>
+                  {isOpen && <div className="flex flex-col gap-2 p-2 pt-0">{items.map(link)}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
-      {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
-      <div className="space-y-2 sm:hidden">
-        {GROUPS.map((g) => {
-          const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
-          if (items.length === 0) return null;
-          const isOpen = !!open[g.key];
-          const groupLabel = t.navGroups[g.key] ?? g.key;
-          const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
-          return (
-            <div key={g.key} className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
-              <button
-                type="button"
-                aria-expanded={isOpen}
-                onClick={() => setOpen((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
-                className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
-              >
-                <span className="flex items-center gap-2">
+      {/* Escritorio: Inicio + familias seccionadas, todo visible. */}
+      <div className="hidden sm:block">
+        {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
+        {role === "loading" && (
+          <p role="status" className="px-1 py-2 text-xs text-zinc-400">
+            {t.nav.checkingRole}
+          </p>
+        )}
+        <div className="space-y-4">
+          {GROUPS.map((g) => {
+            const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
+            if (items.length === 0) return null;
+            const groupLabel = t.navGroups[g.key] ?? g.key;
+            const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+            return (
+              <section key={g.key} aria-label={groupLabel}>
+                <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
                   <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
                   {groupLabel}
-                </span>
-                <span aria-hidden="true" className="text-zinc-400">{isOpen ? "▾" : "▸"}</span>
-              </button>
-              {isOpen && <div className="flex flex-col gap-2 p-2 pt-0">{items.map(link)}</div>}
-            </div>
-          );
-        })}
-      </div>
-      {/* Escritorio: familias seccionadas con encabezado, todas visibles. */}
-      <div className="hidden space-y-4 sm:block">
-        {GROUPS.map((g) => {
-          const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
-          if (items.length === 0) return null;
-          const groupLabel = t.navGroups[g.key] ?? g.key;
-          const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
-          return (
-            <section key={g.key} aria-label={groupLabel}>
-              <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-                <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
-                {groupLabel}
-              </h2>
-              <div className="flex flex-wrap gap-2">{items.map(link)}</div>
-            </section>
-          );
-        })}
+                </h2>
+                <div className="flex flex-wrap gap-2">{items.map(link)}</div>
+              </section>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

@@ -6,9 +6,11 @@ import { useLanguage } from "../lib/i18n";
 /** Barra de secciones sticky de /estudiar (2026-11-05): navegación por
  * anclas entre las 5 secciones apiladas — el contenido NO se oculta,
  * por eso los botones usan `aria-current` y NO `role="tab"`. Las
- * flechas ‹ › son la alternativa visible y de teclado del swipe.
- * La pista de swipe se muestra siempre: es la única manera de descubrir
- * el gesto. Una sola región `aria-live` anuncia el cambio de sección. */
+ * flechas ‹ › son la alternativa visible y de teclado del swipe: la
+ * pista de swipe se eliminó (2026-11-17) porque robaba una línea entera
+ * en móvil y las flechas ya explican el gesto. Una sola fila: flechas +
+ * pestañas con scroll + contador "N / 5" con la posición actual. Una
+ * sola región `aria-live` anuncia el cambio de sección. */
 
 export interface EstudiarSection {
   id: string;
@@ -68,14 +70,13 @@ export function EstudiarTabs({ sections, activeId, onSelect, onPrev, onNext }: E
             </button>
           ))}
         </div>
+        <span aria-hidden="true" className="shrink-0 px-1 text-xs font-semibold tabular-nums text-zinc-400">
+          {activeIndex + 1} / {sections.length}
+        </span>
         <button type="button" aria-label={g.nextSection} onClick={onNext} disabled={activeIndex === sections.length - 1} className={arrowBtn}>
           ›
         </button>
       </div>
-      <p className="pb-2 text-xs text-zinc-400">
-        <span aria-hidden="true">← → </span>
-        {g.swipeHint}
-      </p>
       <div aria-live="polite" className="sr-only">
         {announce}
       </div>

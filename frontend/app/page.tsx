@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   api, getToken, setToken, ApiError,
   type SystemStatus, type BalancesResponse, type PerformanceResponse,
@@ -305,7 +306,10 @@ export default function DashboardPage() {
       )}
 
       <section id="contenido" tabIndex={-1} aria-label={t.dashboard.heroHeading} className="mb-6 outline-none sm:mb-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.heroHeading}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.heroHeading}
+        </h2>
       <div className="mb-5">
         <MarketPanel />
       </div>
@@ -327,15 +331,27 @@ export default function DashboardPage() {
           )}
         </Panel>
 
-        {/* Invertir: entrar / salir / validar (solo admin) */}
-        {isAdmin && (
+        {/* Invertir: entrar / salir / validar (solo admin). Para cuentas
+            prueba, una tarjeta informativa ocupa la segunda celda del
+            grid héroe: sin formulario, sin tocar simulación. */}
+        {isAdmin ? (
           <InvestorPanel
             mode={sim?.current ?? "simulation"}
             realEnabled={sim?.real_enabled ?? false}
             equityUsd={balances ? Number(balances.equity_usd) : null}
             onExecuted={load}
           />
-        )}
+        ) : me ? (
+          <Panel title={t.dashboard.investInfoTitle}>
+            <p className="text-sm leading-relaxed text-zinc-400">{t.dashboard.investInfoBody}</p>
+            <Link
+              href="/estudiar"
+              className="mt-4 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.dashboard.investInfoCta}
+            </Link>
+          </Panel>
+        ) : null}
 
       </div>
       </section>
@@ -347,7 +363,10 @@ export default function DashboardPage() {
       )}
 
       <section aria-label={t.dashboard.secondaryHeading} className="mb-6 sm:mb-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.secondaryHeading}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.secondaryHeading}
+        </h2>
       <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* System status */}
         <Panel title={t.dashboard.systemTitle} badge={<DemoBadge quiet />}>
@@ -432,7 +451,10 @@ export default function DashboardPage() {
       </section>
 
       <section aria-label={t.dashboard.controlTitle} className="mb-6 sm:mb-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">{t.dashboard.controlTitle}</h2>
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.controlTitle}
+        </h2>
       <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
         {/* Scanner controls */}
         <Panel title={t.dashboard.scannerControlsTitle}>

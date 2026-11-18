@@ -17,6 +17,8 @@ personal (public catalogs and lists), it just changes rarely:
 - /api/inicio/posts — Inicio news feed (only changes when the admin
   posts; 60 s of staleness is acceptable for news).
 - /api/recomendaciones — recommendations list (admin-curated).
+- /api/videos — educational videos list (admin-curated; only an
+  admin edit changes it).
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
@@ -34,6 +36,7 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/clases/classes",
         "/api/inicio/posts",
         "/api/recomendaciones",
+        "/api/videos",
     }
 )
 

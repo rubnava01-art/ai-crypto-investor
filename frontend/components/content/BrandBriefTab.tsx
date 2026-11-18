@@ -8,6 +8,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   api, ApiError,
   type BrandBrief, type BrandBriefInput, type BrandBriefSummary,
@@ -16,6 +17,7 @@ import { useLanguage } from "../../lib/i18n";
 import { useAsyncLoad } from "../../lib/useLoad";
 import { ApiErrorBanner, Field } from "../ui";
 import { Panel } from "../Panel";
+import { EmptyState } from "../badges";
 import { BrandBriefForm } from "./BrandBriefForm";
 
 const inputCls =
@@ -25,13 +27,18 @@ export function BrandBriefTab({
   isAdmin,
   surface,
   previewContactId,
+  onBriefStatus,
 }: {
   isAdmin: boolean;
   /** "engine": selector admin propio; "portal": el contacto viene del portal. */
   surface: "engine" | "portal";
   previewContactId?: number;
+  /** Informa al padre (Content Engine) del brief que se está viendo,
+   * para el chip de estado de la pestaña Brief. */
+  onBriefStatus?: (status: { answered: number } | null) => void;
 }) {
   const { t } = useLanguage();
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState<string>("");
   const [brief, setBrief] = useState<BrandBrief | null>(null);
 
@@ -75,6 +82,13 @@ export function BrandBriefTab({
   const contactName =
     formBrief?.contact_name ?? selectedSummary?.contact_name ?? "";
 
+  // Chip de estado (M6): el padre muestra "Sin brief" / "X de 8" /
+  // "Brief completo" según el brief en vista; sin brief, null.
+  useEffect(() => {
+    if (!onBriefStatus) return;
+    onBriefStatus(formBrief ? { answered: formBrief.answered } : null);
+  }, [formBrief, onBriefStatus]);
+
   const save = async (answers: BrandBriefInput): Promise<BrandBrief> => {
     let saved: BrandBrief;
     if (isAdmin && surface === "engine" && selectedId) {
@@ -96,7 +110,15 @@ export function BrandBriefTab({
       return <ApiErrorBanner error={listLoad.error} t={t} onRetry={listLoad.reload} />;
     }
     if (summaries.length === 0) {
-      return <p className="text-sm text-zinc-400">{t.brief.emptyBriefs}</p>;
+      // Sin clientes no hay brief que crear: la acción lleva al CRM,
+      // donde se da de alta el primer cliente.
+      return (
+        <EmptyState
+          text={t.brief.emptyBriefs}
+          actionLabel={t.brief.createBrief}
+          onAction={() => router.push("/crm")}
+        />
+      );
     }
     if (!selectedId) {
       return (
@@ -129,7 +151,7 @@ export function BrandBriefTab({
     return <ApiErrorBanner error={briefLoad.error} t={t} onRetry={briefLoad.reload} />;
   }
   if (!formBrief) {
-    return <p className="text-sm text-zinc-400">{t.brief.noClientSelected}</p>;
+    return <EmptyState text={t.brief.noClientSelected} />;
   }
   return (
     <>

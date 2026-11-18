@@ -9,6 +9,7 @@
 // youtube.com/watch o youtu.be); el frontend extrae el id con la
 // misma regla para el embed de privacidad mejorada (youtube-nocookie).
 import { request } from "./client";
+import { catalogMemo } from "./memo";
 
 export type AgenteKey = "agente1" | "agente2" | "agente3";
 export type AjusteEstado = "propuesta" | "en_curso" | "aplicada";
@@ -117,11 +118,28 @@ export const ajustadorApi = {
   deleteAjuste: (id: number) =>
     request<void>(`/api/ajustes/${id}`, { method: "DELETE", auth: true }),
 
-  listVideos: () => list<VideoEducativo>("/api/videos"),
+  // Videos educativos: catálogo casi estático (2026-11-18), mismo
+  // patrón que Academia/Clases/Inicio: memo 60 s en cliente; el
+  // cliente envía no-store, así que este memo es lo que evita el
+  // viaje al navegar de vuelta a /estudiar. Las mutaciones invalidan
+  // el prefijo, así que la lista tras guardar nunca muestra datos
+  // viejos. Los ajustes NO se memoizan: el tablero cambia con cada
+  // propuesta del admin durante una sesión de ajuste.
+  listVideos: () =>
+    catalogMemo.get<VideoEducativo[]>("/api/videos", () => list<VideoEducativo>("/api/videos")),
   createVideo: (body: VideoInput) =>
-    request<VideoEducativo>("/api/videos", { method: "POST", auth: true, body }),
+    request<VideoEducativo>("/api/videos", { method: "POST", auth: true, body }).then((res) => {
+      catalogMemo.invalidate("/api/videos");
+      return res;
+    }),
   updateVideo: (id: number, body: Partial<VideoInput>) =>
-    request<VideoEducativo>(`/api/videos/${id}`, { method: "PUT", auth: true, body }),
+    request<VideoEducativo>(`/api/videos/${id}`, { method: "PUT", auth: true, body }).then((res) => {
+      catalogMemo.invalidate("/api/videos");
+      return res;
+    }),
   deleteVideo: (id: number) =>
-    request<void>(`/api/videos/${id}`, { method: "DELETE", auth: true }),
+    request<void>(`/api/videos/${id}`, { method: "DELETE", auth: true }).then((res) => {
+      catalogMemo.invalidate("/api/videos");
+      return res;
+    }),
 };

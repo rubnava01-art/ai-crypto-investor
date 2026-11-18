@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-18",
+    title: "Interfaz renovada de Inicio a Negocios: una mejora por segmento, filtros nuevos y portal más seguro",
+    body: "Publicado el 18 de noviembre: interfaz renovada en toda la plataforma, una mejora visible por segmento de Inicio a Negocios — en Inicio las novedades del sistema ya no se mezclan con los posts del admin; en Invertir los encabezados son más grandes y claros; en Estudiar la barra es más compacta y los videos educativos cargan más rápido con caché; en Crear el flujo es ahora 1-2-3 clicable; en Negocio las pestañas tienen un color por nivel y el Brief de Marca muestra su estado; las secciones vacías ahora muestran un botón de acción; y la navegación móvil va detrás de un botón Menú. Además, los clientes ya pueden reservar citas desde su portal, Inteligencia de negocio es solo para administradores, y el portal quedó más seguro: un cliente vinculado ya no puede leer datos de otros clientes. Hoy también llegaron filtros por estado en Facturas y Planillas. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-17",
     title: "Brief de Marca: test exprés de 8 preguntas en Content Engine y Portal cliente",
     body: "Publicado el 17 de noviembre: dentro de Negocio, el área de Marketing ahora tiene el Test exprés para Brief de Marca — 8 preguntas con su ayuda 'Qué buscamos' para entender el propósito, la personalidad, el cliente ideal, los competidores, los valores, los objetivos, las referencias visuales y los retos de cada marca. El cliente responde su propio brief en el Portal cliente y el admin lo ve en Content Engine, donde las respuestas de personalidad, cliente ideal y valores aparecen como contexto visible en el generador de copies. Todas las respuestas empiezan vacías. Trading real sigue apagado y las etiquetas de simulación intactas.",

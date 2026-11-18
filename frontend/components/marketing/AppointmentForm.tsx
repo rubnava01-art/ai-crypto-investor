@@ -1,4 +1,7 @@
-// Formulario de cita (NEST, 2026-11-17): crear/editar. Solo admin.
+// Formulario de cita (NEST, 2026-11-17): crear/editar. Admin: elige el
+// cliente del CRM. Cliente vinculado (S2): el servidor deriva el
+// contacto del token y el nombre viene fijo (`fixedClientName`): no se
+// elige cliente ni se escribe el nombre, solo servicio/fecha/hora.
 // Fecha + hora en inputs separados (mejor UX en iOS que datetime-local);
 // se guardan como ISO UTC interpretando la hora de pared en
 // America/Los_Angeles (lib/dates.ts). Duración 15–480 min.
@@ -16,17 +19,21 @@ const inputCls =
 export function AppointmentForm({
   contacts,
   initial,
+  fixedClientName,
   onSaved,
   onCancel,
 }: {
   contacts: CrmContact[];
   initial?: Appointment | null;
+  /** Cliente vinculado: nombre fijo, sin selector de cliente. El
+   * servidor ignora el nombre del body y usa el del vínculo. */
+  fixedClientName?: string;
   onSaved: (msg: string) => void;
   onCancel: () => void;
 }) {
   const { t } = useLanguage();
   const [contactId, setContactId] = useState<string>(initial?.contact_id ? String(initial.contact_id) : "");
-  const [clientName, setClientName] = useState(initial?.client_name ?? "");
+  const [clientName, setClientName] = useState(initial?.client_name ?? fixedClientName ?? "");
   const [service, setService] = useState(initial?.service_type ?? "");
   const [date, setDate] = useState(toDateInputValue(initial?.starts_at));
   const [time, setTime] = useState(toTimeInputValue(initial?.starts_at) || "10:00");
@@ -46,7 +53,8 @@ export function AppointmentForm({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const name = clientName.trim();
+    // Cliente vinculado: el nombre es el del vínculo, no se escribe.
+    const name = (fixedClientName ?? clientName).trim();
     const svc = service.trim();
     const dur = Number(duration);
     if (!name || !svc || !date || !time || !Number.isFinite(dur) || dur < 15 || dur > 480) {
@@ -71,7 +79,9 @@ export function AppointmentForm({
         onSaved(t.citas.msgUpdated);
       } else {
         await api.createAppointment({
-          contact_id: contactId ? Number(contactId) : null,
+          // Cliente vinculado: sin contact_id — el servidor deriva el
+          // contacto del token (403 si el body mandara otro).
+          contact_id: fixedClientName ? null : contactId ? Number(contactId) : null,
           client_name: name,
           service_type: svc,
           starts_at,
@@ -90,31 +100,39 @@ export function AppointmentForm({
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
       <p className="text-sm font-semibold text-zinc-200">{initial ? t.citas.formEditTitle : t.citas.formTitle}</p>
-      <Field label={t.citas.clientAria}>
-        <select
-          aria-label={t.citas.clientAria}
-          className={inputCls}
-          value={contactId}
-          onChange={(e) => pickContact(e.target.value)}
-        >
-          <option value="">{t.citas.clientOption}</option>
-          {contacts.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t.citas.clientNameAria}>
-        <input
-          aria-label={t.citas.clientNameAria}
-          className={inputCls}
-          placeholder={t.citas.clientNamePlaceholder}
-          value={clientName}
-          onChange={(e) => setClientName(e.target.value)}
-          required
-          maxLength={200}
-          autoComplete="off"
-        />
-      </Field>
+      {fixedClientName ? (
+        <Field label={t.citas.clientNameAria}>
+          <p className="py-2.5 text-sm font-semibold text-zinc-100">{fixedClientName}</p>
+        </Field>
+      ) : (
+        <>
+          <Field label={t.citas.clientAria}>
+            <select
+              aria-label={t.citas.clientAria}
+              className={inputCls}
+              value={contactId}
+              onChange={(e) => pickContact(e.target.value)}
+            >
+              <option value="">{t.citas.clientOption}</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t.citas.clientNameAria}>
+            <input
+              aria-label={t.citas.clientNameAria}
+              className={inputCls}
+              placeholder={t.citas.clientNamePlaceholder}
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              required
+              maxLength={200}
+              autoComplete="off"
+            />
+          </Field>
+        </>
+      )}
       <Field label={t.citas.serviceAria}>
         <input
           aria-label={t.citas.serviceAria}

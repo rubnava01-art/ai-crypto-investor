@@ -10,7 +10,8 @@ import {
   type BrandBrief, type BrandBriefSummary, type ContentPlatform, type ContentTemplate, type TemplateGeneration,
 } from "../../lib/api";
 import { Panel } from "../Panel";
-import { ApiErrorBanner, Field, copyTextWithFallback, useConfirm } from "../ui";
+import { EmptyState } from "../badges";
+import { ApiErrorBanner, Field, copyTextWithFallback, isAdminOnlyForbidden, useConfirm } from "../ui";
 import { useLanguage } from "../../lib/i18n";
 import { useAsyncLoad } from "../../lib/useLoad";
 import { BriefContextCard } from "./BriefContextCard";
@@ -51,6 +52,9 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
     [],
   );
   const templates = load.data ?? [];
+  // H1 (2026-11-17): cliente vinculado → 403 (S1): estado amable en vez
+  // del banner rojo, sin reintento.
+  const forbidden = isAdminOnlyForbidden(load.error, isAdmin);
 
   // Brief de marca como contexto visible para generar: el admin elige
   // el cliente; el cliente vinculado ve su propio brief. Sin vínculo
@@ -186,7 +190,11 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
         {load.loading ? (
           <p role="status" className="py-4 text-center text-sm text-zinc-400">{t.contenido.loadingTemplates}</p>
         ) : load.error ? (
-          <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+          forbidden ? (
+            <EmptyState text={t.reliability.adminOnlySection} />
+          ) : (
+            <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+          )
         ) : templates.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
             <p className="text-sm text-zinc-400">{t.contenido.emptyTemplates}</p>

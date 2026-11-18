@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.ai import copies as copy_service
 from app.ai.models import AIModelError
+from app.api.portal import deny_linked_reader
 from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
@@ -191,6 +192,8 @@ def list_copies(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     rows = db.query(CopyDraft).order_by(CopyDraft.id.desc()).offset(offset).limit(limit).all()
     return [_copy_out(d) for d in rows]
 

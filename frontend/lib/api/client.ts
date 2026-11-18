@@ -190,10 +190,18 @@ export function handleUnauthorized() {
 // si el cuerpo no es JSON (p. ej. página del proxy), cae al statusText.
 // Lo comparten request() (JSON) y downloadCoursePdf() (blob) para que un
 // fallo de descarga muestre la causa real y no solo el código HTTP.
+// Un 422 de FastAPI trae `detail` como LISTA de {loc, msg, type}: se
+// aplana a su primer `msg` legible (P3, 2026-11-17) en vez de mostrar
+// el JSON entero; un `detail` string sigue pasando tal cual.
 export async function errorDetail(res: Response): Promise<string> {
   try {
     const j = await res.json();
     if (typeof j?.detail === "string") return j.detail;
+    if (Array.isArray(j?.detail) && j.detail.length > 0) {
+      const first = j.detail[0];
+      if (typeof first?.msg === "string") return first.msg;
+      if (typeof first === "string") return first;
+    }
   } catch {
     /* cuerpo no-JSON: usa statusText */
   }

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import BusinessNote, BusinessTask, User
@@ -116,6 +117,8 @@ def list_notes(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     area = _check_area(area)
     return [
         _out_note(n)
@@ -180,6 +183,8 @@ def list_tasks(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     area = _check_area(area)
     return [
         _out_task(t)

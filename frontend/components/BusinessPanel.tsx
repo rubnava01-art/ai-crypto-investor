@@ -6,16 +6,26 @@
 // pasa `me`/`isAdmin` por props (un solo /me). Las áreas ventas/legal/
 // administrativo no cambian. Sin entradas nuevas en ModuleNav, sin rutas
 // nuevas en app/.
+//
+// REGLA DE COLOR POR NIVEL DE PESTAÑAS (2026-11-17, un color por nivel):
+// - Nivel 1, áreas de Negocio (AREAS): emerald (bg-emerald-700).
+// - Nivel 2, sub-pestañas de Marketing (SUBS): sky (bg-sky-700).
+// - Nivel 3, pestañas internas de cada módulo (MarketingPanel,
+//   ContentEnginePanel, ClientPortalPanel): sky oscuro (bg-sky-800).
+//   La activa de cada nivel usa su color; la inactiva, borde zinc.
+// Inteligencia (BI) es solo admin: sus endpoints son require_admin, así
+// que la sub-pestaña se oculta a no-admin y el panel ni se monta.
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api, ApiError,
   type BusinessArea, type BusinessNote, type BusinessTask, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
-import { useConfirm, Field, PanelLoading } from "./ui";
+import { EmptyState } from "./badges";
+import { useConfirm, Field, PanelLoading, isAdminOnlyForbidden } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
@@ -58,19 +68,34 @@ export function BusinessPanel() {
   const [tasks, setTasks] = useState<BusinessTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Error de carga en crudo (H1): el 403 del cliente vinculado se detecta
+  // aquí; `error` queda solo para los fallos de acción (crear/editar…).
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const [noteTitle, setNoteTitle] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
+  // Refs para los EmptyState con acción: el botón enfoca el campo de
+  // creación (primera nota / primera tarea) en vez de dejar una frase.
+  const noteTitleRef = useRef<HTMLInputElement | null>(null);
+  const taskTitleRef = useRef<HTMLInputElement | null>(null);
+  const focusField = (ref: React.RefObject<HTMLInputElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    ref.current?.focus();
+  };
   const [editingNote, setEditingNote] = useState<BusinessNote | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
 
   const isAdmin = me?.is_admin ?? false;
+  // H1 (2026-11-17): cliente vinculado → 403 (S1) en notas/tareas: estado
+  // amable en vez del párrafo rojo, sin reintento.
+  const forbidden = isAdminOnlyForbidden(loadError, isAdmin);
 
   const load = useCallback(async (a: BusinessArea) => {
     setLoading(true);
     setError(null);
+    setLoadError(null);
     try {
       const [n, t, m] = await Promise.all([
         api.listBusinessNotes(a),
@@ -82,7 +107,9 @@ export function BusinessPanel() {
       setTasks(t);
       setMe(m);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : tt.business.errLoad);
+      // H1: el 403 del cliente vinculado (S1) no va al párrafo rojo de
+      // error: lo marca `loadError` y lo muestra el EmptyState amable.
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
@@ -145,16 +172,24 @@ export function BusinessPanel() {
     { value: "marketing", label: tt.business.subMarketing },
     { value: "portal", label: tt.business.subPortal },
     { value: "contenido", label: tt.business.subContenido },
-    { value: "bi", label: tt.business.subBi },
+    // Inteligencia (S3): solo admin — sus endpoints son require_admin y
+    // el panel ni se monta para no-admin.
+    ...(isAdmin ? [{ value: "bi" as MarketingSub, label: tt.business.subBi }] : []),
   ];
 
   const notesTasksView = loading ? (
     <p className="text-sm text-zinc-400">{tt.business.loading.replace("{area}", areaLabel)}</p>
+  ) : forbidden ? (
+    <EmptyState text={tt.reliability.adminOnlySection} />
   ) : (
     <div className="grid gap-6 md:grid-cols-2">
       <Panel title={tt.business.notesTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
         {notes.length === 0 && (
-          <p className="text-sm text-zinc-400">{tt.business.emptyNotes.replace("{area}", areaLabel)}</p>
+          <EmptyState
+            text={tt.business.emptyNotes.replace("{area}", areaLabel)}
+            actionLabel={isAdmin ? tt.business.createFirstNote : undefined}
+            onAction={isAdmin ? () => focusField(noteTitleRef) : undefined}
+          />
         )}
         <ul className="space-y-3">
           {notes.map((n) => (
@@ -196,6 +231,7 @@ export function BusinessPanel() {
         {isAdmin && (
           <div className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
             <Field label={tt.business.noteTitleAria}><input aria-label={tt.business.noteTitleAria}
+              ref={noteTitleRef}
               className={inputCls}
               placeholder={tt.business.noteTitlePlaceholder}
               value={noteTitle}
@@ -217,7 +253,11 @@ export function BusinessPanel() {
 
       <Panel title={tt.business.tasksTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
         {tasks.length === 0 && (
-          <p className="text-sm text-zinc-400">{tt.business.emptyTasks.replace("{area}", areaLabel)}</p>
+          <EmptyState
+            text={tt.business.emptyTasks.replace("{area}", areaLabel)}
+            actionLabel={isAdmin ? tt.business.addFirstTask : undefined}
+            onAction={isAdmin ? () => focusField(taskTitleRef) : undefined}
+          />
         )}
         <ul className="space-y-2">
           {tasks.map((t) => (
@@ -247,6 +287,7 @@ export function BusinessPanel() {
         {isAdmin && (
           <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
             <Field label={tt.business.newTaskAria} className="flex-1"><input aria-label={tt.business.newTaskAria}
+              ref={taskTitleRef}
               className={inputCls}
               placeholder={tt.business.newTaskPlaceholder}
               value={taskTitle}
@@ -288,6 +329,10 @@ export function BusinessPanel() {
         <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{error}</p>
       )}
 
+      {loadError != null && !forbidden && (
+        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{loadError instanceof ApiError ? loadError.message : tt.business.errLoad}</p>
+      )}
+
       {area === "marketing" && (
         <div className="flex flex-wrap gap-2 overflow-x-auto" role="tablist" aria-label={tt.business.subAria}>
           {SUBS.map((s) => (
@@ -311,7 +356,7 @@ export function BusinessPanel() {
       {area === "marketing" && sub === "marketing" && <MarketingPanel me={me} isAdmin={isAdmin} />}
       {area === "marketing" && sub === "portal" && <ClientPortalPanel me={me} isAdmin={isAdmin} />}
       {area === "marketing" && sub === "contenido" && <ContentEnginePanel me={me} isAdmin={isAdmin} />}
-      {area === "marketing" && sub === "bi" && <BusinessIntelligencePanel me={me} isAdmin={isAdmin} />}
+      {area === "marketing" && sub === "bi" && isAdmin && <BusinessIntelligencePanel me={me} isAdmin={isAdmin} />}
       {(area !== "marketing" || sub === "notas") && notesTasksView}
       {!isAdmin && me && (
         <p className="text-xs text-zinc-400">{tt.business.viewerNote}</p>

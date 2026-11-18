@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, Invoice, User
@@ -89,6 +90,8 @@ def list_invoices(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     rows = db.query(Invoice).order_by(Invoice.id.desc()).offset(offset).limit(limit).all()
     return [_inv_out(r) for r in rows]
 

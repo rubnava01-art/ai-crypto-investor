@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type MeResponse } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { useConfirm } from "./ui";
@@ -276,6 +277,9 @@ export function FlujosPanel() {
   const [flows, setFlows] = useState<SavedFlow[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [flowName, setFlowName] = useState("");
+  // Ref al campo del nombre: el EmptyState "Crear tu primer flujo"
+  // arranca un flujo nuevo y enfoca aquí para ponerle nombre.
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -759,6 +763,7 @@ export function FlujosPanel() {
           <label className="min-w-0 flex-1">
             <span className="sr-only">{t.flujos.flowNameAria}</span>
             <input
+              ref={nameInputRef}
               className={inputCls}
               value={flowName}
               onChange={(e) => setFlowName(e.target.value)}
@@ -792,7 +797,19 @@ export function FlujosPanel() {
         {!loaded ? (
           <p className="mt-4 text-sm text-zinc-400">{t.common.loading}</p>
         ) : flows.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-400">{t.flujos.emptyFlows}</p>
+          <EmptyState
+            text={t.flujos.emptyFlows}
+            actionLabel={isAdmin ? t.flujos.createFirstFlow : undefined}
+            onAction={
+              isAdmin
+                ? () => {
+                    newFlow();
+                    nameInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    nameInputRef.current?.focus();
+                  }
+                : undefined
+            }
+          />
         ) : (
           <ul className="mt-4 space-y-2">
             {flows.map((f) => (

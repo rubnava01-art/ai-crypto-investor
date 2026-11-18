@@ -23,6 +23,7 @@ from app.api.portal import (
     BRIEF_FIELDS,
     BriefUpdate,
     brief_out,
+    deny_linked_reader,
     linked_contact_for,
     upsert_brief,
 )
@@ -329,6 +330,11 @@ def list_templates(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    # Las plantillas no tienen contact_id (QA #2 / D-01 bis pendiente:
+    # globales por diseño o por cliente): mientras se decide, el
+    # cliente vinculado no las lee por esta ruta no-portal.
+    deny_linked_reader(db, user)
     rows = (
         db.query(ContentTemplate)
         .order_by(ContentTemplate.id.desc()).offset(offset).limit(limit).all()
@@ -624,10 +630,19 @@ def list_briefs(
         .order_by(Contact.id.asc())
         .offset(offset).limit(limit).all()
     )
-    briefs = {
-        b.contact_id: b
-        for b in db.query(BrandBrief).all()
-    }
+    # S4 (QA #11, 2026-11-17): filtrar los briefs por los contact_id
+    # de la página en vez de cargar todos con .all().
+    page_ids = [c.id for c in contacts]
+    briefs = (
+        {
+            b.contact_id: b
+            for b in db.query(BrandBrief)
+            .filter(BrandBrief.contact_id.in_(page_ids))
+            .all()
+        }
+        if page_ids
+        else {}
+    )
     out = []
     for contact in contacts:
         summary = brief_out(briefs.get(contact.id), contact)

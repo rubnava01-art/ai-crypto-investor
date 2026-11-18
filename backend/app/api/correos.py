@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.rate_limit import correos_limiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
@@ -132,6 +133,8 @@ def list_templates(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     _check_correos_limit(user)
     rows = db.query(EmailTemplate).order_by(EmailTemplate.id.desc()).offset(offset).limit(limit).all()
     return [_tpl_out(r) for r in rows]
@@ -177,6 +180,8 @@ def list_logs(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # S1 (2026-11-17): cliente vinculado -> 403 (ver portal.py).
+    deny_linked_reader(db, user)
     _check_correos_limit(user)
     rows = db.query(EmailLog).order_by(EmailLog.id.desc()).offset(offset).limit(limit).all()
     return [_log_out(r) for r in rows]

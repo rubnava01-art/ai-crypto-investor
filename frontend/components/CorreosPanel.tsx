@@ -7,9 +7,10 @@ import {
   type Invoice, type MeResponse, type ReferralCampaign,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage, type Dictionary } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
-import { ApiErrorBanner, copyTextWithFallback, useConfirm, Field } from "./ui";
+import { ApiErrorBanner, copyTextWithFallback, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-cyan-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60";
@@ -122,6 +123,9 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
     [page],
   );
   const templatesError = templatesLoad.error;
+  // H1 (2026-11-17): cliente vinculado → 403 (S1): estado amable en vez
+  // del banner rojo, sin reintento.
+  const templatesForbidden = isAdminOnlyForbidden(templatesError, isAdmin);
   const [rows, setRows] = useState<EmailTemplate[]>([]);
   const [hasMore, setHasMore] = useState(false);
   // No re-aplicar la misma página dos veces (p. ej. al cambiar `page` con
@@ -219,13 +223,19 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
       )}
 
       <div className="mt-5 border-t border-zinc-800 pt-4">
-        {templatesError ? <ApiErrorBanner error={templatesError} t={tt} onRetry={templatesLoad.reload} /> : null}
+        {templatesForbidden ? (
+          <EmptyState text={tt.reliability.adminOnlySection} />
+        ) : templatesError ? (
+          <ApiErrorBanner error={templatesError} t={tt} onRetry={templatesLoad.reload} />
+        ) : null}
         {loadingFirst && !templatesError ? (
           <ListSkeleton />
         ) : rows.length === 0 ? (
+          templatesForbidden ? null : (
           <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
             <p className="text-sm text-zinc-400">{tt.correos.emptyTemplates}</p>
           </div>
+          )
         ) : (
           <>
           <ul className="space-y-3">
@@ -595,6 +605,9 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
     [refreshKey, page],
   );
   const logsError = logsLoad.error;
+  // H1 (2026-11-17): cliente vinculado → 403 (S1): estado amable en vez
+  // del banner rojo, sin reintento.
+  const logsForbidden = isAdminOnlyForbidden(logsError, isAdmin);
   const [rows, setRows] = useState<EmailLog[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const appliedRef = useRef<EmailLog[] | null>(null);
@@ -655,13 +668,19 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
         {t.correos.logsIntro}
       </p>
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-      {logsError ? <ApiErrorBanner error={logsError} t={t} onRetry={logsLoad.reload} /> : null}
+      {logsForbidden ? (
+        <EmptyState text={t.reliability.adminOnlySection} />
+      ) : logsError ? (
+        <ApiErrorBanner error={logsError} t={t} onRetry={logsLoad.reload} />
+      ) : null}
       {loadingFirst && !logsError ? (
         <ListSkeleton />
       ) : rows.length === 0 ? (
+        logsForbidden ? null : (
         <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
           <p className="text-sm text-zinc-400">{t.correos.emptyLogs}</p>
         </div>
+        )
       ) : (
         <>
         <ul className="space-y-3">

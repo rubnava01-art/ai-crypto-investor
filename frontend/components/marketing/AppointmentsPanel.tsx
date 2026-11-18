@@ -1,4 +1,7 @@
-// Panel de citas (NEST, 2026-11-17): agenda del admin.
+// Panel de citas (NEST, 2026-11-17): agenda del admin + reserva del
+// cliente vinculado (S2). El cliente NO usa /citas (403 fuera del portal,
+// S1): lee por GET /portal/citas y crea por POST /citas con el contacto
+// derivado del token; el formulario le muestra el nombre fijo.
 // Máquina de estados forward-only (patrón ReferidosPanel):
 // pendiente → confirmada → completada; cancelada terminal desde
 // pendiente/confirmada; nunca se reabre completada/cancelada.
@@ -31,7 +34,22 @@ function statusCls(status: AppointmentStatus): string {
   }
 }
 
-export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAdmin: boolean }) {
+export function AppointmentsPanel({
+  me,
+  isAdmin,
+  portalContactId,
+  clientName,
+  allowCreate = true,
+}: {
+  me: MeResponse | null;
+  isAdmin: boolean;
+  /** Vista previa admin en el portal: citas de ese cliente por /portal/citas. */
+  portalContactId?: number;
+  /** Nombre del cliente para el formulario (portal o vista previa). */
+  clientName?: string;
+  /** Portal (vista previa admin): solo lectura; el admin crea desde Marketing. */
+  allowCreate?: boolean;
+}) {
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
   const { confirm, dialog } = useConfirm(t);
@@ -42,15 +60,30 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
   const [msg, setMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // S2: modo portal para el cliente vinculado (y para la vista previa
+  // admin del portal). El endpoint del portal no filtra por estado: el
+  // filtro se aplica en cliente sobre lo cargado.
+  const portalMode = !isAdmin || portalContactId !== undefined;
   const load = useAsyncLoad<Appointment[]>(
-    (signal) =>
-      api.listAppointments(
+    async (signal) => {
+      if (portalMode) return api.listPortalAppointments(portalContactId, { signal });
+      return api.listAppointments(
         statusFilter ? { status: statusFilter as AppointmentStatus } : undefined,
         { signal },
-      ),
-    [statusFilter],
+      );
+    },
+    [statusFilter, portalMode, portalContactId],
   );
-  const appointments = load.data ?? [];
+  const loaded = load.data ?? [];
+  const appointments =
+    portalMode && statusFilter ? loaded.filter((a) => a.status === statusFilter) : loaded;
+
+  // Cliente sin vínculo: /portal/citas responde 403 — no es un error
+  // genérico: se explica que falta el vínculo en vez del banner de error.
+  const notLinked = !isAdmin && load.error instanceof ApiError && load.error.status === 403;
+  // Reservar: admin siempre; cliente vinculado solo cuando su portal
+  // cargó (si dio 403, no está vinculado y no se le ofrece el formulario).
+  const canBook = allowCreate && (isAdmin || load.data != null);
 
   const statusLabel = (s: AppointmentStatus) =>
     s === "pendiente" ? t.citas.statusPendiente
@@ -62,7 +95,9 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
     setMsg(null);
     setActionError(null);
     setEditing(a ?? null);
-    if (!contacts) {
+    // Solo el admin en su agenda carga el CRM; el cliente vinculado no
+    // elige cliente (nombre fijo) y no toca /crm.
+    if (isAdmin && !portalMode && !contacts) {
       try {
         setContacts(await api.listContacts());
       } catch {
@@ -106,7 +141,11 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
           {load.loading ? (
             <p role="status" className="py-4 text-center text-sm text-zinc-400">{t.citas.loadingAppointments}</p>
           ) : load.error ? (
-            <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+            notLinked ? (
+              <p className="py-4 text-center text-sm text-zinc-400">{t.portal.notLinkedBody}</p>
+            ) : (
+              <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+            )
           ) : (
             <AppointmentCalendar appointments={appointments} />
           )}
@@ -122,7 +161,7 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
                 ))}
               </select>
             </Field>
-            {isAdmin && (
+            {canBook && (
               <button
                 type="button"
                 onClick={() => openForm()}
@@ -136,7 +175,11 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
           {load.loading ? (
             <p role="status" className="py-4 text-center text-sm text-zinc-400">{t.citas.loadingAppointments}</p>
           ) : load.error ? (
-            <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+            notLinked ? (
+              <p className="py-4 text-center text-sm text-zinc-400">{t.portal.notLinkedBody}</p>
+            ) : (
+              <ApiErrorBanner error={load.error} t={t} onRetry={load.reload} />
+            )
           ) : upcoming.length === 0 ? (
             <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
               <p className="text-sm text-zinc-400">
@@ -221,18 +264,20 @@ export function AppointmentsPanel({ me, isAdmin }: { me: MeResponse | null; isAd
 
           {msg && <p className="mt-3 text-sm text-emerald-400">{msg}</p>}
           {actionError && <p role="alert" className="mt-3 text-sm text-red-400">{actionError}</p>}
-          {showForm && isAdmin && (
+          {showForm && canBook && (
             <div className="mt-4">
               <AppointmentForm
                 contacts={contacts ?? []}
                 initial={editing}
+                fixedClientName={
+                  portalMode
+                    ? (clientName ?? me?.display_name ?? me?.username ?? appointments[0]?.client_name ?? "")
+                    : undefined
+                }
                 onSaved={(m) => { setMsg(m); setShowForm(false); setEditing(null); load.reload(); }}
                 onCancel={() => { setShowForm(false); setEditing(null); }}
               />
             </div>
-          )}
-          {!isAdmin && me && (
-            <p className="mt-3 text-xs text-zinc-400">{t.business.viewerNote}</p>
           )}
         </Panel>
       </div>

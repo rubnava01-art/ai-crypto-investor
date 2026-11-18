@@ -45,7 +45,7 @@ export type Dictionary = {
   /** Entradas del menú + cadena neutra mientras /me resuelve (corrección
    * QA 2026-11-10 nº 1): `checkingRole` no es una entrada de módulo, por
    * eso va como campo aparte del Record de NavKey. */
-  nav: Record<NavKey, { label: string; hint: string }> & { checkingRole: string };
+  nav: Record<NavKey, { label: string; hint: string }> & { checkingRole: string; menu: string };
   /** Etiquetas de las familias de navegación agrupada (Fase 5, F1). */
   navGroups: Record<string, string>;
   common: {
