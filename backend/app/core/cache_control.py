@@ -19,6 +19,8 @@ personal (public catalogs and lists), it just changes rarely:
 - /api/recomendaciones — recommendations list (admin-curated).
 - /api/videos — educational videos list (admin-curated; only an
   admin edit changes it).
+- /api/correos/templates — email templates (admin-curated; only an
+  admin edit changes them).
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
@@ -37,6 +39,7 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/inicio/posts",
         "/api/recomendaciones",
         "/api/videos",
+        "/api/correos/templates",
     }
 )
 

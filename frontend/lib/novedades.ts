@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-19",
+    title: "Mejoras diarias: caché en Correos, 'Solo stock bajo' en Inventario y filtro en Control de usuarios",
+    body: "Publicado el 19 de noviembre: tres mejoras del día — en Correos, las plantillas ahora se guardan en caché 60 segundos y cargan más rápido; en Inventario, una casilla 'Solo stock bajo' junto al buscador muestra de un vistazo qué artículos necesitan reposición; y en Control de usuarios, un filtro por rol y estado (Todos, Pendientes, Prueba, Administrador, Super admin) para encontrar cuentas más rápido. Solo presentación, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-18",
     title: "Desarrollo de marca: nueva sub-pestaña en Negocio > Marketing con el Test de Marca",
     body: "Publicado el 18 de noviembre: dentro de Negocio, el área de Marketing ahora tiene una sexta sub-pestaña, Desarrollo de marca, con el Test exprés para Brief de Marca como herramienta para analizar la marca de una empresa — se elige un cliente del CRM, se responden las 8 preguntas con su ayuda 'Qué buscamos', se ve el progreso X de 8 y una tarjeta 'Análisis de la marca' con la personalidad, el cliente ideal y los valores. Usa los mismos datos del brief que ya estaba en Content Engine y en el Portal cliente, sin duplicar nada. Trading real sigue apagado y las etiquetas de simulación intactas.",

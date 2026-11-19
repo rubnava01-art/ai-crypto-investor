@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type AdminUser } from "../lib/api";
 import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
@@ -33,6 +33,7 @@ export function UsersPanel() {
           ? t.planes.nameTotal
           : key;
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [roleFilter, setRoleFilter] = useState<"all" | "pending" | "prueba" | "admin" | "super_admin">("all");
   const [meSuper, setMeSuper] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +208,17 @@ export function UsersPanel() {
   // Cuentas pendientes: solo presentación, derivada de la lista ya cargada.
   const pendingCount = (users ?? []).filter((u) => u.status === "pending").length;
 
+  // Filtro por rol o estado (2026-11-19): solo presentación sobre la lista
+  // ya cargada; no cambia permisos ni la carga.
+  const visibleUsers = useMemo(() => {
+    const rows = users ?? [];
+    if (roleFilter === "all") return rows;
+    if (roleFilter === "pending") return rows.filter((u) => u.status === "pending");
+    if (roleFilter === "super_admin") return rows.filter((u) => u.is_super_admin && u.status !== "pending");
+    if (roleFilter === "admin") return rows.filter((u) => u.is_admin && !u.is_super_admin && u.status !== "pending");
+    return rows.filter((u) => !u.is_admin && !u.is_super_admin && u.status !== "pending");
+  }, [users, roleFilter]);
+
   return (
     <>
       {dialog}
@@ -260,8 +272,21 @@ export function UsersPanel() {
           <p className="py-4 text-center text-sm text-zinc-400">{t.usuarios.emptyUsers}</p>
         )
       ) : (
+        <>
+        <Field label={t.usuarios.filterAria}>
+          <select className={inputCls} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)} aria-label={t.usuarios.filterAria}>
+            <option value="all">{t.usuarios.filterAll}</option>
+            <option value="pending">{t.usuarios.filterPending}</option>
+            <option value="prueba">{t.usuarios.filterTrial}</option>
+            <option value="admin">{t.usuarios.filterAdmin}</option>
+            <option value="super_admin">{t.usuarios.filterSuper}</option>
+          </select>
+        </Field>
+        {visibleUsers.length === 0 ? (
+          <p className="py-4 text-center text-sm text-zinc-400">{t.usuarios.noMatch}</p>
+        ) : (
         <ul className="divide-y divide-zinc-800/70">
-          {users.map((u) => (
+          {visibleUsers.map((u) => (
             <li key={u.id} className="py-2.5">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span
@@ -413,6 +438,8 @@ export function UsersPanel() {
             </li>
           ))}
         </ul>
+        )}
+        </>
       )}
 
       <form onSubmit={create} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">

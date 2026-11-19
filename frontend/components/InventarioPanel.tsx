@@ -24,6 +24,7 @@ export function InventarioPanel() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [items, setItems] = useState<InventoryItem[] | null>(null);
   const [filter, setFilter] = useState("");
+  const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sku, setSku] = useState("");
@@ -65,11 +66,13 @@ export function InventarioPanel() {
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!items || !q) return items ?? [];
-    return items.filter((it) =>
-      [it.name, it.sku, it.description].join(" ").toLowerCase().includes(q)
-    );
-  }, [items, filter]);
+    const rows = items ?? [];
+    return rows.filter((it) => {
+      if (onlyLowStock && !it.low_stock) return false;
+      if (!q) return true;
+      return [it.name, it.sku, it.description].join(" ").toLowerCase().includes(q);
+    });
+  }, [items, filter, onlyLowStock]);
 
   const totals = useMemo(() => {
     const rows = items ?? [];
@@ -231,6 +234,15 @@ export function InventarioPanel() {
           onChange={(e) => setFilter(e.target.value)}
           autoComplete="off"
         /></Field>
+        <label className="mt-2 flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={onlyLowStock}
+            onChange={(e) => setOnlyLowStock(e.target.checked)}
+            className="h-4 w-4 accent-emerald-600"
+          />
+          {t.inventario.onlyLowStock}
+        </label>
         {items === null ? (
           <p className="py-2 text-sm text-zinc-400">{t.inventario.loadingItems}</p>
         ) : visible.length === 0 ? (
