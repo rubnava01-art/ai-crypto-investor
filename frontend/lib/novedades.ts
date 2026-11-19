@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-18",
+    title: "Desarrollo de marca: nueva sub-pestaña en Negocio > Marketing con el Test de Marca",
+    body: "Publicado el 18 de noviembre: dentro de Negocio, el área de Marketing ahora tiene una sexta sub-pestaña, Desarrollo de marca, con el Test exprés para Brief de Marca como herramienta para analizar la marca de una empresa — se elige un cliente del CRM, se responden las 8 preguntas con su ayuda 'Qué buscamos', se ve el progreso X de 8 y una tarjeta 'Análisis de la marca' con la personalidad, el cliente ideal y los valores. Usa los mismos datos del brief que ya estaba en Content Engine y en el Portal cliente, sin duplicar nada. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-18",
     title: "Interfaz renovada de Inicio a Negocios: una mejora por segmento, filtros nuevos y portal más seguro",
     body: "Publicado el 18 de noviembre: interfaz renovada en toda la plataforma, una mejora visible por segmento de Inicio a Negocios — en Inicio las novedades del sistema ya no se mezclan con los posts del admin; en Invertir los encabezados son más grandes y claros; en Estudiar la barra es más compacta y los videos educativos cargan más rápido con caché; en Crear el flujo es ahora 1-2-3 clicable; en Negocio las pestañas tienen un color por nivel y el Brief de Marca muestra su estado; las secciones vacías ahora muestran un botón de acción; y la navegación móvil va detrás de un botón Menú. Además, los clientes ya pueden reservar citas desde su portal, Inteligencia de negocio es solo para administradores, y el portal quedó más seguro: un cliente vinculado ya no puede leer datos de otros clientes. Hoy también llegaron filtros por estado en Facturas y Planillas. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

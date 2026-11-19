@@ -28,6 +28,7 @@ export function BrandBriefTab({
   surface,
   previewContactId,
   onBriefStatus,
+  onBrief,
 }: {
   isAdmin: boolean;
   /** "engine": selector admin propio; "portal": el contacto viene del portal. */
@@ -36,6 +37,9 @@ export function BrandBriefTab({
   /** Informa al padre (Content Engine) del brief que se está viendo,
    * para el chip de estado de la pestaña Brief. */
   onBriefStatus?: (status: { answered: number } | null) => void;
+  /** Informa al padre del brief completo en vista (o null), para que
+   * lo muestre como análisis (Desarrollo de marca). */
+  onBrief?: (brief: BrandBrief | null) => void;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -84,10 +88,25 @@ export function BrandBriefTab({
 
   // Chip de estado (M6): el padre muestra "Sin brief" / "X de 8" /
   // "Brief completo" según el brief en vista; sin brief, null.
+  // Desarrollo de marca recibe además el brief completo (onBrief)
+  // para mostrarlo como análisis.
+  // Mientras carga el brief nuevo (o si falla), useAsyncLoad conserva
+  // el dato anterior: se reporta null para no mostrar transitoriamente
+  // el brief del cliente anterior; el padre oculta la tarjeta y el chip
+  // dice "Sin brief" hasta que resuelva.
   useEffect(() => {
-    if (!onBriefStatus) return;
-    onBriefStatus(formBrief ? { answered: formBrief.answered } : null);
-  }, [formBrief, onBriefStatus]);
+    if (briefLoad.loading || briefLoad.error) {
+      if (onBriefStatus) onBriefStatus(null);
+      if (onBrief) onBrief(null);
+      return;
+    }
+    if (onBriefStatus) {
+      onBriefStatus(formBrief ? { answered: formBrief.answered } : null);
+    }
+    if (onBrief) {
+      onBrief(formBrief);
+    }
+  }, [formBrief, briefLoad.loading, briefLoad.error, onBriefStatus, onBrief]);
 
   const save = async (answers: BrandBriefInput): Promise<BrandBrief> => {
     let saved: BrandBrief;
@@ -99,6 +118,11 @@ export function BrandBriefTab({
       saved = await api.savePortalBrief(answers);
     }
     setBrief(saved);
+    // Reporta de inmediato lo guardado: briefLoad.data sigue siendo el
+    // brief anterior y el efecto no se re-dispararía hasta cambiar de
+    // cliente, así que la tarjeta/chip quedarían con los datos viejos.
+    if (onBriefStatus) onBriefStatus({ answered: saved.answered });
+    if (onBrief) onBrief(saved);
     return saved;
   };
 

@@ -1,8 +1,8 @@
 // Business — shell (NEST, 2026-11-17): conserva las pestañas de área y las
 // notas/tareas por área. Cuando el área es Marketing, aparece una segunda
 // fila de sub-pestañas: Notas y tareas (la vista actual, sin cambios) ·
-// Marketing y citas · Portal cliente · Contenido · Inteligencia. Cada
-// sub-sección vive en su propio archivo y se carga con dynamic(); el shell
+// Marketing y citas · Portal cliente · Contenido · Desarrollo de marca ·
+// Inteligencia. Cada sub-sección vive en su propio archivo y se carga con
 // pasa `me`/`isAdmin` por props (un solo /me). Las áreas ventas/legal/
 // administrativo no cambian. Sin entradas nuevas en ModuleNav, sin rutas
 // nuevas en app/.
@@ -45,11 +45,15 @@ const BusinessIntelligencePanel = dynamic(
   () => import("./bi/BusinessIntelligencePanel").then((m) => m.BusinessIntelligencePanel),
   { loading: () => <PanelLoading /> },
 );
+const BrandDevelopmentPanel = dynamic(
+  () => import("./marketing/BrandDevelopmentPanel").then((m) => m.BrandDevelopmentPanel),
+  { loading: () => <PanelLoading /> },
+);
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
 
-type MarketingSub = "notas" | "marketing" | "portal" | "contenido" | "bi";
+type MarketingSub = "notas" | "marketing" | "portal" | "contenido" | "desarrollo" | "bi";
 
 export function BusinessPanel() {
   const isCancelled = useCancelled();
@@ -172,6 +176,7 @@ export function BusinessPanel() {
     { value: "marketing", label: tt.business.subMarketing },
     { value: "portal", label: tt.business.subPortal },
     { value: "contenido", label: tt.business.subContenido },
+    { value: "desarrollo", label: tt.business.subDesarrollo },
     // Inteligencia (S3): solo admin — sus endpoints son require_admin y
     // el panel ni se monta para no-admin.
     ...(isAdmin ? [{ value: "bi" as MarketingSub, label: tt.business.subBi }] : []),
@@ -356,6 +361,7 @@ export function BusinessPanel() {
       {area === "marketing" && sub === "marketing" && <MarketingPanel me={me} isAdmin={isAdmin} />}
       {area === "marketing" && sub === "portal" && <ClientPortalPanel me={me} isAdmin={isAdmin} />}
       {area === "marketing" && sub === "contenido" && <ContentEnginePanel me={me} isAdmin={isAdmin} />}
+      {area === "marketing" && sub === "desarrollo" && <BrandDevelopmentPanel me={me} isAdmin={isAdmin} />}
       {area === "marketing" && sub === "bi" && isAdmin && <BusinessIntelligencePanel me={me} isAdmin={isAdmin} />}
       {(area !== "marketing" || sub === "notas") && notesTasksView}
       {!isAdmin && me && (
