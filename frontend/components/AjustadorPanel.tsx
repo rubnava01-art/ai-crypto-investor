@@ -63,28 +63,31 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * entrada nueva (perfil) en [0] — y con la entrada NEST del 2026-11-17
  * antepuesta: todos los índices +1 y la entrada nueva (business) en [0] — y con
  * la entrada de Brief de Marca del 2026-11-17 antepuesta: todos los índices +1
- * y la entrada nueva (business) en [0, 1] junto a la NEST. */
+ * y la entrada nueva (business) en [0, 1] junto a la NEST — y con las
+ * entradas de mejoras diarias del 2026-11-20 y 2026-11-21 antepuestas:
+ * todos los índices +2, la entrada del 2026-11-20 (business, riesgos,
+ * crm) en [1] y la del 2026-11-21 (crear, talento, usuarios) en [0]. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [1, 2, 3, 4],
-  planes: [14],
-  terminal: [15],
-  flujos: [8, 15],
-  analizador: [15],
-  auditor: [15, 18],
-  ajustador: [25],
-  crear: [2, 17],
-  estudiar: [2, 6, 13, 15, 23, 25, 28, 29],
-  inicio: [2, 15, 26, 34],
-  perfil: [5, 27],
-  talento: [6, 30],
-  riesgos: [30],
-  planillas: [2, 30],
-  crm: [30],
-  analisis: [30],
-  invertir: [2, 7, 11, 12, 16, 31, 33],
-  usuarios: [0, 9, 33, 34],
-  espacio: [34],
-  facturas: [2],
+  business: [1, 3, 4, 5, 6],
+  planes: [16],
+  terminal: [17],
+  flujos: [10, 17],
+  analizador: [17],
+  auditor: [17, 20],
+  ajustador: [27],
+  crear: [0, 4, 19],
+  estudiar: [4, 8, 15, 17, 25, 27, 30, 31],
+  inicio: [4, 17, 28, 36],
+  perfil: [7, 29],
+  talento: [0, 8, 32],
+  riesgos: [1, 32],
+  planillas: [4, 32],
+  crm: [1, 32],
+  analisis: [32],
+  invertir: [4, 9, 13, 14, 18, 33, 35],
+  usuarios: [0, 2, 11, 35, 36],
+  espacio: [36],
+  facturas: [4],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

@@ -34,6 +34,10 @@ export function UsersPanel() {
           : key;
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [roleFilter, setRoleFilter] = useState<"all" | "pending" | "prueba" | "admin" | "super_admin">("all");
+  // Búsqueda por nombre de usuario (2026-11-21): el filtro por rol ya
+  // existía, pero con muchos usuarios no había forma de encontrar uno
+  // por su nombre. Solo presentación sobre la lista ya cargada.
+  const [query, setQuery] = useState("");
   const [meSuper, setMeSuper] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -212,12 +216,15 @@ export function UsersPanel() {
   // ya cargada; no cambia permisos ni la carga.
   const visibleUsers = useMemo(() => {
     const rows = users ?? [];
-    if (roleFilter === "all") return rows;
-    if (roleFilter === "pending") return rows.filter((u) => u.status === "pending");
-    if (roleFilter === "super_admin") return rows.filter((u) => u.is_super_admin && u.status !== "pending");
-    if (roleFilter === "admin") return rows.filter((u) => u.is_admin && !u.is_super_admin && u.status !== "pending");
-    return rows.filter((u) => !u.is_admin && !u.is_super_admin && u.status !== "pending");
-  }, [users, roleFilter]);
+    let filtered = rows;
+    if (roleFilter === "pending") filtered = rows.filter((u) => u.status === "pending");
+    else if (roleFilter === "super_admin") filtered = rows.filter((u) => u.is_super_admin && u.status !== "pending");
+    else if (roleFilter === "admin") filtered = rows.filter((u) => u.is_admin && !u.is_super_admin && u.status !== "pending");
+    else if (roleFilter === "prueba") filtered = rows.filter((u) => !u.is_admin && !u.is_super_admin && u.status !== "pending");
+    const q = query.trim().toLowerCase();
+    if (!q) return filtered;
+    return filtered.filter((u) => u.username.toLowerCase().includes(q));
+  }, [users, roleFilter, query]);
 
   return (
     <>
@@ -273,6 +280,10 @@ export function UsersPanel() {
         )
       ) : (
         <>
+        <Field label={t.usuarios.searchAria}>
+          <input className={inputCls} placeholder={t.usuarios.searchPlaceholder} value={query}
+            onChange={(e) => setQuery(e.target.value)} aria-label={t.usuarios.searchAria} />
+        </Field>
         <Field label={t.usuarios.filterAria}>
           <select className={inputCls} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)} aria-label={t.usuarios.filterAria}>
             <option value="all">{t.usuarios.filterAll}</option>

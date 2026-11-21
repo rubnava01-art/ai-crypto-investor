@@ -24,6 +24,7 @@ export function RiesgosPanel() {
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("");
+  const [probFilter, setProbFilter] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [riesgo, setRiesgo] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -63,6 +64,7 @@ export function RiesgosPanel() {
   const visible = (rows ?? []).filter((r) => {
     const q = query.trim().toLowerCase();
     if (estadoFilter && r.estado !== estadoFilter) return false;
+    if (probFilter && r.probabilidad !== probFilter) return false;
     if (!q) return true;
     return [r.riesgo, r.descripcion, r.responsable].join(" ").toLowerCase().includes(q);
   });
@@ -142,7 +144,7 @@ export function RiesgosPanel() {
         <p className="mb-4 text-sm leading-relaxed text-zinc-400">
           {t.riesgos.intro} {isAdmin ? t.riesgos.introAdmin : t.riesgos.introViewer}
         </p>
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px_200px]">
           <Field label={t.riesgos.searchAria}>
             <input className={inputCls} placeholder={t.riesgos.searchPlaceholder} value={query}
               onChange={(e) => setQuery(e.target.value)} aria-label={t.riesgos.searchAria} />
@@ -154,6 +156,14 @@ export function RiesgosPanel() {
               <option value="en_curso">{t.riesgos.estadoEnCurso}</option>
               <option value="mitigado">{t.riesgos.estadoMitigado}</option>
               <option value="cerrado">{t.riesgos.estadoCerrado}</option>
+            </select>
+          </Field>
+          <Field label={t.riesgos.filterProbAria}>
+            <select className={inputCls} value={probFilter} onChange={(e) => setProbFilter(e.target.value)} aria-label={t.riesgos.filterProbAria}>
+              <option value="">{t.riesgos.allProbs}</option>
+              <option value="alta">{t.riesgos.probAlta}</option>
+              <option value="media">{t.riesgos.probMedia}</option>
+              <option value="baja">{t.riesgos.probBaja}</option>
             </select>
           </Field>
         </div>

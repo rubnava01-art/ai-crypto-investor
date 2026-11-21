@@ -21,6 +21,10 @@ personal (public catalogs and lists), it just changes rarely:
   admin edit changes it).
 - /api/correos/templates — email templates (admin-curated; only an
   admin edit changes them).
+- /api/business/marketing/contenido/plantillas — content templates
+  (admin-curated; only an admin edit changes them).
+- /api/crear/trends — trend notes (admin-curated; only an admin
+  create/delete changes them).
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
@@ -40,6 +44,8 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/recomendaciones",
         "/api/videos",
         "/api/correos/templates",
+        "/api/business/marketing/contenido/plantillas",
+        "/api/crear/trends",
     }
 )
 

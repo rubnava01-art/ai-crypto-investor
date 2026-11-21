@@ -99,6 +99,17 @@ export function CrmPanel() {
   const [contacts, setContacts] = useState<CrmContact[] | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+
+  // Filtro por etiqueta (2026-11-20): en cliente sobre la página cargada
+  // (la búsqueda y el estado ya filtran en el servidor); las etiquetas
+  // disponibles salen de los contactos cargados.
+  const allTags = Array.from(
+    new Set((contacts ?? []).flatMap((c) => c.tags)),
+  ).sort((a, b) => a.localeCompare(b));
+  const visible = (contacts ?? []).filter(
+    (c) => !tagFilter || c.tags.includes(tagFilter),
+  );
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -212,7 +223,7 @@ export function CrmPanel() {
       title={t.crm.panelTitle}
       badge={
         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-          {contacts === null ? (forbidden ? "—" : t.crm.badgeLoading) : `${contacts.length} ${contacts.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
+          {contacts === null ? (forbidden ? "—" : t.crm.badgeLoading) : `${visible.length} ${visible.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
         </span>
       }
     >
@@ -225,7 +236,7 @@ export function CrmPanel() {
         vinculado (cada tecla re-dispararía el 403); se ocultan con el
         estado amable. */}
       {!forbidden && (
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_220px]">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px_200px]">
         <Field label={t.crm.searchAria}><input
           className={inputCls}
           placeholder={t.crm.searchPlaceholder}
@@ -244,6 +255,19 @@ export function CrmPanel() {
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select></Field>
+        {allTags.length > 0 && (
+        <Field label={t.crm.filterTagAria}><select
+          className={inputCls}
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          aria-label={t.crm.filterTagAria}
+        >
+          <option value="">{t.crm.allTags}</option>
+          {allTags.map((tg) => (
+            <option key={tg} value={tg}>{tg}</option>
+          ))}
+        </select></Field>
+        )}
       </div>
       )}
 
@@ -257,16 +281,16 @@ export function CrmPanel() {
         loadError ? null : (
           <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>
         )
-      ) : contacts.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p className="py-4 text-center text-sm text-zinc-400">
-          {t.crm.emptyContacts}{query || statusFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.
+          {t.crm.emptyContacts}{query || statusFilter || tagFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.
         </p>
       ) : (
         <>
         {/* Tarjetas apiladas en teléfono (F7): la tabla, con 6 columnas y
           scroll horizontal, dejaba nombre y acciones fuera de pantalla. */}
         <ul className="space-y-3 sm:hidden">
-          {contacts.map((c) => (
+          {visible.map((c) => (
             <li key={c.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold text-zinc-100">{c.name}</p>
@@ -317,7 +341,7 @@ export function CrmPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/70">
-              {contacts.map((c) => (
+              {visible.map((c) => (
                 <tr key={c.id} className="align-top hover:bg-zinc-900/40">
                   <td className="py-3 pr-3">
                     <span className="font-semibold text-zinc-100">{c.name}</span>

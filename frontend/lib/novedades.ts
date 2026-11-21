@@ -26,6 +26,16 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-21",
+    title: "Mejoras diarias: tendencias en caché, contador filtrado en Talento y búsqueda en Control de usuarios",
+    body: "Publicado el 21 de noviembre: tres mejoras del día — en velocidad, las notas de tendencias de Crear ahora se guardan en caché 60 segundos y cargan más rápido al navegar; en Talento humano, el contador muestra cuántos empleados coinciden con la búsqueda o el filtro (visibles / total) y el mensaje de vacío distingue entre no tener empleados y no haber coincidencias; y en Control de usuarios, una búsqueda por nombre de usuario junto al filtro por rol para encontrar cuentas más rápido. Solo presentación y filtros, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-20",
+    title: "Mejoras diarias: filtro por probabilidad en Riesgos, filtro por etiqueta en Clientes y caché en plantillas de contenido",
+    body: "Publicado el 20 de noviembre: tres mejoras del día — en Gestión de Riesgos, un filtro por probabilidad (Alta, Media, Baja) junto al de estado para encontrar riesgos más rápido; en Gestor de Clientes, un filtro por etiqueta con las etiquetas ya registradas; y en velocidad, las plantillas de contenido ahora se guardan en caché 60 segundos y cargan más rápido. Solo presentación y filtros, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-19",
     title: "Mejoras diarias: caché en Correos, 'Solo stock bajo' en Inventario y filtro en Control de usuarios",
     body: "Publicado el 19 de noviembre: tres mejoras del día — en Correos, las plantillas ahora se guardan en caché 60 segundos y cargan más rápido; en Inventario, una casilla 'Solo stock bajo' junto al buscador muestra de un vistazo qué artículos necesitan reposición; y en Control de usuarios, un filtro por rol y estado (Todos, Pendientes, Prueba, Administrador, Super admin) para encontrar cuentas más rápido. Solo presentación, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",

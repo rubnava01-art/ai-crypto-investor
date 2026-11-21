@@ -61,6 +61,10 @@ export function TalentoPanel() {
     if (!q) return true;
     return [r.nombre, r.puesto, r.contacto].join(" ").toLowerCase().includes(q);
   });
+  // Conteo filtrado (2026-11-21): con búsqueda o filtro activo el badge
+  // muestra "visibles / total", mismo patrón que Facturas; sin filtro,
+  // solo el total como antes.
+  const filtering = query.trim() !== "" || estadoFilter !== "todos";
 
   const resetForm = () => {
     setEditingId(null);
@@ -135,7 +139,7 @@ export function TalentoPanel() {
         title={t.talento.panelTitle}
         badge={
           <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {rows === null ? t.talento.loading : `${rows.length}`}
+            {rows === null ? t.talento.loading : filtering ? `${visible.length} / ${rows.length}` : `${rows.length}`}
           </span>
         }
       >
@@ -165,7 +169,7 @@ export function TalentoPanel() {
         {rows === null ? (
           loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.talento.loading}</p>
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{t.talento.empty}</p>
+          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.talento.emptyFiltered : t.talento.empty}</p>
         ) : (
           <>
             <ul className="space-y-3 sm:hidden">
