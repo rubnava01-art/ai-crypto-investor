@@ -122,8 +122,10 @@ class ExchangeConnection(Base):
 
     __tablename__ = "exchange_connections"
 
+    # Conexiones propias del usuario: se borran con él (CASCADE). Las
+    # claves reales nunca se guardan aquí (solo metadatos).
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     exchange: Mapped[str] = mapped_column(String(32), nullable=False)  # coinbase|kraken
     label: Mapped[str] = mapped_column(String(64), nullable=False)
     permissions: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
@@ -308,7 +310,12 @@ class AuditLog(Base):
     __table_args__ = (Index("ix_audit_logs_user_id", "user_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # Actor que hizo la acción. SET NULL al borrar al usuario (bug
+    # 2026-11-21: sin ondelete, borrar un usuario con acciones
+    # auditadas devolvía 409 en Postgres): la fila de historial se
+    # conserva, solo se anonimiza el actor. Nunca se borran filas
+    # de auditoría al borrar un usuario.
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     entity: Mapped[str] = mapped_column(String(64), nullable=True)
     entity_id: Mapped[str] = mapped_column(String(64), nullable=True)
@@ -368,7 +375,7 @@ class IdempotencyKey(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(String(128), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     route: Mapped[str] = mapped_column(String(128), nullable=False)
     response_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
@@ -387,7 +394,7 @@ class AIExplanation(Base):
     signal_id: Mapped[int | None] = mapped_column(
         ForeignKey("signals.id"), nullable=True
     )
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     question_excerpt: Mapped[str] = mapped_column(Text, default="", nullable=False)
     answer_excerpt: Mapped[str] = mapped_column(Text, default="", nullable=False)
     confidence: Mapped[Decimal | None] = mapped_column(
@@ -442,7 +449,7 @@ class Contact(Base):
     # un lead normal. Backfill NULL: el admin liga a mano, nunca se
     # empareja por email. Llega por migración Alembic.
     user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True, unique=True, index=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, unique=True, index=True
     )
     source: Mapped[str] = mapped_column(
         String(32), default="manual", nullable=False
@@ -858,7 +865,7 @@ class ChatMessage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     author_username: Mapped[str] = mapped_column(String(64), nullable=False)
     author_label: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -953,7 +960,7 @@ class TrendSearch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     keyword: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
@@ -975,7 +982,7 @@ class WebAudit(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     final_url: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -1278,7 +1285,7 @@ class Appointment(Base):
     )  # pendiente|confirmada|completada|cancelada
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_by_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -1464,7 +1471,7 @@ class BusinessCost(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_by_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

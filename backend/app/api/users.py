@@ -31,7 +31,21 @@ from app.core.security import (
     revoke_user_tokens,
 )
 from app.database import get_db
-from app.models.tables import PendingActivation, SuperAdminGrant, User
+from app.models.tables import (
+    AIExplanation,
+    Appointment,
+    AuditLog,
+    BusinessCost,
+    ChatMessage,
+    Contact,
+    ExchangeConnection,
+    IdempotencyKey,
+    PendingActivation,
+    SuperAdminGrant,
+    TrendSearch,
+    User,
+    WebAudit,
+)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -125,6 +139,51 @@ def _set_super(db: Session, user: User, grant: bool) -> None:
         db.add(SuperAdminGrant(user_id=user.id))
     elif not grant and row is not None:
         db.delete(row)
+
+
+def _detach_user_references(db: Session, user: User) -> None:
+    """Desvincula al usuario de todas las tablas que lo referencian
+    (bug de borrado, 2026-11-21): sin esto, DELETE /api/users/{id}
+    devolvía 409 en Postgres para cualquier usuario con acciones
+    auditadas — AuditLog.user_id (y las demás FK a users sin ondelete)
+    bloquea el borrado. El historial se PRESERVA: las filas quedan con
+    user_id NULL (actor anónimo), nunca se borran filas de auditoría
+    ni de contenido ajenas; solo se borran las conexiones de exchange,
+    que son metadatos propios del usuario. Las FK del modelo llevan el
+    mismo ondelete, pero esta limpieza explícita hace que el borrado
+    funcione en cualquier BD (SQLite no aplica las cascadas de la BD)
+    y en BD creadas antes de la migración Alembic."""
+    db.query(AuditLog).filter(AuditLog.user_id == user.id).update(
+        {AuditLog.user_id: None}
+    )
+    db.query(IdempotencyKey).filter(IdempotencyKey.user_id == user.id).update(
+        {IdempotencyKey.user_id: None}
+    )
+    db.query(AIExplanation).filter(AIExplanation.user_id == user.id).update(
+        {AIExplanation.user_id: None}
+    )
+    db.query(Contact).filter(Contact.user_id == user.id).update(
+        {Contact.user_id: None}
+    )
+    db.query(ChatMessage).filter(ChatMessage.user_id == user.id).update(
+        {ChatMessage.user_id: None}
+    )
+    db.query(TrendSearch).filter(TrendSearch.user_id == user.id).update(
+        {TrendSearch.user_id: None}
+    )
+    db.query(WebAudit).filter(WebAudit.user_id == user.id).update(
+        {WebAudit.user_id: None}
+    )
+    db.query(Appointment).filter(
+        Appointment.created_by_user_id == user.id
+    ).update({Appointment.created_by_user_id: None})
+    db.query(BusinessCost).filter(
+        BusinessCost.created_by_user_id == user.id
+    ).update({BusinessCost.created_by_user_id: None})
+    # Conexiones de exchange: metadatos propios del usuario, se borran.
+    db.query(ExchangeConnection).filter(
+        ExchangeConnection.user_id == user.id
+    ).delete(synchronize_session=False)
 
 
 def _role_to_admin(role: str) -> bool:
@@ -349,6 +408,7 @@ def reject_user(
     # Auditoría ANTES de borrar (después ya no hay fila que referenciar).
     audit(db, admin, "users.reject", "user", str(user.id),
           details={"username": user.username})
+    _detach_user_references(db, user)
     db.delete(row)
     db.delete(user)
     db.commit()
@@ -380,6 +440,7 @@ def delete_user(
     # Auditoría ANTES de borrar (después ya no hay fila que referenciar).
     audit(db, admin, "users.delete", "user", str(user.id),
           details={"username": user.username})
+    _detach_user_references(db, user)
     _set_super(db, user, False)  # explicit: SQLite may not enforce the FK cascade
     pending = (
         db.query(PendingActivation)
