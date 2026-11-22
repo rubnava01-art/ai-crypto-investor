@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api, ApiError,
   type EduClass, type EduClassKind, type MeResponse,
@@ -69,6 +69,20 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
   const [showForm, setShowForm] = useState(false);
   // E8: borrar con estado por fila (doble clic ya no dispara dos borrados).
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  // Búsqueda por título/descripción (2026-11-22): mismo patrón que
+  // VideosPanel — solo filtra en cliente, sin cambios de endpoints ni
+  // de datos. Clases no tenía búsqueda; con la lista creciendo, el
+  // título ya no basta para encontrar una clase.
+  const [search, setSearch] = useState("");
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows ?? [];
+    return (rows ?? []).filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+    );
+  }, [rows, search]);
 
   const isLive = kind === "envivo";
   // E8: aviso de fecha pasada (no bloquea el guardado, solo avisa).
@@ -190,6 +204,20 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
         </button>
       )}
 
+      {rows !== null && rows.length > 0 && (
+        <div data-no-swipe className="mb-3">
+          <input
+            aria-label={t.clases.searchAria}
+            className={inputCls}
+            placeholder={t.clases.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            maxLength={200}
+            autoComplete="off"
+          />
+        </div>
+      )}
+
       <div className="border-t border-zinc-800 pt-3">
         {loadError ? (
           <ApiErrorBanner error={loadError} t={t} onRetry={load} />
@@ -201,9 +229,11 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
               ? t.clases.emptyLive
               : t.clases.emptyRecorded}
           </p>
+        ) : visible.length === 0 ? (
+          <p className="py-2 text-sm text-zinc-400">{t.clases.noResults}</p>
         ) : (
           <ul className="divide-y divide-zinc-800/70">
-            {rows.map((c) => (
+            {visible.map((c) => (
               <li key={c.id} className="py-3">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="text-sm font-semibold text-zinc-100">{c.title}</span>

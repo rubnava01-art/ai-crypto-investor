@@ -74,6 +74,11 @@ export function PlanillasPanel() {
     });
   }, [rows, periodoFilter, estadoFilter]);
 
+  // Contador filtrado (2026-11-22): mismo patrón que Talento (ayer).
+  // Con periodo o estado activo el badge muestra "visibles / total";
+  // sin filtro sigue mostrando solo el total.
+  const filtering = periodoFilter.trim() !== "" || estadoFilter !== "";
+
   const totals = useMemo(() => {
     const list = rows ?? [];
     return {
@@ -159,7 +164,7 @@ export function PlanillasPanel() {
         title={t.planillas.panelTitle}
         badge={
           <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {rows === null ? t.planillas.loading : `${rows.length}`}
+            {rows === null ? t.planillas.loading : filtering ? `${visible.length} / ${rows.length}` : `${rows.length}`}
           </span>
         }
       >
@@ -197,7 +202,7 @@ export function PlanillasPanel() {
         {rows === null ? (
           loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.planillas.loading}</p>
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{t.planillas.empty}</p>
+          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.planillas.emptyFiltered : t.planillas.empty}</p>
         ) : (
           <ul className="space-y-3">
             {visible.map((r) => (

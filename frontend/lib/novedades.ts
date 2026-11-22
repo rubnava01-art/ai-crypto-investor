@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-22",
+    title: "Mejoras diarias: búsqueda en Clases, contador filtrado en Planillas y caché en Facturas",
+    body: "Publicado el 22 de noviembre: tres mejoras del día — en Estudiar, las clases (grabadas y en vivo) ya se pueden buscar por título o descripción, como ya se hacía con los videos, y el mensaje de vacío distingue entre no tener clases y no haber coincidencias; en Planillas, el contador muestra cuántas planillas coinciden con el periodo o el estado (visibles / total) y el mensaje de vacío distingue entre no tener planillas y no haber coincidencias; y en velocidad, la lista de facturas guardadas ahora se guarda en caché 60 segundos y carga más rápido al navegar, con invalidación inmediata al crear, cambiar estado o borrar. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-21",
     title: "Claves y usuarios: cambio de clave arreglado, cambio propio en Mi perfil y renombrar usuarios",
     body: "Publicado el 21 de noviembre: el cambio de clave en Control de usuarios fallaba — el formulario aceptaba claves de 4 caracteres pero el sistema exige 12, así que ahora pide 12 desde el principio y avisa claro si la clave es corta. Además, cada usuario ya puede cambiar su propia clave desde Mi perfil con su clave actual, el admin puede corregir el nombre de un usuario, y si te cambias tu propia clave o tu propio nombre, la sesión se cierra y vuelves a entrar con el dato nuevo. Todo con pruebas nuevas (463 en verde). Trading real sigue apagado y las etiquetas de simulación intactas.",

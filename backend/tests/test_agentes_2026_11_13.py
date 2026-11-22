@@ -238,6 +238,7 @@ def test_cache_control_on_static_gets(client, admin_headers):
         "/api/correos/templates",
         "/api/business/marketing/contenido/plantillas",
         "/api/crear/trends",
+        "/api/facturas/invoices",
     ):
         r = client.get(path, headers=admin_headers)
         assert r.status_code == 200, (path, r.text)

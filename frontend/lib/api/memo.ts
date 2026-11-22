@@ -9,10 +9,13 @@
 // de peticiones en vuelo) a esos dos listados.
 //
 // Solo para lecturas de catálogo: nunca se memoizan datos por usuario
-// ni mutables (CRM, facturas, inventario, perfil, /me ya tiene su
-// propio memo). Los errores NO se guardan: un fallo deja la entrada
-// libre para reintentar. Cada mutación (crear/editar/borrar curso o
-// clase) invalida su prefijo, así que la lista tras guardar nunca
+// ni mutables (CRM, inventario, perfil, /me ya tiene su propio memo).
+// Excepción desde 2026-11-22: la lista de facturas guardadas — lista
+// compartida gestionada solo por el admin, la misma para todos los
+// lectores, y sus tres mutaciones (crear/cambiar estado/borrar)
+// invalidan el prefijo en lib/api/facturas.ts. Los errores NO se
+// guardan: un fallo deja la entrada libre para reintentar. Cada
+// mutación (crear/editar/borrar curso o clase) invalida su prefijo, así que la lista tras guardar nunca
 // muestra datos viejos más de lo que tarda el refetch.
 export interface CatalogMemo {
   get<T>(key: string, fetcher: () => Promise<T>): Promise<T>;

@@ -8,8 +8,10 @@ directive from this middleware (the client already sends
 
 Why `private`: these responses are served to an authenticated user,
 so they must never sit in a shared cache — only the user's own
-browser/proxy may reuse them for 60 s. The data itself is not
-personal (public catalogs and lists), it just changes rarely:
+browser/proxy may reuse them for 60 s. The lists are the same for
+every reader (not per-user data), they just change rarely — the
+invoices list carries client names/contact details, so `private`
+(rather than a shared cache) is what keeps that safe.
 
 - /api/academy/courses — academia catalog (seeded; only an admin edit
   changes it).
@@ -25,11 +27,18 @@ personal (public catalogs and lists), it just changes rarely:
   (admin-curated; only an admin edit changes them).
 - /api/crear/trends — trend notes (admin-curated; only an admin
   create/delete changes them).
+- /api/facturas/invoices — saved invoices list (2026-11-22; shared
+  admin-managed list, the same rows for every reader — only linked
+  readers are denied outright — and every in-app mutation
+  create/status-change/delete invalidates the client memo, so the
+  list after saving never shows stale rows; another admin's change
+  in another tab can take up to 60 s to appear, the same trade-off
+  already accepted for templates/trends).
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
 server-side TTL + stale flag), any POST/PATCH/DELETE, and any
-per-user or mutable read (CRM, correos, facturas, perfil, users).
+per-user or mutable read (CRM, correos, perfil, users).
 """
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -46,6 +55,7 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/correos/templates",
         "/api/business/marketing/contenido/plantillas",
         "/api/crear/trends",
+        "/api/facturas/invoices",
     }
 )
 
