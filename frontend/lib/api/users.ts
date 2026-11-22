@@ -10,8 +10,20 @@ export const usersApi = {
       auth: true,
       body: { username, password, role },
     }),
-  updateUser: (id: number, patch: { role?: "admin" | "prueba" | "super_admin"; password?: string }) =>
+  updateUser: (
+    id: number,
+    patch: { username?: string; role?: "admin" | "prueba" | "super_admin"; password?: string },
+  ) =>
     request<AdminUser>(`/api/users/${id}`, { method: "PATCH", auth: true, body: patch }),
+  // Cambio de clave propio (2026-11-21): el usuario conoce su clave
+  // actual; el backend revoca la sesión, así que tras el éxito hay que
+  // volver a entrar con la clave nueva.
+  changeMyPassword: (current_password: string, new_password: string) =>
+    request<{ ok: boolean }>("/api/auth/change-password", {
+      method: "POST",
+      auth: true,
+      body: { current_password, new_password },
+    }),
   registerChallenge: () => request<RegisterChallenge>("/api/auth/register-challenge"),
   register: (body: { username: string; password: string; challenge_id: string; answer: number; plan?: string }) =>
     request<AdminUser>("/api/auth/register", { method: "POST", body }),

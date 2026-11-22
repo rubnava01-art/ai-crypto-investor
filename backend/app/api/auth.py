@@ -37,6 +37,7 @@ from app.core.security import (
     get_current_user,
     hash_password,
     is_super_admin,
+    revoke_user_tokens,
     verify_password,
 )
 from app.database import get_db
@@ -182,6 +183,48 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
         "is_super_admin": super_flag,
         "role": effective_role(user, db, super_flag=super_flag),
     }
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def _password_bytes(cls, v: str) -> str:
+        return _password_byte_cap(v)
+
+
+@router.post("/change-password")
+def change_password(
+    payload: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cambio de clave propio (2026-11-21): cualquier usuario con sesión
+    puede cambiar SU clave conociendo la actual. Antes no existía esta
+    ruta: la única forma era que un admin la cambiara desde Control de
+    usuarios, y el formulario de ahí aceptaba 4 caracteres mientras el
+    backend exige 12 — por eso "no funcionaba cambiar claves".
+    La clave nueva revoca todos los tokens (incluida esta sesión): el
+    cliente debe volver a entrar con la clave nueva."""
+    if not verify_password(payload.current_password, user.password_hash):
+        audit(db, user, "auth.change_password_failed", "auth",
+              details={"reason": "current_password"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="La contraseña actual no es correcta.",
+        )
+    if payload.new_password == payload.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La clave nueva debe ser distinta de la actual.",
+        )
+    user.password_hash = hash_password(payload.new_password)
+    revoke_user_tokens(user)
+    db.commit()
+    audit(db, user, "auth.change_password", "auth")
+    return {"ok": True}
 
 
 @router.get("/register-challenge")

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { api, ApiError, type ReferralCampaign, type UserProfile } from "../lib/api";
+import { api, ApiError, setToken, type ReferralCampaign, type UserProfile } from "../lib/api";
 import { Panel } from "./Panel";
 import { ProfileEditor } from "./ProfileMenu";
 import { useLanguage } from "../lib/i18n";
@@ -246,6 +246,16 @@ export function PerfilPanel() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [stats, setStats] = useState<{ contacts?: number; clients?: number; referrals?: number }>({});
   const [activeCampaign, setActiveCampaign] = useState<ReferralCampaign | null>(null);
+  // Cambiar mi clave (2026-11-21): antes no existía forma de que un
+  // usuario cambiara su propia clave; solo el admin podía hacerlo desde
+  // Control de usuarios. Requiere la clave actual; al guardar, el
+  // backend revoca la sesión y hay que volver a entrar.
+  const [cpCurrent, setCpCurrent] = useState("");
+  const [cpNew, setCpNew] = useState("");
+  const [cpConfirm, setCpConfirm] = useState("");
+  const [cpMsg, setCpMsg] = useState<string | null>(null);
+  const [cpError, setCpError] = useState<string | null>(null);
+  const [cpBusy, setCpBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -384,6 +394,42 @@ export function PerfilPanel() {
     iso
       ? new Date(iso).toLocaleDateString(lang === "en" ? "en-US" : "es-MX", { day: "numeric", month: "long", year: "numeric" })
       : t.perfil.notRegistered;
+
+  const changeMyPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCpMsg(null);
+    setCpError(null);
+    if (cpNew.trim().length < 12) {
+      setCpError(t.perfil.errPwShort);
+      return;
+    }
+    if (cpNew !== cpConfirm) {
+      setCpError(t.perfil.errPwMismatch);
+      return;
+    }
+    setCpBusy(true);
+    try {
+      await api.changeMyPassword(cpCurrent, cpNew);
+      setCpCurrent("");
+      setCpNew("");
+      setCpConfirm("");
+      setCpMsg(t.perfil.msgPwChanged);
+      window.setTimeout(() => {
+        setToken(null);
+        window.location.replace("/login");
+      }, 3000);
+    } catch (err) {
+      setCpError(
+        err instanceof ApiError && err.status === 401
+          ? t.perfil.errPwCurrent
+          : err instanceof ApiError
+            ? err.message
+            : t.perfil.errChangePw,
+      );
+    } finally {
+      setCpBusy(false);
+    }
+  };
 
   const badge =
     profile?.role === "super_admin" ? (
@@ -604,6 +650,61 @@ export function PerfilPanel() {
               </dd>
             </div>
           </dl>
+
+          <form onSubmit={changeMyPassword} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
+            <h3 className="text-base font-bold text-zinc-100">{t.perfil.changePwTitle}</h3>
+            <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.changePwHint}</p>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.currentPwAria}</span>
+              <input
+                aria-label={t.perfil.currentPwAria}
+                className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                placeholder={t.perfil.currentPwPlaceholder}
+                type="password"
+                value={cpCurrent}
+                onChange={(e) => setCpCurrent(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.newPwAria}</span>
+              <input
+                aria-label={t.perfil.newPwAria}
+                className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                placeholder={t.perfil.newPwPlaceholder}
+                type="password"
+                value={cpNew}
+                onChange={(e) => setCpNew(e.target.value)}
+                required
+                minLength={12}
+                autoComplete="new-password"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.confirmPwAria}</span>
+              <input
+                aria-label={t.perfil.confirmPwAria}
+                className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                placeholder={t.perfil.confirmPwPlaceholder}
+                type="password"
+                value={cpConfirm}
+                onChange={(e) => setCpConfirm(e.target.value)}
+                required
+                minLength={12}
+                autoComplete="new-password"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={cpBusy}
+              className="min-h-[44px] w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {cpBusy ? t.perfil.changingPw : t.perfil.changePwSave}
+            </button>
+            {cpMsg && <p role="status" className="text-sm text-emerald-400">{cpMsg}</p>}
+            {cpError && <p role="alert" className="text-sm text-red-400">{cpError}</p>}
+          </form>
 
           <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.note}</p>
         </div>

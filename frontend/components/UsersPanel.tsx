@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, type AdminUser } from "../lib/api";
+import { api, ApiError, setToken, type AdminUser } from "../lib/api";
 import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
@@ -39,6 +39,7 @@ export function UsersPanel() {
   // por su nombre. Solo presentación sobre la lista ya cargada.
   const [query, setQuery] = useState("");
   const [meSuper, setMeSuper] = useState(false);
+  const [meUsername, setMeUsername] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,6 +55,11 @@ export function UsersPanel() {
   const [pwValue, setPwValue] = useState("");
   const [pwTemp, setPwTemp] = useState<string | null>(null);
   const [pwBusy, setPwBusy] = useState(false);
+  // Renombrar usuario (2026-11-21): el admin corrige el nombre; el
+  // backend lo valida como único y revoca las sesiones del usuario.
+  const [renameUserId, setRenameUserId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -69,8 +75,10 @@ export function UsersPanel() {
       const _meSuper = await api.me();
       if (isCancelled()) return;
       setMeSuper(_meSuper.is_super_admin);
+      setMeUsername(_meSuper.username);
     } catch {
       setMeSuper(false);
+      setMeUsername(null);
     }
   }, []);
 
@@ -155,7 +163,11 @@ export function UsersPanel() {
   };
 
   const savePassword = async (u: AdminUser) => {
-    if (pwValue.trim().length < 4) {
+    // CAUSA RAÍZ (2026-11-21): antes se pedían 4 caracteres y el
+    // backend exige 12 (decisión de Rubén 2026-11-02): cualquier clave
+    // de 4-11 caracteres fallaba con un 422 en inglés y el cambio
+    // "no funcionaba". Ahora la UI pide 12 desde el principio.
+    if (pwValue.trim().length < 12) {
       setError(t.usuarios.errPwShort);
       return;
     }
@@ -164,14 +176,68 @@ export function UsersPanel() {
     setMsg(null);
     try {
       await api.updateUser(u.id, { password: pwValue });
-      setMsg(t.usuarios.msgPwUpdated.replace("{nombre}", u.username));
+      const isMe = meUsername !== null && u.username === meUsername;
       setPwValue("");
       setPwTemp(null);
       setPwUserId(null);
+      if (isMe) {
+        // Cambiar la propia clave revoca la sesión actual: avisar y
+        // llevar al login, en vez de dejar el panel atascado con 401.
+        setMsg(t.usuarios.msgPwUpdatedOwn);
+        window.setTimeout(() => {
+          setToken(null);
+          window.location.replace("/login");
+        }, 3000);
+      } else {
+        setMsg(t.usuarios.msgPwUpdated.replace("{nombre}", u.username));
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.usuarios.errChangePw);
     } finally {
       setPwBusy(false);
+    }
+  };
+
+  const saveRename = async (u: AdminUser) => {
+    const next = renameValue.trim();
+    if (next.length < 3) {
+      setError(t.usuarios.errNameShort);
+      return;
+    }
+    if (next === u.username) {
+      setRenameUserId(null);
+      return;
+    }
+    setRenameBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      await api.updateUser(u.id, { username: next });
+      const isMe = meUsername !== null && u.username === meUsername;
+      setRenameUserId(null);
+      setRenameValue("");
+      if (isMe) {
+        // Renombrarse revoca la sesión (el token lleva el nombre):
+        // avisar y llevar al login con el nombre nuevo.
+        setMsg(t.usuarios.msgRenamedOwn.replace("{nombre}", next));
+        window.setTimeout(() => {
+          setToken(null);
+          window.location.replace("/login");
+        }, 3000);
+      } else {
+        setMsg(t.usuarios.msgRenamed.replace("{nombre}", next));
+        await load();
+      }
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? t.usuarios.errUsernameTaken
+          : err instanceof ApiError
+            ? err.message
+            : t.usuarios.errRename,
+      );
+    } finally {
+      setRenameBusy(false);
     }
   };
 
@@ -402,6 +468,17 @@ export function UsersPanel() {
                       {t.usuarios.pwButton}
                     </button>
                     <button
+                      onClick={() => {
+                        setRenameUserId(renameUserId === u.id ? null : u.id);
+                        setRenameValue(u.username);
+                      }}
+                      aria-label={t.usuarios.renameTitle}
+                      className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      title={t.usuarios.renameTitle}
+                    >
+                      {t.usuarios.renameButton}
+                    </button>
+                    <button
                       onClick={() => remove(u)}
                       aria-label={t.usuarios.deleteTitle}
                       className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
@@ -422,6 +499,7 @@ export function UsersPanel() {
                     value={pwValue}
                     onChange={(e) => setPwValue(e.target.value)}
                     autoComplete="new-password"
+                    minLength={12}
                   /></Field>
                   <button
                     onClick={() => savePassword(u)}
@@ -445,6 +523,33 @@ export function UsersPanel() {
                   {t.usuarios.tempPrefix.replace("{nombre}", u.username)}
                   <code className="font-mono font-semibold">{pwTemp}</code>{t.usuarios.tempSuffix}
                 </p>
+              )}
+              {renameUserId === u.id && u.status !== "pending" && (
+                <div className="mt-3 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 sm:flex-row sm:items-center">
+                  <Field label={t.usuarios.renameAria.replace("{nombre}", u.username)} className="flex-1"><input
+                    aria-label={t.usuarios.renameAria.replace("{nombre}", u.username)}
+                    className={inputCls}
+                    placeholder={t.usuarios.renamePlaceholder}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    autoComplete="off"
+                    minLength={3}
+                  /></Field>
+                  <button
+                    onClick={() => saveRename(u)}
+                    disabled={renameBusy}
+                    className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  >
+                    {t.usuarios.renameSave}
+                  </button>
+                  <button
+                    onClick={() => setRenameUserId(null)}
+                    disabled={renameBusy}
+                    className="min-h-[44px] shrink-0 rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  >
+                    {t.usuarios.renameCancel}
+                  </button>
+                </div>
               )}
             </li>
           ))}

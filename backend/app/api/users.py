@@ -75,6 +75,10 @@ class CreateUserRequest(BaseModel):
 
 
 class UpdateUserRequest(BaseModel):
+    # Renombrar (2026-11-21): el admin puede corregir el nombre de
+    # usuario; es único y revoca los tokens (el token lleva el nombre
+    # en `sub`). Ninguno de estos campos cambia el plan elegido.
+    username: str | None = Field(default=None, min_length=3, max_length=64)
     role: str | None = None  # "super_admin" | "admin" | "prueba"
     password: str | None = Field(default=None, min_length=12, max_length=128)
 
@@ -217,6 +221,22 @@ def update_user(
         )
     role_changed = False
     role_effective_changed = False
+    username_changed = False
+    old_username = user.username
+    if payload.username is not None:
+        new_username = payload.username.strip()
+        if new_username != user.username:
+            clash = (
+                db.query(User).filter(User.username == new_username).first()
+            )
+            if clash is not None:
+                raise HTTPException(
+                    status_code=409, detail="Username already exists"
+                )
+            # El nombre va en el `sub` del token: renombrar revoca las
+            # sesiones del usuario, igual que cambiar su clave.
+            user.username = new_username
+            username_changed = True
     if payload.role is not None:
         want_super = payload.role.strip().lower() == "super_admin"
         if want_super and not caller_super:
@@ -254,17 +274,19 @@ def update_user(
     password_changed = bool(payload.password)
     if payload.password:
         user.password_hash = hash_password(payload.password)
-    if password_changed or role_effective_changed:
+    if password_changed or role_effective_changed or username_changed:
         revoke_user_tokens(user)
     db.commit()
     db.refresh(user)
     # Auditoría (M2): cambio de rol y/o reseteo de contraseña. El valor
     # de la contraseña nunca se registra, solo el hecho del cambio.
-    if role_changed or password_changed:
+    if role_changed or password_changed or username_changed:
         audit(db, admin, "users.update", "user", str(user.id),
               details={"username": user.username,
+                       "old_username": old_username if username_changed else None,
                        "role_changed": role_changed,
-                       "password_changed": password_changed})
+                       "password_changed": password_changed,
+                       "username_changed": username_changed})
     return _out(user, db)
 
 

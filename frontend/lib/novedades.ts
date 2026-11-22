@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-21",
+    title: "Claves y usuarios: cambio de clave arreglado, cambio propio en Mi perfil y renombrar usuarios",
+    body: "Publicado el 21 de noviembre: el cambio de clave en Control de usuarios fallaba — el formulario aceptaba claves de 4 caracteres pero el sistema exige 12, así que ahora pide 12 desde el principio y avisa claro si la clave es corta. Además, cada usuario ya puede cambiar su propia clave desde Mi perfil con su clave actual, el admin puede corregir el nombre de un usuario, y si te cambias tu propia clave o tu propio nombre, la sesión se cierra y vuelves a entrar con el dato nuevo. Todo con pruebas nuevas (463 en verde). Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-21",
     title: "Mejoras diarias: tendencias en caché, contador filtrado en Talento y búsqueda en Control de usuarios",
     body: "Publicado el 21 de noviembre: tres mejoras del día — en velocidad, las notas de tendencias de Crear ahora se guardan en caché 60 segundos y cargan más rápido al navegar; en Talento humano, el contador muestra cuántos empleados coinciden con la búsqueda o el filtro (visibles / total) y el mensaje de vacío distingue entre no tener empleados y no haber coincidencias; y en Control de usuarios, una búsqueda por nombre de usuario junto al filtro por rol para encontrar cuentas más rápido. Solo presentación y filtros, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },
