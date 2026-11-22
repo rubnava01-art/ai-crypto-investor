@@ -72,6 +72,7 @@ export type Dictionary = {
   invertir: Record<string, string>;
   market: Record<string, string>;
   ai: Record<string, string>;
+  asistente: Record<string, string>;
   crm: Record<string, string>;
   referidos: Record<string, string>;
   business: Record<string, string>;

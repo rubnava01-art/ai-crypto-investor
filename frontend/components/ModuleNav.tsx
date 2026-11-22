@@ -476,12 +476,12 @@ export function ModuleNav() {
           className={
             active
               ? `flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg ${accent.active} px-4 py-2.5 text-sm font-semibold shadow-sm ring-1 ring-inset transition-colors`
-              : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-100"
+              : "flex min-h-[2.75rem] items-center gap-2 whitespace-nowrap rounded-lg border border-slate-700/70 bg-slate-900/50 px-4 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800/80 hover:text-slate-100"
           }
         >
           {m.icon}
           {label}
-          <span className={`hidden text-xs font-normal sm:inline ${active ? accent.hint : "text-zinc-400"}`}>
+          <span className={`hidden text-xs font-normal sm:inline ${active ? accent.hint : "text-slate-400"}`}>
             {hint}
           </span>
         </Link>
@@ -499,14 +499,14 @@ export function ModuleNav() {
           type="button"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-slate-700/80 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm backdrop-blur transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
         >
           <span className="flex min-w-0 items-center gap-2">
             <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${currentAccent.dot}`} />
             {t.nav.menu}
-            <span className="truncate font-normal text-zinc-400">· {currentLabel}</span>
+            <span className="truncate font-normal text-slate-400">· {currentLabel}</span>
           </span>
-          <span aria-hidden="true" className="shrink-0 text-zinc-400">{menuOpen ? "▾" : "▸"}</span>
+          <span aria-hidden="true" className="shrink-0 text-slate-400">{menuOpen ? "▾" : "▸"}</span>
         </button>
       </div>
       {menuOpen && (
@@ -518,7 +518,7 @@ export function ModuleNav() {
               listan entradas admin ni se habla de "solo lectura"; las entradas
               adminOnly aparecen solo cuando /me confirma admin. */}
           {role === "loading" && (
-            <p role="status" className="px-1 py-2 text-xs text-zinc-400">
+            <p role="status" className="px-1 py-2 text-xs text-slate-400">
               {t.nav.checkingRole}
             </p>
           )}
@@ -531,18 +531,18 @@ export function ModuleNav() {
               const groupLabel = t.navGroups[g.key] ?? g.key;
               const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
               return (
-                <div key={g.key} className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
+                <div key={g.key} className="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/50 backdrop-blur">
                   <button
                     type="button"
                     aria-expanded={isOpen}
                     onClick={() => setOpen((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
-                    className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
+                    className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-800/80 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
                   >
                     <span className="flex items-center gap-2">
                       <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
                       {groupLabel}
                     </span>
-                    <span aria-hidden="true" className="text-zinc-400">{isOpen ? "▾" : "▸"}</span>
+                    <span aria-hidden="true" className="text-slate-400">{isOpen ? "▾" : "▸"}</span>
                   </button>
                   {isOpen && <div className="flex flex-col gap-2 p-2 pt-0">{items.map(link)}</div>}
                 </div>
@@ -555,7 +555,7 @@ export function ModuleNav() {
       <div className="hidden sm:block">
         {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
         {role === "loading" && (
-          <p role="status" className="px-1 py-2 text-xs text-zinc-400">
+          <p role="status" className="px-1 py-2 text-xs text-slate-400">
             {t.nav.checkingRole}
           </p>
         )}
@@ -567,7 +567,7 @@ export function ModuleNav() {
             const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
             return (
               <section key={g.key} aria-label={groupLabel}>
-                <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
                   <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
                   {groupLabel}
                 </h2>

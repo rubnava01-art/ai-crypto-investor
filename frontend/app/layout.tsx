@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "../lib/i18n";
 import { Analytics } from "../lib/analytics";
+import { AsistenteChat } from "../components/AsistenteChat";
 
 // Gestión SEO 2026-11-03 (reel Peter Lead: servicios + nombre del
 // negocio en los títulos; contenido con términos que la gente busca).
@@ -58,7 +59,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`dark ${inter.variable} ${jakarta.variable}`}>
       <body className="min-h-dvh bg-[#030712] text-zinc-100 antialiased">
         <Analytics />
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          {children}
+          <AsistenteChat />
+        </LanguageProvider>
       </body>
     </html>
   );

@@ -56,8 +56,8 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
     <header
       className={
         onBlue
-          ? "sticky top-0 z-40 border-b border-blue-800 bg-blue-800/95 backdrop-blur"
-          : "sticky top-0 z-40 border-b border-slate-800/80 bg-[#0B0F19]/90 backdrop-blur"
+          ? "sticky top-0 z-40 border-b border-blue-800 bg-blue-800/95 shadow-[0_8px_24px_rgb(0_0_0/0.35)] backdrop-blur"
+          : "sticky top-0 z-40 border-b border-slate-800/80 bg-[#0B0F19]/90 shadow-[0_8px_24px_rgb(0_0_0/0.35)] backdrop-blur"
       }
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">

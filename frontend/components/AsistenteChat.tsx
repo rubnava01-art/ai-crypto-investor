@@ -1,0 +1,359 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ApiError, getToken } from "../lib/api/client";
+import { loginUrl } from "../lib/session";
+import { getCapacidades, postChat, type AsistenteAccion, type AsistenteComando } from "../lib/asistente";
+import { useLanguage } from "../lib/i18n";
+
+/**
+ * Asistente — chat personalizado dentro de la web.
+ * Botón flotante (esquina inferior derecha) + panel de chat, y vista
+ * dedicada en /asistente (mismo cuerpo de chat, variante "page").
+ * Historial solo en sesión (estado React): nada se persiste en BD.
+ * Las respuestas llegan en español desde el backend y se muestran tal cual;
+ * si el backend devuelve accion null con texto de solo-lectura (rol prueba),
+ * también se muestra tal cual.
+ * Tras una acción se muestra la confirmación; no hay mecanismo global de
+ * refresco de paneles en la plataforma, así que la lista afectada se
+ * actualiza la próxima vez que se visite (ver audit-agente-1.md §5).
+ */
+
+type ChatMsg = {
+  id: number;
+  role: "user" | "assistant" | "error";
+  text: string;
+  accion?: AsistenteAccion | null;
+  /** Mensaje original que falló, para el botón de reintento. */
+  failedInput?: string;
+};
+
+let nextMsgId = 1;
+
+/** Mapea ApiError.key a una cadena i18n. Nunca se muestra el detalle
+ * técnico del backend ni trazas al usuario. */
+function errorKeyToString(key: ApiError["key"], t: ReturnType<typeof useLanguage>["t"]): string {
+  switch (key) {
+    case "network":
+      return t.asistente.errNetwork;
+    case "timeout":
+      return t.asistente.errTimeout;
+    case "forbidden":
+      return t.asistente.errForbidden;
+    case "server":
+    case "notFound":
+    case "tooManyRequests":
+      return t.asistente.errServer;
+    default:
+      return t.asistente.errGeneric;
+  }
+}
+
+function ChatIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Cuerpo del chat compartido por el panel flotante y la página /asistente. */
+function AsistenteChatBody() {
+  const { t } = useLanguage();
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    { id: 0, role: "assistant", text: t.asistente.greeting },
+  ]);
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [comandos, setComandos] = useState<AsistenteComando[]>([]);
+  const [sugerencias, setSugerencias] = useState<string[]>([]);
+  const [hasSession, setHasSession] = useState(() => !!getToken());
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
+
+  // Capacidades (chips de comandos) al montar, solo con sesión.
+  useEffect(() => {
+    if (!getToken()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getCapacidades();
+        if (!cancelled) setComandos(res.comandos ?? []);
+      } catch {
+        // Sin chips si fallan las capacidades: el chat sigue funcionando.
+        if (!cancelled) setComandos([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Autoscroll al fondo con cada mensaje nuevo o al escribir.
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, typing]);
+
+  const send = useCallback(
+    async (raw: string) => {
+      const text = raw.trim();
+      if (!text || sendingRef.current) return;
+      if (!getToken()) {
+        setHasSession(false);
+        return;
+      }
+      sendingRef.current = true;
+      setTyping(true);
+      setMessages((prev) => [...prev, { id: nextMsgId++, role: "user", text }]);
+      setInput("");
+      setSugerencias([]);
+      try {
+        const res = await postChat(text);
+        setMessages((prev) => [
+          ...prev,
+          { id: nextMsgId++, role: "assistant", text: res.respuesta, accion: res.accion ?? null },
+        ]);
+        setSugerencias(res.sugerencias ?? []);
+      } catch (err) {
+        // Un 401 con sesión expirada ya redirige al login desde el cliente
+        // central; aquí solo queda el resto de fallos, sin trazas técnicas.
+        const key = err instanceof ApiError ? err.key : "unknown";
+        setMessages((prev) => [
+          ...prev,
+          { id: nextMsgId++, role: "error", text: errorKeyToString(key, t), failedInput: text },
+        ]);
+      } finally {
+        setTyping(false);
+        sendingRef.current = false;
+      }
+    },
+    [t],
+  );
+
+  const retry = (msg: ChatMsg) => {
+    if (!msg.failedInput) return;
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    void send(msg.failedInput);
+  };
+
+  // Chips: tras cada respuesta mandan las sugerencias del backend; al
+  // inicio, los ejemplos de las capacidades. Un chip rellena el input y
+  // pone el foco (no envía solo: evita ejecutar una acción por un toque).
+  const chips: { label: string; title?: string; admin?: boolean }[] =
+    sugerencias.length > 0
+      ? sugerencias.map((s) => ({ label: s }))
+      : comandos.map((c) => ({ label: c.ejemplo, title: c.descripcion, admin: c.requiere_admin }));
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={listRef}
+        role="log"
+        aria-live="polite"
+        aria-label={t.asistente.title}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+      >
+        {messages.map((m) => (
+          <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "rounded-br-md bg-emerald-700 text-white"
+                  : m.role === "error"
+                    ? "rounded-bl-md border border-red-800/70 bg-red-500/10 text-red-200"
+                    : "rounded-bl-md border border-zinc-700 bg-zinc-800 text-zinc-100"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{m.text}</p>
+              {m.accion && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                  <span aria-hidden="true">✓</span>
+                  {t.asistente.actionDone.replace("{tipo}", m.accion.tipo)}
+                </p>
+              )}
+              {m.role === "error" && m.failedInput && (
+                <button
+                  type="button"
+                  onClick={() => retry(m)}
+                  className="mt-2 block min-h-[36px] rounded-lg border border-red-400/60 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+                >
+                  {t.asistente.retry}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {typing && (
+          <div className="flex justify-start">
+            <div
+              aria-label={t.asistente.typing}
+              className="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-zinc-700 bg-zinc-800 px-3.5 py-3"
+            >
+              <span className="sr-only">{t.asistente.typing}</span>
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-zinc-400 motion-safe:animate-bounce" />
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-zinc-400 motion-safe:animate-bounce [animation-delay:150ms]" />
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-zinc-400 motion-safe:animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!hasSession && (
+        <div className="border-t border-zinc-800 px-4 py-3">
+          <p className="text-sm text-zinc-300">{t.asistente.errLogin}</p>
+          <Link
+            href={loginUrl(typeof window !== "undefined" ? window.location.pathname : "/asistente")}
+            className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          >
+            {t.asistente.loginCta}
+          </Link>
+        </div>
+      )}
+
+      {chips.length > 0 && hasSession && (
+        <div className="border-t border-zinc-800 px-4 pb-1 pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            {t.asistente.suggestionsTitle}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {chips.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                title={c.title}
+                onClick={() => {
+                  setInput(c.label);
+                  inputRef.current?.focus();
+                }}
+                className="min-h-[36px] rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:border-emerald-600 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              >
+                {c.label}
+                {c.admin && (
+                  <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                    {t.asistente.adminBadge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 border-t border-zinc-800 px-4 py-3">
+        <input
+          ref={inputRef}
+          aria-label={t.asistente.inputAria}
+          type="text"
+          value={input}
+          disabled={!hasSession || typing}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void send(input);
+          }}
+          placeholder={t.asistente.inputPlaceholder}
+          maxLength={1000}
+          className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={() => void send(input)}
+          disabled={!hasSession || typing || !input.trim()}
+          className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+        >
+          {typing ? t.asistente.sending : t.asistente.send}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Botón flotante + panel de chat. Se monta en el layout raíz; se oculta
+ * en /login (pantalla pública) y en /asistente (la vista dedicada ya tiene
+ * el chat). En móvil queda por encima de la barra inferior (bottom-20);
+ * en escritorio, bottom-6. z-50 por encima de la nav inferior (z-40). */
+export function AsistenteChat() {
+  const pathname = usePathname();
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open ]);
+
+  if (pathname === "/login" || pathname === "/asistente") return null;
+
+  return (
+    <>
+      {open && (
+        <section
+          aria-label={t.asistente.title}
+          className="fixed inset-x-4 bottom-40 z-50 flex h-[min(70dvh,560px)] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl sm:inset-x-auto sm:bottom-24 sm:right-6 sm:w-[380px]"
+        >
+          <header className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+              <span className="text-emerald-400">
+                <ChatIcon size={18} />
+              </span>
+              {t.asistente.title}
+            </h2>
+            <div className="flex items-center gap-1">
+              <Link
+                href="/asistente"
+                onClick={() => setOpen(false)}
+                className="min-h-[36px] rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              >
+                {t.asistente.openFullPage}
+              </Link>
+              <button
+                type="button"
+                aria-label={t.asistente.closeAria}
+                onClick={() => setOpen(false)}
+                className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              >
+                <span aria-hidden="true" className="text-lg leading-none">×</span>
+              </button>
+            </div>
+          </header>
+          <AsistenteChatBody />
+        </section>
+      )}
+      <button
+        type="button"
+        aria-label={open ? t.asistente.closeAria : t.asistente.openAria}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-2xl ring-4 ring-zinc-900/60 transition-transform hover:scale-105 hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:bottom-6 sm:right-6"
+      >
+        {open ? (
+          <span aria-hidden="true" className="text-2xl leading-none">×</span>
+        ) : (
+          <ChatIcon size={26} />
+        )}
+      </button>
+    </>
+  );
+}
+
+/** Variante de página completa para /asistente (dentro de ModuleShell). */
+export function AsistentePanel() {
+  return (
+    <div className="flex h-[70dvh] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900">
+      <AsistenteChatBody />
+    </div>
+  );
+}

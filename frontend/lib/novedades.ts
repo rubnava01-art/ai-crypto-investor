@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-22",
+    title: "Asistente: chat que ejecuta tareas de la plataforma y análisis con datos reales",
+    body: "Publicado el 22 de noviembre: nuevo Asistente en la web, con botón flotante y vista propia, que entiende órdenes en español y ejecuta tareas sin salir del chat — en Negocio crea notas y tareas, en Crear prepara borradores de contenido, en Estudiar lista las clases, en Invertir consulta precios y señales y hace análisis de mercado con los indicadores reales, además de citas, facturas y contactos. Funciona con reglas, sin IA externa, y solo con datos reales de la plataforma, sin inventar cifras. El rol prueba solo consulta y analiza; las acciones las hace el admin. El chat no toca usuarios, claves, roles ni trading real, que sigue manual y en simulación. La interfaz también se renovó: más profundidad de color, tarjetas con efecto cristal y mejor jerarquía en móvil y escritorio. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-22",
     title: "Mejoras diarias: búsqueda en Clases, contador filtrado en Planillas y caché en Facturas",
     body: "Publicado el 22 de noviembre: tres mejoras del día — en Estudiar, las clases (grabadas y en vivo) ya se pueden buscar por título o descripción, como ya se hacía con los videos, y el mensaje de vacío distingue entre no tener clases y no haber coincidencias; en Planillas, el contador muestra cuántas planillas coinciden con el periodo o el estado (visibles / total) y el mensaje de vacío distingue entre no tener planillas y no haber coincidencias; y en velocidad, la lista de facturas guardadas ahora se guarda en caché 60 segundos y carga más rápido al navegar, con invalidación inmediata al crear, cambiar estado o borrar. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

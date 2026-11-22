@@ -22,7 +22,7 @@ import { formatDate, formatMoney } from "../lib/format";
 // ---------- Button / Input ----------
 
 const btnBase =
-  "inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-50";
+  "inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-50";
 
 export function Button({
   variant = "secondary",
@@ -33,10 +33,12 @@ export function Button({
 }) {
   const tone =
     variant === "primary"
-      ? "bg-emerald-700 text-white hover:bg-emerald-800"
+      ? "bg-emerald-700 text-white shadow-sm hover:bg-emerald-800 hover:shadow-fintech-glow-emerald"
       : variant === "danger"
-        ? "bg-red-700 text-white hover:bg-red-800"
-        : "border border-zinc-700 text-zinc-200 hover:bg-zinc-800";
+        ? "bg-red-700 text-white shadow-sm hover:bg-red-800"
+        : // Secundario glass slate (2026-11-22, Agente UX): antes zinc
+          // plano; ahora el mismo vidrio del sistema fintech.
+          "border border-slate-700/80 bg-slate-900/60 text-slate-200 backdrop-blur hover:border-slate-600 hover:bg-slate-800";
   return <button type="button" className={`${btnBase} ${tone} ${className}`} {...props} />;
 }
 
@@ -63,7 +65,7 @@ export function PanelLoading() {
   return (
     <div
       role="status"
-      className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-sm text-zinc-400"
+      className="fintech-card px-4 py-6 text-sm text-slate-400"
     >
       {t.dashboard.panelLoading}
     </div>
@@ -86,7 +88,7 @@ export function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1 block text-xs font-medium text-zinc-400">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-slate-400">{label}</span>
       {children}
     </label>
   );
@@ -98,7 +100,7 @@ export function SkipLink({ label, targetId = "contenido" }: { label: string; tar
   return (
     <a
       href={`#${targetId}`}
-      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-zinc-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-zinc-100 focus:ring-2 focus:ring-emerald-500/60"
+      className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-slate-100 focus:ring-2 focus:ring-emerald-500/60"
     >
       {label}
     </a>
@@ -226,15 +228,15 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-label={t.reliability.confirmTitle}
-        className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl"
+        className="fintech-card w-full max-w-sm p-5 shadow-fintech-lg"
       >
-        <p className="text-sm leading-relaxed text-zinc-100">{message}</p>
+        <p className="text-sm leading-relaxed text-slate-100">{message}</p>
         <div className="mt-5 flex gap-2.5">
           <button
             type="button"
             ref={cancelRef}
             onClick={onCancel}
-            className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            className="min-h-[44px] flex-1 rounded-lg border border-slate-700/80 bg-slate-900/60 px-3 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.reliability.confirmCancel}
           </button>
@@ -330,13 +332,13 @@ export function LoadMore({
   if (visible >= total) return null;
   return (
     <div className="mt-3 text-center">
-      <p className="mb-2 text-xs text-zinc-400">
+      <p className="mb-2 text-xs text-slate-400">
         {t.reliability.showingOf.replace("{n}", String(visible)).replace("{total}", String(total))}
       </p>
       <button
         type="button"
         onClick={onLoadMore}
-        className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+        className="min-h-[44px] rounded-lg border border-slate-700/80 bg-slate-900/60 px-4 py-2.5 text-sm font-semibold text-slate-200 backdrop-blur transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
       >
         {t.reliability.loadMore}
       </button>
