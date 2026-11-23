@@ -16,10 +16,17 @@
 // invalidan el prefijo en lib/api/facturas.ts. Los errores NO se
 // guardan: un fallo deja la entrada libre para reintentar. Cada
 // mutación (crear/editar/borrar curso o clase) invalida su prefijo, así que la lista tras guardar nunca
-// muestra datos viejos más de lo que tarda el refetch.
+// muestra datos viejos más de lo que tarda el refetch. Además, desde
+// 2026-11-23 el memo se vacía entero al cambiar el token (login,
+// logout o 401; lib/api/client.ts): defensa en profundidad para que
+// ningún catálogo sobreviva a un cambio de sesión.
 export interface CatalogMemo {
   get<T>(key: string, fetcher: () => Promise<T>): Promise<T>;
   invalidate(keyPrefix: string): void;
+  /** Vacía toda la caché (2026-11-23): al cambiar el token (login,
+   * logout o 401) ningún catálogo del usuario anterior debe sobrevivir
+   * al siguiente; los fetches en vuelo no se guardan por la generación. */
+  clear(): void;
 }
 
 export const CATALOG_MEMO_TTL_MS = 60_000;
@@ -58,6 +65,11 @@ export function createCatalogMemo(ttlMs: number = CATALOG_MEMO_TTL_MS): CatalogM
       for (const key of [...cache.keys()]) {
         if (key.startsWith(keyPrefix)) cache.delete(key);
       }
+    },
+
+    clear() {
+      generation += 1;
+      cache.clear();
     },
   };
 }

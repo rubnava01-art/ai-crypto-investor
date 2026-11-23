@@ -11,6 +11,7 @@ from decimal import Decimal
 
 import pytest
 
+from app.api.asistente import asistente_limiter
 from app.database import get_db
 from app.models.tables import (
     Appointment,
@@ -47,6 +48,18 @@ def _close(gen) -> None:
 
 def _chat(client, headers, mensaje: str):
     return client.post(f"{BASE}/chat", json={"mensaje": mensaje}, headers=headers)
+
+
+@pytest.fixture(autouse=True)
+def _clear_asistente_limiter():
+    """B2 (corrida seguridad 2026-11-23): el chat tiene limiter
+    20/min por usuario y este módulo hace ~35 llamadas como admin
+    en total; vaciarlo por test (patrón test_portal_isolation con
+    citas_limiter) para que la ráfaga de un test no bloquee el
+    siguiente. Cada test individual queda muy por debajo de 20."""
+    asistente_limiter.clear()
+    yield
+    asistente_limiter.clear()
 
 
 @pytest.fixture()

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getToken, setToken } from "../lib/api";
+import { getToken, logout as logoutSession } from "../lib/api";
 import { loginUrl } from "../lib/session";
 import { FAMILY_ACCENT, familyForHref, ModuleNav } from "./ModuleNav";
 import { ProfileMenu } from "./ProfileMenu";
@@ -62,7 +62,7 @@ export function ModuleShell({
   }
 
   function logout() {
-    setToken(null);
+    logoutSession();
     router.replace("/login");
   }
 

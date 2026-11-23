@@ -17,11 +17,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import HomeComment, HomePost, User
 
 router = APIRouter(prefix="/api/inicio", tags=["inicio"])
+
+# B3 (corrida seguridad 2026-11-23): comentarios limitados por usuario
+# (20/min). Los posts (solo admin) no se limitan.
+comment_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 
 class PostOut(BaseModel):
@@ -240,6 +245,12 @@ def create_comment(
         raise HTTPException(status_code=404, detail="Post not found")
     if not payload.body.strip():
         raise HTTPException(status_code=422, detail="El comentario no puede estar vacío.")
+    # B3: tras la validación, los 404/422 no consumen presupuesto.
+    if not comment_limiter.allow(f"inicio_comment:{user.id}"):
+        raise too_many_requests(
+            "Demasiados comentarios seguidos. Espera un minuto.",
+            comment_limiter.window,
+        )
     row = HomeComment(post_id=post_id, author_id=user.id, body=payload.body.strip())
     db.add(row)
     db.commit()

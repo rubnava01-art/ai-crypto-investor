@@ -34,6 +34,8 @@ from app.models.tables import (
     ChatMessage,
     Contact,
     ExchangeConnection,
+    HomeComment,
+    HomePost,
     IdempotencyKey,
     PendingActivation,
     TrendSearch,
@@ -107,6 +109,17 @@ def _seed_references(uid, other_uid=None):
         db.add(BusinessCost(date=date(2026, 11, 21), category="otro",
                             concept="gasto víctima", amount=1,
                             created_by_user_id=uid))
+        # B9 (corrida seguridad 2026-11-23): post + comentario de
+        # Inicio del usuario víctima (author_id, no user_id).
+        post = HomePost(title="Post víctima " + uuid.uuid4().hex[:6],
+                        body="cuerpo", author_id=uid)
+        db.add(post)
+        db.flush()
+        comment = HomeComment(post_id=post.id, author_id=uid,
+                              body="comentario víctima")
+        db.add(comment)
+        db.flush()
+        home_ids = {"post_id": post.id, "comment_id": comment.id}
         other_audit_id = None
         if other_uid is not None:
             other = AuditLog(user_id=other_uid, action="auth.login",
@@ -119,9 +132,21 @@ def _seed_references(uid, other_uid=None):
             "audit_ids": audit_ids,
             "other_audit_id": other_audit_id,
             "contact_name": contact_name,
+            "home_ids": home_ids,
         }
     finally:
         db.close()
+
+
+def _cleanup_home(client, admin_headers, seed):
+    """Borra el post sembrado por _seed_references (B9): el borrado
+    del usuario PRESERVA el post con autor NULL, así que sin esto
+    quedaría en la BD compartida y rompería tests que exigen la
+    lista de Inicio vacía."""
+    home_ids = (seed or {}).get("home_ids") or {}
+    post_id = home_ids.get("post_id")
+    if post_id is not None:
+        client.delete(f"/api/inicio/posts/{post_id}", headers=admin_headers)
 
 
 def test_delete_user_with_audit_rows_succeeds_and_preserves_history(
@@ -179,9 +204,15 @@ def test_delete_user_with_audit_rows_succeeds_and_preserves_history(
                 Appointment.created_by_user_id.is_(None)).count() >= 1
             assert db.query(BusinessCost).filter(
                 BusinessCost.created_by_user_id.is_(None)).count() >= 1
+            # B9: post y comentario preservados, con autor anónimo.
+            post = db.get(HomePost, seed["home_ids"]["post_id"])
+            assert post is not None and post.author_id is None
+            comment = db.get(HomeComment, seed["home_ids"]["comment_id"])
+            assert comment is not None and comment.author_id is None
         finally:
             db.close()
     finally:
+        _cleanup_home(client, admin_headers, seed)
         client.delete(f"/api/users/{vid}", headers=admin_headers)
         client.delete(f"/api/users/{oid}", headers=admin_headers)
 
@@ -221,6 +252,7 @@ def test_detach_helper_nulls_references_without_deleting_rows(
         finally:
             db.close()
     finally:
+        _cleanup_home(client, admin_headers, seed)
         client.delete(f"/api/users/{vid}", headers=admin_headers)
 
 

@@ -442,7 +442,10 @@ def kill_switch_deactivate(
 
 # ---------- logs ----------
 @logs_router.get("", response_model=list[LogEntry])
-def logs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def logs(user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    # B6 (corrida seguridad 2026-11-23): eventos internos del sistema,
+    # solo admin. systemApi.logs() no tiene llamador en el frontend
+    # (LogsPanel de Correos usa los logs de correo, no estos).
     rows = (
         db.query(SystemEvent).order_by(SystemEvent.created_at.desc()).limit(100).all()
     )

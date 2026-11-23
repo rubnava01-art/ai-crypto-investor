@@ -71,6 +71,21 @@ test("memo: invalidate por prefijo solo borra las claves que empiezan así", asy
   assert.equal(calls, 3);
 });
 
+test("memo: clear vacía toda la caché y el siguiente get vuelve a pedir", async () => {
+  const memo = createCatalogMemo(60_000);
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return calls;
+  };
+  assert.equal(await memo.get("/api/clases/classes", fetcher), 1);
+  assert.equal(await memo.get("/api/academy/courses", fetcher), 2);
+  memo.clear();
+  assert.equal(await memo.get("/api/clases/classes", fetcher), 3);
+  assert.equal(await memo.get("/api/academy/courses", fetcher), 4);
+  assert.equal(calls, 4);
+});
+
 test("memo: invalidate durante un fetch en vuelo no guarda el resultado viejo", async () => {
   const memo = createCatalogMemo(60_000);
   let calls = 0;

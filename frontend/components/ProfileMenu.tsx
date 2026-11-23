@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, type MeResponse, type UserProfile } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
+import { isSafeAvatarSrc } from "../lib/urls";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors hover:border-zinc-600 focus:border-emerald-500 focus:outline-none";
@@ -266,7 +267,8 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         aria-label={t.perfil.menuAria}
         className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-emerald-700 text-base font-bold text-white shadow-sm ring-1 ring-emerald-500/50 transition-colors hover:bg-emerald-800"
       >
-        {profile?.avatar_data_url ? (
+        {/* F5 (2026-11-23, B6): solo data:image/ o https se renderiza. */}
+        {isSafeAvatarSrc(profile?.avatar_data_url) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={profile.avatar_data_url} alt="" className="h-full w-full object-cover" />
         ) : (

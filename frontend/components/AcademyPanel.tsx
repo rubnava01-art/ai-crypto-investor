@@ -10,6 +10,7 @@ import { useConfirm } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { isFreePrice } from "../lib/format";
 import { useCancelled } from "../lib/useLoad";
+import { safeHttpHref } from "../lib/urls";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-2 focus-visible:ring-emerald-500/40";
@@ -254,7 +255,12 @@ export function AcademyPanel() {
           <p className="py-2 text-sm text-zinc-400">{t.academy.emptyText}</p>
         </Panel>
       ) : (
-        courses.map((c) => (
+        courses.map((c) => {
+          // F4 (2026-11-23, B3): solo http/https llega a href; un esquema
+          // no admitido (p. ej. javascript:) guardado por otra vía no se
+          // enlaza. El `rel` ya llevaba noopener noreferrer.
+          const safeBuyUrl = safeHttpHref(c.buy_url);
+          return (
           <Panel
             key={c.id}
             title={c.title}
@@ -278,9 +284,9 @@ export function AcademyPanel() {
             {c.description && <p className="text-sm leading-relaxed text-zinc-300">{c.description}</p>}
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">{c.delivery_note}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {c.buy_url && (
+              {safeBuyUrl && (
                 <a
-                  href={c.buy_url}
+                  href={safeBuyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 active:bg-emerald-800 motion-safe:active:scale-[0.98]"
@@ -300,7 +306,8 @@ export function AcademyPanel() {
               <StudentsSection course={c} isAdmin={isAdmin} contacts={contacts} />
             )}
           </Panel>
-        ))
+          );
+        })
       )}
     </div>
   );

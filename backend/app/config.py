@@ -15,7 +15,6 @@ class Settings(BaseSettings):
 
     # Auth (Phase 1: single admin user seeded from env; real user management later)
     jwt_secret_key: str = "CHANGE-ME-IN-PRODUCTION-use-a-long-random-secret"
-    jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
     admin_username: str = "admin"
     # Set ADMIN_PASSWORD_HASH (bcrypt) in production. If unset, dev default is used.

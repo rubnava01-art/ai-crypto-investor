@@ -221,6 +221,9 @@ def list_trends(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
+    # B6 (corrida seguridad 2026-11-23): S1, cliente vinculado -> 403
+    # (mismo patrón que list_copies). Prueba sin vínculo no cambia.
+    deny_linked_reader(db, user)
     rows = (
         db.query(TrendNote)
         .order_by(TrendNote.published_on.desc(), TrendNote.id.desc())

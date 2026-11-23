@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import ChatMessage, User
@@ -16,6 +17,10 @@ from app.models.tables import ChatMessage, User
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 MAX_MESSAGES = 100
+
+# B3 (corrida seguridad 2026-11-23): escritura de chat limitada por
+# usuario (10/min). Las lecturas no se limitan.
+chat_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
 
 class ChatMessageOut(BaseModel):
@@ -67,6 +72,12 @@ def post_message(
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="El mensaje no puede estar vacío.")
+    # B3: tras la validación, los 422 no consumen presupuesto.
+    if not chat_limiter.allow(f"chat:{user.id}"):
+        raise too_many_requests(
+            "Demasiados mensajes seguidos. Espera un minuto.",
+            chat_limiter.window,
+        )
     label = (user.display_name or "").strip() or user.username
     row = ChatMessage(
         user_id=user.id,

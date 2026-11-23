@@ -1,4 +1,5 @@
 import type { MeResponse } from "./types";
+import { catalogMemo } from "./memo";
 import { expiredLoginUrlFromLocation } from "../session";
 
 // Cliente fetch del API (extraído de lib/api.ts en Fase 4, sin cambios
@@ -32,6 +33,35 @@ export function setToken(token: string | null) {
   if (token) window.localStorage.setItem(TOKEN_KEY, token);
   else window.localStorage.removeItem(TOKEN_KEY);
   clearMeCache();
+  // Defensa en profundidad (2026-11-23, recomendación QA 2026-11-22):
+  // al cambiar de sesión ningún catálogo memoizado (facturas,
+  // plantillas, clases…) debe sobrevivir al usuario anterior. Sin
+  // fuga real verificada — las listas son las mismas para admin y
+  // prueba y los errores no se cachean — pero el memo se vacía igual.
+  catalogMemo.clear();
+}
+
+// Cierre de sesión centralizado y completo (2026-11-23, A3): borrar el
+// token no basta — el borrador de correo (PII de cliente,
+// sessionStorage `grow-correo-borrador`) y los datos locales de flujos
+// (`grow-flows`) y análisis sociales (`grow-social-analyses`) quedaban
+// en un dispositivo compartido tras cerrar sesión. La usan app/page.tsx,
+// ModuleShell y handleUnauthorized (401). No borra nada más: el idioma
+// (`aci_lang`) y las preferencias no son datos de sesión.
+export function logout() {
+  if (typeof window === "undefined") return;
+  setToken(null);
+  try {
+    window.sessionStorage.removeItem("grow-correo-borrador");
+  } catch {
+    /* almacenamiento no disponible: no hay nada que limpiar */
+  }
+  try {
+    window.localStorage.removeItem("grow-flows");
+    window.localStorage.removeItem("grow-social-analyses");
+  } catch {
+    /* almacenamiento no disponible: no hay nada que limpiar */
+  }
 }
 
 /** Clave de error calculada en la frontera del cliente (Fase 4, FE8): la UI
@@ -179,7 +209,9 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 export function handleUnauthorized() {
   if (typeof window === "undefined") return;
   if (window.location.pathname === "/login") return;
-  setToken(null);
+  // F1 (2026-11-23): la expiración también es un cierre de sesión:
+  // token + borrador + datos locales, no solo el token.
+  logout();
   // Fase 4 (FE7): preservar el destino (?next=) y marcar la expiración para
   // que /login muestre "sesión expirada" en vez de un login pelado. El
   // backend sigue siendo el gate real; esto es solo UX de redirección.

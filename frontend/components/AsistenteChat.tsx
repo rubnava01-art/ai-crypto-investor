@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ApiError, getToken } from "../lib/api/client";
+import { api } from "../lib/api";
 import { loginUrl } from "../lib/session";
 import { getCapacidades, postChat, type AsistenteAccion, type AsistenteComando } from "../lib/asistente";
 import { useLanguage } from "../lib/i18n";
@@ -75,6 +76,9 @@ function AsistenteChatBody() {
   const [typing, setTyping] = useState(false);
   const [comandos, setComandos] = useState<AsistenteComando[]>([]);
   const [sugerencias, setSugerencias] = useState<string[]>([]);
+  // F3 (2026-11-23): rol para filtrar los chips de creación de admin.
+  // Empieza en false (fail-closed, como ModuleNav) hasta que /me confirme.
+  const [isAdmin, setIsAdmin] = useState(false);
   const [hasSession, setHasSession] = useState(() => !!getToken());
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -93,6 +97,10 @@ function AsistenteChatBody() {
         if (!cancelled) setComandos([]);
       }
     })();
+    // Rol (F3): los chips de creación de admin solo se muestran a admin.
+    // Ante error se asume no-admin (fail-closed): el chat sigue
+    // funcionando, solo sin esos chips.
+    api.me().then((m) => { if (!cancelled) setIsAdmin(!!m.is_admin); }).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -149,10 +157,20 @@ function AsistenteChatBody() {
   // Chips: tras cada respuesta mandan las sugerencias del backend; al
   // inicio, los ejemplos de las capacidades. Un chip rellena el input y
   // pone el foco (no envía solo: evita ejecutar una acción por un toque).
-  const chips: { label: string; title?: string; admin?: boolean }[] =
+  // F3 (2026-11-23, M5): a prueba NO se le ofrecen los chips de creación
+  // de admin (el backend ya los rechaza; la UI no debe prometerlos). Los
+  // chips de lectura sensible SE mantienen visibles: la decisión M1 es
+  // de Rubén y está pendiente. Las sugerencias del backend son texto
+  // libre sin marca de rol, así que las de creación se filtran por el
+  // prefijo "Crea " — todos los ejemplos de creación del backend
+  // empiezan así y ningún comando de lectura lo hace.
+  const chips: { label: string; title?: string; admin?: boolean }[] = (
     sugerencias.length > 0
       ? sugerencias.map((s) => ({ label: s }))
-      : comandos.map((c) => ({ label: c.ejemplo, title: c.descripcion, admin: c.requiere_admin }));
+      : comandos
+          .filter((c) => isAdmin || !c.requiere_admin)
+          .map((c) => ({ label: c.ejemplo, title: c.descripcion, admin: c.requiere_admin }))
+  ).filter((c) => isAdmin || !c.label.startsWith("Crea "));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

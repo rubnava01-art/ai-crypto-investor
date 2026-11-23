@@ -49,3 +49,23 @@ export function isSafeNext(value: string | null | undefined): boolean {
 export function safeNext(value: string | null | undefined, fallback = "/"): string {
   return isSafeNext(value) ? (value as string) : fallback;
 }
+
+/** Expiración del JWT solo para UX (B4, 2026-11-23): decodifica `exp`
+ * sin verificar la firma — el backend sigue siendo el gate real. Un
+ * token caducado se trata como ausente antes de redirigir desde /login,
+ * para no rebotar /login → dashboard → 401 → /login. Sin `exp` no se
+ * puede saber: se deja pasar y decide el backend. Un token ilegible se
+ * trata como ausente. */
+export function isTokenExpired(token: string | null | undefined): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3 || !parts[1]) return true;
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4)));
+    if (typeof json?.exp !== "number") return false;
+    return json.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}

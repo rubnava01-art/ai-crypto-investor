@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
 import { paymentUrlForPlan } from "../lib/pagos";
+import { safeHttpHref } from "../lib/urls";
 
 /** Icono de verificación (sin emoji): marca de la lista de funciones. */
 export function Check() {
@@ -119,7 +120,9 @@ export function PlanesPanel() {
       <div className="grid gap-4 md:grid-cols-3 md:gap-5">
         {cards.map((c) => {
           // C5: URL de pago del plan (hoy `null` en los 3: flujo actual).
-          const payUrl = paymentUrlForPlan(c.planKey);
+          // F4 (2026-11-23, B3): solo http/https llega a href; una URL
+          // con otro esquema no se enlaza y el CTA cae al registro.
+          const payUrl = safeHttpHref(paymentUrlForPlan(c.planKey));
           return (
           <article
             key={c.name}

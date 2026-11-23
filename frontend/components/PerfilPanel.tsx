@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { api, ApiError, setToken, type ReferralCampaign, type UserProfile } from "../lib/api";
+import { api, ApiError, logout, type ReferralCampaign, type UserProfile } from "../lib/api";
 import { Panel } from "./Panel";
 import { ProfileEditor } from "./ProfileMenu";
 import { useLanguage } from "../lib/i18n";
@@ -11,6 +11,7 @@ import { useCancelled } from "../lib/useLoad";
 import { encodeQr, type QrCode } from "../lib/qr";
 import { MODULES } from "./ModuleNav";
 import { copyTextWithFallback } from "./ui";
+import { isSafeAvatarSrc } from "../lib/urls";
 
 const MAX_AVATAR_BYTES = 500 * 1024;
 
@@ -415,7 +416,7 @@ export function PerfilPanel() {
       setCpConfirm("");
       setCpMsg(t.perfil.msgPwChanged);
       window.setTimeout(() => {
-        setToken(null);
+        logout();
         window.location.replace("/login");
       }, 3000);
     } catch (err) {
@@ -471,7 +472,10 @@ export function PerfilPanel() {
 
           <div className="flex flex-wrap items-start gap-4 sm:gap-5">
             <div className="relative shrink-0">
-              {profile.avatar_data_url ? (
+              {/* F5 (2026-11-23, B6): solo data:image/ o https se
+                  renderiza; un valor no-imagen guardado por otra vía
+                  muestra la inicial, no una imagen. */}
+              {isSafeAvatarSrc(profile.avatar_data_url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={profile.avatar_data_url} alt={t.perfil.photoAlt} className={`h-28 w-28 rounded-full object-cover ring-2 ${ringCls}`} />
               ) : (

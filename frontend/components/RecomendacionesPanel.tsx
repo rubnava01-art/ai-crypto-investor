@@ -6,6 +6,7 @@ import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+import { safeHttpHref } from "../lib/urls";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-amber-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
@@ -150,7 +151,13 @@ export function RecomendacionesPanel() {
           </p>
         ) : (
           <ul className="space-y-3">
-            {rows.map((r) => (
+            {rows.map((r) => {
+              // F4 (2026-11-23, B3): solo http/https llega a href; un
+              // esquema no admitido (p. ej. javascript:) guardado por
+              // otra vía no se enlaza. El texto visible sigue siendo la
+              // URL guardada.
+              const safeUrl = safeHttpHref(r.url);
+              return (
               <li key={r.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${r.category === "curso" ? "bg-emerald-500/15 text-emerald-300" : "bg-violet-500/15 text-violet-300"}`}>
@@ -169,13 +176,14 @@ export function RecomendacionesPanel() {
                   )}
                 </div>
                 {r.description && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{r.description}</p>}
-                {r.url && (
-                  <a href={r.url} target="_blank" rel="noreferrer" className="mt-1.5 block truncate text-sm font-medium text-emerald-400 hover:underline">
+                {safeUrl && (
+                  <a href={safeUrl} target="_blank" rel="noopener noreferrer" className="mt-1.5 block truncate text-sm font-medium text-emerald-400 hover:underline">
                     {r.url} ↗
                   </a>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

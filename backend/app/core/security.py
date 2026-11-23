@@ -33,6 +33,11 @@ from app.models.tables import PendingActivation, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# B4 (corrida seguridad 2026-11-23): algoritmo JWT fijado en código.
+# El env JWT_ALGORITHM se ignora por diseño: un valor "none" en el
+# entorno desactivaría la firma. Solo HS256 está permitido.
+JWT_ALGORITHM = "HS256"
+
 # bcrypt hard limit: inputs past 72 bytes are silently truncated by the
 # algorithm, so two passwords differing only after byte 72 would
 # collide. Reject, don't truncate.
@@ -90,7 +95,7 @@ def create_access_token(
         payload["user_id"] = user_id
     if token_version is not None:
         payload["tv"] = token_version
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=JWT_ALGORITHM)
 
 
 def get_current_user(
@@ -106,7 +111,7 @@ def get_current_user(
         payload = jwt.decode(
             credentials.credentials,
             settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
+            algorithms=[JWT_ALGORITHM],
         )
         username = payload.get("sub")
     except JWTError:

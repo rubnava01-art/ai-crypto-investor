@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, setToken, type AdminUser } from "../lib/api";
+import { api, ApiError, logout, type AdminUser } from "../lib/api";
 import { Panel } from "./Panel";
-import { useConfirm, Field } from "./ui";
+import { useConfirm, Field, copyTextWithFallback } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
@@ -63,6 +63,9 @@ export function UsersPanel() {
 
   const load = useCallback(async () => {
     setLoadError(null);
+    // F7 (2026-11-23, B1): al recargar la lista, ninguna temporal queda
+    // visible (el botón de cada fila ya la limpia al cambiar de fila).
+    setPwTemp(null);
     try {
       const _load1 = await api.listUsers();
       if (isCancelled()) return;
@@ -185,7 +188,7 @@ export function UsersPanel() {
         // llevar al login, en vez de dejar el panel atascado con 401.
         setMsg(t.usuarios.msgPwUpdatedOwn);
         window.setTimeout(() => {
-          setToken(null);
+          logout();
           window.location.replace("/login");
         }, 3000);
       } else {
@@ -221,7 +224,7 @@ export function UsersPanel() {
         // avisar y llevar al login con el nombre nuevo.
         setMsg(t.usuarios.msgRenamedOwn.replace("{nombre}", next));
         window.setTimeout(() => {
-          setToken(null);
+          logout();
           window.location.replace("/login");
         }, 3000);
       } else {
@@ -260,6 +263,16 @@ export function UsersPanel() {
     } finally {
       setPwBusy(false);
     }
+  };
+
+  // F7 (2026-11-23, B1): copiar la temporal y ocultarla de inmediato —
+  // no queda visible en pantalla ni en el estado tras copiarla.
+  const copyTempAndHide = async () => {
+    if (!pwTemp) return;
+    const ok = await copyTextWithFallback(pwTemp);
+    if (!ok) return; // si la copia falló, la temporal sigue visible para reintentarlo a mano
+    setPwTemp(null);
+    setMsg(t.usuarios.tempCopied);
   };
 
   const remove = async (u: AdminUser) => {
@@ -519,10 +532,19 @@ export function UsersPanel() {
                 </div>
               )}
               {pwUserId === u.id && pwTemp && (
-                <p className="mt-3 rounded-lg border border-amber-700/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                  {t.usuarios.tempPrefix.replace("{nombre}", u.username)}
-                  <code className="font-mono font-semibold">{pwTemp}</code>{t.usuarios.tempSuffix}
-                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-700/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                  <p className="min-w-0 flex-1">
+                    {t.usuarios.tempPrefix.replace("{nombre}", u.username)}
+                    <code className="font-mono font-semibold">{pwTemp}</code>{t.usuarios.tempSuffix}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={copyTempAndHide}
+                    className="min-h-[44px] shrink-0 rounded-lg border border-amber-700/60 px-4 py-2.5 text-sm font-semibold text-amber-200 hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                  >
+                    {t.usuarios.copyTempHide}
+                  </button>
+                </div>
               )}
               {renameUserId === u.id && u.status !== "pending" && (
                 <div className="mt-3 flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 sm:flex-row sm:items-center">

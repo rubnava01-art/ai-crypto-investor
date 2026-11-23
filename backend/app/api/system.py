@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app import database
 from app.config import build_git_sha, build_timestamp_utc, settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.core.state import state
 from app.exchange import adapter
 from app.models.tables import User
@@ -63,7 +63,9 @@ def system_status(user: User = Depends(get_current_user)):
 
 
 @router.get("/api/system/metrics")
-def system_metrics(user: User = Depends(get_current_user)):
+def system_metrics(user: User = Depends(require_admin)):
+    # B6 (corrida seguridad 2026-11-23): contadores y latencias
+    # internas, solo admin. Sin llamador no-admin en el frontend.
     from app.core.metrics import snapshot
 
     return snapshot()

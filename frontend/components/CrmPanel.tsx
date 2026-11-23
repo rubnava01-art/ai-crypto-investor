@@ -110,6 +110,12 @@ export function CrmPanel() {
   const visible = (contacts ?? []).filter(
     (c) => !tagFilter || c.tags.includes(tagFilter),
   );
+  // Conteo filtrado (2026-11-23): con el filtro por etiqueta activo el
+  // badge muestra "visibles / total", mismo patrón que Talento humano y
+  // Planillas; sin filtro, solo el total como antes. La búsqueda y el
+  // estado ya filtran en el servidor, así que el total cargado es el
+  // de esa búsqueda/estado y solo la etiqueta recorta en cliente.
+  const filteringByTag = tagFilter !== "";
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -223,7 +229,7 @@ export function CrmPanel() {
       title={t.crm.panelTitle}
       badge={
         <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-          {contacts === null ? (forbidden ? "—" : t.crm.badgeLoading) : `${visible.length} ${visible.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
+          {contacts === null ? (forbidden ? "—" : t.crm.badgeLoading) : filteringByTag ? `${visible.length} / ${contacts.length} ${t.crm.contactPlural}` : `${visible.length} ${visible.length === 1 ? t.crm.contactSingular : t.crm.contactPlural}`}
         </span>
       }
     >

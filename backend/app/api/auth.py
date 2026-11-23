@@ -19,7 +19,6 @@ used to leave an active, unapproved account). Auth error messages are
 unified in Spanish in this module (login + register); the pending
 message is byte-identical to before.
 """
-import random
 import secrets
 import time
 
@@ -45,6 +44,12 @@ from app.models.tables import PendingActivation, User
 from app.schemas.api import LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# B8 (corrida seguridad 2026-11-23): hash ficticio para igualar el
+# tiempo de login cuando el usuario no existe (oráculo de timing).
+# Se genera una vez al importar: bcrypt es lento a propósito y el
+# valor nunca coincide con ninguna contraseña real.
+_DUMMY_PASSWORD_HASH = hash_password("dummy-password-nunca-valida-" + secrets.token_hex(16))
 
 # One-time human challenges: challenge_id -> (answer, expires_at).
 # In-memory by design (single worker, same assumption as the login rate
@@ -138,7 +143,14 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
             headers={"Retry-After": str(LoginLockout.LOCKOUT_SECONDS)},
         )
     user = db.query(User).filter(User.username == payload.username).first()
-    if user is None or not verify_password(payload.password, user.password_hash):
+    # B8: verificar siempre la contraseña, también cuando el usuario
+    # no existe (contra el hash ficticio), para igualar el tiempo.
+    password_ok = (
+        verify_password(payload.password, user.password_hash)
+        if user is not None
+        else verify_password(payload.password, _DUMMY_PASSWORD_HASH)
+    )
+    if user is None or not password_ok:
         login_lockout.record_failure(payload.username)
         audit(
             db, user, "auth.login_failed", "auth",
@@ -208,6 +220,16 @@ def change_password(
     backend exige 12 — por eso "no funcionaba cambiar claves".
     La clave nueva revoca todos los tokens (incluida esta sesión): el
     cliente debe volver a entrar con la clave nueva."""
+    # B7 (corrida seguridad 2026-11-23): reutiliza login_limiter
+    # (10/min) por USUARIO: con una sesión válida ya no se pueden
+    # probar claves actuales sin freno. Tras la validación Pydantic:
+    # los 422 no consumen presupuesto.
+    if not login_limiter.allow(f"change-password:{user.id}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados cambios de clave. Espera un minuto.",
+            headers={"Retry-After": "60"},
+        )
     if not verify_password(payload.current_password, user.password_hash):
         audit(db, user, "auth.change_password_failed", "auth",
               details={"reason": "current_password"})
@@ -241,8 +263,10 @@ def register_challenge(request: Request):
             headers={"Retry-After": "60"},
         )
     _prune_challenges()
-    a = random.randint(10, 99)
-    b = random.randint(10, 99)
+    # B10 (corrida seguridad 2026-11-23): secrets en vez de random
+    # (el reto no debe depender del PRNG predecible de random).
+    a = secrets.randbelow(90) + 10
+    b = secrets.randbelow(90) + 10
     cid = secrets.token_urlsafe(16)
     _CHALLENGES[cid] = (a + b, time.monotonic() + _CHALLENGE_TTL_SECONDS)
     return {"challenge_id": cid, "question": f"¿Cuánto es {a} + {b}?"}
@@ -271,7 +295,24 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         )
     username = payload.username.strip()
     if db.query(User).filter(User.username == username).first() is not None:
-        raise HTTPException(status_code=409, detail="El nombre de usuario ya existe.")
+        # B8 (corrida seguridad 2026-11-23): mismo 201 genérico de
+        # éxito pendiente aunque el nombre exista (sin crear
+        # duplicado): el 409 anterior permitía enumerar usuarios.
+        # C1 (QA 2026-11-23): hashear también en este camino para
+        # igualar el tiempo con un registro real; si no, el duplicado
+        # responde más rápido y delata que el nombre existe.
+        hash_password(payload.password)
+        # Sin id ni created_at: no hay fila creada que referenciar.
+        return {
+            "id": None,
+            "username": username,
+            "role": "prueba",
+            "is_admin": False,
+            "is_super_admin": False,
+            "status": "pending",
+            "requested_plan": payload.plan,
+            "created_at": None,
+        }
     user = User(
         username=username,
         password_hash=hash_password(payload.password),

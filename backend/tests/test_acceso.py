@@ -49,13 +49,19 @@ def test_register_human_check_and_prueba_role(client, admin_headers):
     assert r.json()["role"] == "prueba"
     assert r.json()["is_admin"] is False
 
-    # Duplicate username -> 409 (with a fresh challenge).
+    # Duplicate username -> mismo 201 genérico de éxito pendiente
+    # (B8, corrida seguridad 2026-11-23): el 409 anterior permitía
+    # enumerar usuarios. No se crea duplicado.
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
         json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
     )
-    assert r.status_code == 409
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "pending"
+    assert r.json()["id"] is None
+    users = client.get("/api/users", headers=admin_headers).json()
+    assert len([u for u in users if u["username"] == "nuevo1"]) == 1
 
     # Pending + minted token: still locked out everywhere (Fase 2, M1) —
     # a token must not bypass approval. Only after admin approval is

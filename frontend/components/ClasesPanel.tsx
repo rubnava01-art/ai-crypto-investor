@@ -10,6 +10,7 @@ import { ClasesHerramientas } from "./ClasesHerramientas";
 import { useConfirm, Field, ApiErrorBanner, apiErrorText } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+import { normalizeClassUrl } from "../lib/urls";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
@@ -20,33 +21,6 @@ const fmtDateTime = (iso: string | null, locale: string) =>
         day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
       })
     : null;
-
-/** Espejo frontend de la regla de URLs del backend (E3): solo http/https
- * con host (netloc). Sin esquema se normaliza a https://; cualquier otro
- * esquema se rechaza. */
-function normalizeClassUrl(raw: string): { url: string } | { error: true } {
-  const value = raw.trim();
-  if (!value) return { url: "" };
-  if (value.startsWith("//")) return { url: `https:${value}` };
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(value);
-  if (scheme) {
-    const s = scheme[1].toLowerCase();
-    if (s !== "http" && s !== "https") return { error: true };
-    const rest = value.slice(scheme[0].length);
-    if (!rest.startsWith("//")) {
-      // V1 del QA de Clases (2026-11-12): "http:example.com" pasaba
-      // este filtro y el backend lo rechazaba con 422 (sin netloc).
-      // Sin autoridad se normaliza a https:// + el resto sin barras.
-      const hostpart = rest.replace(/^\/+/, "");
-      if (!hostpart) return { error: true };
-      return { url: `https://${hostpart}` };
-    }
-    // "http://" sin host también lo rechaza el backend (sin netloc).
-    if (!rest.slice(2).split("/")[0]) return { error: true };
-    return { url: value };
-  }
-  return { url: `https://${value}` };
-}
 
 function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean }) {
   const isCancelled = useCancelled();

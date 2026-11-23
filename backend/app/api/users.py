@@ -39,6 +39,8 @@ from app.models.tables import (
     ChatMessage,
     Contact,
     ExchangeConnection,
+    HomeComment,
+    HomePost,
     IdempotencyKey,
     PendingActivation,
     SuperAdminGrant,
@@ -180,6 +182,17 @@ def _detach_user_references(db: Session, user: User) -> None:
     db.query(BusinessCost).filter(
         BusinessCost.created_by_user_id == user.id
     ).update({BusinessCost.created_by_user_id: None})
+    # B9 (corrida seguridad 2026-11-23): posts y comentarios de Inicio
+    # referencian al autor por author_id (FK ondelete SET NULL en el
+    # modelo, pero SQLite no aplica cascadas de BD): sin esto el
+    # borrado fallaba en Postgres para autores de posts/comentarios.
+    # El contenido se PRESERVA con autor anónimo (NULL), nunca se borra.
+    db.query(HomePost).filter(HomePost.author_id == user.id).update(
+        {HomePost.author_id: None}
+    )
+    db.query(HomeComment).filter(HomeComment.author_id == user.id).update(
+        {HomeComment.author_id: None}
+    )
     # Conexiones de exchange: metadatos propios del usuario, se borran.
     db.query(ExchangeConnection).filter(
         ExchangeConnection.user_id == user.id

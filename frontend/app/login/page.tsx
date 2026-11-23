@@ -4,8 +4,8 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, getToken, setToken, ApiError } from "../../lib/api";
-import { safeNext } from "../../lib/session";
+import { api, getToken, setToken, logout, ApiError } from "../../lib/api";
+import { isTokenExpired, safeNext } from "../../lib/session";
 import { passwordStrength } from "../../lib/passwordStrength";
 import { isPlanKey, planNameForKey, type PlanKey } from "../../components/PlanesPanel";
 import { useLanguage } from "../../lib/i18n";
@@ -98,8 +98,18 @@ function LoginPageInner() {
   // A5: con sesión válida, /login no es destino — volver al destino
   // pedido (o al dashboard). Con expired=1 NO se redirige: el aviso de
   // sesión expirada debe seguir visible y el token ya no vale.
+  // F8 (2026-11-23, B4): un token caducado es como no tener token — se
+  // borra y NO se redirige al dashboard (evita el rebote dashboard →
+  // 401 → /login).
   useEffect(() => {
-    if (!sessionExpired && getToken()) router.replace(nextDest);
+    if (sessionExpired) return;
+    const token = getToken();
+    if (!token) return;
+    if (isTokenExpired(token)) {
+      logout();
+      return;
+    }
+    router.replace(nextDest);
   }, [sessionExpired, nextDest, router]);
 
   const loadChallenge = useCallback(async () => {
@@ -189,9 +199,18 @@ function LoginPageInner() {
       setPassword("");
       setAnswer("");
     } catch (err) {
-      // M6: el 422 del reto (respuesta no entera o reto vencido) se muestra
-      // con texto i18n, no con el detalle crudo del backend.
-      if (err instanceof ApiError && err.status === 422) {
+      // F6 (2026-11-23, M1): el 409 NO revela que el nombre ya existe —
+      // se muestra el mismo aviso genérico de cuenta pendiente que un
+      // registro correcto (el backend, B8, hace lo mismo en su lado).
+      if (err instanceof ApiError && err.status === 409) {
+        setNotice(t.login.noticePending);
+        setRegisteredPlan(planName);
+        setMode("login");
+        setPassword("");
+        setAnswer("");
+      } else if (err instanceof ApiError && err.status === 422) {
+        // M6: el 422 del reto (respuesta no entera o reto vencido) se
+        // muestra con texto i18n, no con el detalle crudo del backend.
         setError(t.login.errorAnswerInvalid);
       } else {
         setError(err instanceof ApiError ? err.message : t.login.errorCreate);

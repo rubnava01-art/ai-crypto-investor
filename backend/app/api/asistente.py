@@ -40,7 +40,7 @@ import re
 import unicodedata
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -48,6 +48,9 @@ from app.api import market as market_api
 from app.api.backtest import RUNS_DIR
 from app.api.bi import _invoice_total
 from app.api.marketing import _overlaps
+from app.api.portal import deny_linked_reader
+from app.core.hardening import audit
+from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user
 from app.data import ingest
 from app.database import get_db
@@ -68,6 +71,11 @@ from app.models.tables import (
 router = APIRouter(prefix="/api/asistente", tags=["asistente"])
 
 MAX_MENSAJE = 1000
+
+# B2 (corrida seguridad 2026-11-23): limiter por USUARIO en /chat
+# (20/min, como ai_ask). Clave solo por usuario: sobrevive al proxy
+# de Render, donde la IP colapsa (ver rate_limit.py).
+asistente_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 # ------------------------------------------------------------------ catálogo --
 
@@ -486,6 +494,9 @@ def _h_crear_nota(db: Session, user: User, mensaje: str) -> dict:
     db.add(nota)
     db.commit()
     db.refresh(nota)
+    # B2: auditoría de la mutación (sin el contenido del usuario).
+    audit(db, user, "asistente.crear_nota", "business_note", str(nota.id),
+          details={"area": "marketing"})
     return _respuesta(
         f"Nota creada en Negocio > Marketing (id {nota.id}): «{nota.title}».",
         tipo="crear_nota", datos={"id": nota.id, "title": nota.title, "area": "marketing"},
@@ -507,6 +518,9 @@ def _h_crear_tarea(db: Session, user: User, mensaje: str) -> dict:
     db.add(tarea)
     db.commit()
     db.refresh(tarea)
+    # B2: auditoría de la mutación (sin el contenido del usuario).
+    audit(db, user, "asistente.crear_tarea", "business_task", str(tarea.id),
+          details={"area": "marketing"})
     return _respuesta(
         f"Tarea creada en Negocio > Marketing (id {tarea.id}): «{tarea.title}».",
         tipo="crear_tarea", datos={"id": tarea.id, "title": tarea.title, "area": "marketing"},
@@ -550,6 +564,9 @@ def _h_crear_borrador(db: Session, user: User, mensaje: str) -> dict:
     db.add(item)
     db.commit()
     db.refresh(item)
+    # B2: auditoría de la mutación (sin el contenido del usuario).
+    audit(db, user, "asistente.crear_borrador", "content_item", str(item.id),
+          details={"source": "plantilla", "status": "borrador"})
     return _respuesta(
         f"Borrador creado en el Content Engine (id {item.id}): «{item.title}». "
         "Es una plantilla por reglas, no IA: revísalo antes de programarlo.",
@@ -644,7 +661,12 @@ def _h_crear_cita(db: Session, user: User, mensaje: str, norm: str) -> dict:
         )
     contact = None
     if cliente:
-        contact = db.query(Contact).filter(Contact.name.ilike(f"%{cliente}%")).first()
+        # B5: escapar wildcards LIKE (mismo escapado que crm.py:110-116):
+        # un % o _ del usuario no debe actuar como comodín.
+        raw = cliente.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        contact = db.query(Contact).filter(
+            Contact.name.ilike(f"%{raw}%", escape="\\")
+        ).first()
     contact_id = contact.id if contact else None
     client_name = contact.name if contact else cliente
     if not client_name:
@@ -670,6 +692,9 @@ def _h_crear_cita(db: Session, user: User, mensaje: str, norm: str) -> dict:
     db.add(appt)
     db.commit()
     db.refresh(appt)
+    # B2: auditoría de la mutación (sin el contenido del usuario).
+    audit(db, user, "asistente.crear_cita", "appointment", str(appt.id),
+          details={"contact_id": contact_id})
     return _respuesta(
         f"Cita creada (id {appt.id}): {client_name} — {servicio}, "
         f"{starts_at.isoformat()} (60 min, pendiente).",
@@ -774,13 +799,21 @@ class ChatIn(BaseModel):
 
 
 @router.get("/capacidades")
-def capacidades(user: User = Depends(get_current_user)):
+def capacidades(user: User = Depends(get_current_user),
+                db: Session = Depends(get_db)):
+    # B1 (corrida seguridad 2026-11-23): cliente vinculado -> 403
+    # (mismo patrón que crm.py:105). Solo bloquea a clientes
+    # vinculados; el rol prueba sin vínculo no cambia (decisión M1
+    # de Rubén, pendiente).
+    deny_linked_reader(db, user)
     return {"comandos": COMANDOS}
 
 
 @router.post("/chat")
 def chat(payload: ChatIn, user: User = Depends(get_current_user),
           db: Session = Depends(get_db)):
+    # B1: cliente vinculado -> 403 (ver capacidades()).
+    deny_linked_reader(db, user)
     mensaje = (payload.mensaje or "")
     if not mensaje.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -788,6 +821,13 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
     if len(mensaje) > MAX_MENSAJE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"El mensaje no puede superar {MAX_MENSAJE} caracteres.")
+    # B2: limiter por usuario (20/min, como ai_ask). Tras la
+    # validación: los 400 no consumen presupuesto.
+    if not asistente_limiter.allow(f"asistente_chat:{user.id}"):
+        raise too_many_requests(
+            "Demasiadas preguntas al asistente. Espera un minuto.",
+            asistente_limiter.window,
+        )
     norm = _norm(mensaje)
     # 1) Prohibido, antes que cualquier intención: subcadenas fijas y
     # compra/venta de cripto con cantidad intermedia ("compra 0.01 BTC").

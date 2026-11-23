@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  api, getToken, setToken, ApiError,
+  api, getToken, logout as logoutSession, setToken, ApiError,
   type SystemStatus, type BalancesResponse, type PerformanceResponse,
   type SignalsResponse, type StrategyOut, type SimulationModes,
   type OperationsResponse, type RiskLimits, type LogEntry,
@@ -209,7 +209,7 @@ export default function DashboardPage() {
   }
 
   function logout() {
-    setToken(null);
+    logoutSession();
     router.replace("/login");
   }
 
