@@ -114,6 +114,7 @@ export type Dictionary = {
   planes: Record<string, string>;
   // Landing pública, menú público y página de contacto (2026-11-12).
   landing: Record<string, string>;
+  guest: Record<string, string>;
   publicNav: Record<string, string>;
   contacto: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.

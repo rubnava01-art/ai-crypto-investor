@@ -26,7 +26,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user, require_admin
+from app.core.security import (
+    Principal,
+    get_current_user,
+    guest_read_guard,
+    require_admin,
+)
 from app.database import get_db
 from app.models.tables import Contact, Course, CourseEnrollment, User, utcnow
 
@@ -360,7 +365,9 @@ def _check_kind(value: str) -> str:
 
 @router.get("/courses", response_model=list[CourseOut])
 def list_courses(
-    user: User = Depends(get_current_user),
+    # Fase 1 (2026-11-23): catálogo abierto a invitado (solo lectura;
+    # alumnos y escrituras siguen cerrados).
+    user: Principal = Depends(guest_read_guard),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -374,7 +381,9 @@ def list_courses(
 @router.get("/courses/{course_id}/download")
 def download_course_pdf(
     course_id: int,
-    user: User = Depends(get_current_user),
+    # Fase 1 (2026-11-23): descarga de PDF abierta a invitado
+    # (Estudiar en solo lectura).
+    user: Principal = Depends(guest_read_guard),
     db: Session = Depends(get_db),
 ):
     """Serve the course's real PDF — authenticated users only (any role).

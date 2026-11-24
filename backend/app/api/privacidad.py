@@ -12,6 +12,15 @@ task center — it does not publish legal texts and does not claim the
 site complies. The document items (privacy policy, terms, refunds,
 cookies) are tasks to draft and maintain those documents; their
 links/text live in `notes`, filled in by the admin.
+
+Verificación Fase 0 (2026-11-23, mejoras óptimas, P0-1): las
+lecturas de este router NO se cierran con require_modulo. No
+exponen datos de otros usuarios: los ítems son tareas compartidas
+de cumplimiento (título/categoría/descripción/estado/notas del
+admin), sin filas por usuario ni PII de clientes. Las escrituras
+ya son admin-only (require_admin). Si las notas llegan a llevar
+datos de un usuario concreto, hay que cerrar el router con el
+módulo "privacidad".
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status

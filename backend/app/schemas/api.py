@@ -63,7 +63,11 @@ class SystemStatus(BaseModel):
     simulation_mode: Literal["simulation", "paper", "real"] = "simulation"
     kill_switch: bool = False
     data_source: str = "DEMO"
-    last_update_utc: str
+    # Fase 5 (2026-11-23, P2-2): última ingesta REAL de mercado (max
+    # open_time de MarketCandle o último SystemEvent de scanner).
+    # None = nunca ha habido ingesta (el frontend lo muestra como
+    # "sin datos todavía"); antes era utcnow(), engañoso.
+    last_update_utc: str | None = None
 
 
 # ---------- portfolio ----------

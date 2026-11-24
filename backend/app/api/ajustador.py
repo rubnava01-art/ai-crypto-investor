@@ -15,6 +15,16 @@
 
 List responses are bare JSON arrays, matching the CRM/inventario
 pattern (not {items: [...]}). Both lists start EMPTY.
+
+Verificación Fase 0 (2026-11-23, mejoras óptimas, P0-1): las
+lecturas de estos dos routers NO se cierran con require_modulo.
+No exponen datos de otros usuarios: los ajustes son propuestas
+sobre secciones de la plataforma (sin filas por usuario ni PII) y
+los vídeos son enlaces públicos de YouTube con título — el mismo
+contenido para cualquier lector autenticado. Las escrituras ya son
+admin-only (require_admin). Si un ajuste o vídeo llega a llevar
+datos de un usuario concreto, hay que cerrar el router con su
+módulo ("ajustador").
 """
 import datetime as dt
 import re

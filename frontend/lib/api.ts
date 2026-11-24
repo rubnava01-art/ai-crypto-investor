@@ -5,6 +5,8 @@
 export * from "./api/types";
 export * from "./api/client";
 export * from "./api/market";
+export { guestApi, GUEST_MODULES } from "./api/guest";
+export type { GuestTokenResponse } from "./api/guest";
 import { systemApi } from "./api/system";
 import { usersApi } from "./api/users";
 import { crmApi } from "./api/crm";
@@ -32,6 +34,7 @@ import { portalApi } from "./api/portal";
 import { contenidoApi } from "./api/contenido";
 import { biApi } from "./api/bi";
 import { accesoApi } from "./api/acceso";
+import { guestApi } from "./api/guest";
 
 export const api = {
   ...systemApi,
@@ -61,4 +64,5 @@ export const api = {
   ...contenidoApi,
   ...biApi,
   ...accesoApi,
+  ...guestApi,
 };

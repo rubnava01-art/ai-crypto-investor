@@ -104,8 +104,12 @@ def linked_contact_for(db: Session, user: User) -> Contact | None:
     devuelve un contacto. Devuelve None para el admin (ve todo) y
     para el no-admin sin vínculo (cuenta `prueba` del dueño: sus
     lecturas quedan como hoy, por decisión D3 del plan). No deniega
-    nada: el llamador decide qué hacer con None."""
+    nada: el llamador decide qué hacer con None. Un Guest (id None)
+    devuelve None: sin el guard, `Contact.user_id == None` sería
+    IS NULL y casaría con cualquier contacto sin vínculo."""
     if user.is_admin:
+        return None
+    if getattr(user, "id", None) is None:
         return None
     return db.query(Contact).filter(Contact.user_id == user.id).first()
 

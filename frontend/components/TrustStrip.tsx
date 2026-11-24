@@ -1,7 +1,7 @@
 // Franja de confianza / prueba social — rediseño fintech (2026-11-14,
 // Agente 1). REGLA DE HONESTIDAD: todos los valores llegan por props
 // como strings; este componente NO inventa ni hardcodea ninguna cifra.
-// El llamador pasa solo números reales verificados (p. ej. 24 módulos,
+// El llamador pasa solo números reales verificados (p. ej. 25 módulos,
 // 4 pilares, 3 planes, 14 días gratis, 2 idiomas). Sin items no
 // renderiza nada. El backtest −9,29 % neto NO va aquí: solo con su
 // aviso de resultados pasados, en el sitio que lo muestre.

@@ -64,8 +64,19 @@ from app.api.bi import _invoice_total
 from app.api.marketing import _overlaps
 from app.api.portal import deny_linked_reader
 from app.core.hardening import audit
-from app.core.rate_limit import RateLimiter, too_many_requests
-from app.core.security import get_current_user, require_admin
+from app.core.rate_limit import (
+    RateLimiter,
+    guest_chat_limiter,
+    too_many_requests,
+)
+from app.core.security import (
+    Guest,
+    Principal,
+    get_current_principal,
+    get_current_user,
+    guest_read_guard,
+    require_admin,
+)
 from app.data import ingest
 from app.database import get_db
 from app.indicators import technical as ind
@@ -303,9 +314,18 @@ def _respuesta(texto: str, tipo: str | None = None, datos: dict | None = None,
     }
 
 
-def _solo_lectura() -> dict:
+def _etiqueta_principal(principal) -> str:
+    """Nombre del perfil para los mensajes de rechazo: el invitado no
+    es "prueba" (P2 QA 2026-11-23: el texto lo etiquetaba mal)."""
+    if isinstance(principal, Guest):
+        return "invitado"
+    return "prueba"
+
+
+def _solo_lectura(principal=None) -> dict:
+    etiqueta = _etiqueta_principal(principal)
     return _respuesta(
-        "Tu rol (prueba) es de solo lectura: puedes consultar precios, "
+        f"Tu rol ({etiqueta}) es de solo lectura: puedes consultar precios, "
         "señales, análisis, citas, facturas, contactos, clases y "
         "novedades, pero no crear notas, tareas, borradores ni citas. "
         "Pídele a un administrador que haga ese cambio.",
@@ -313,12 +333,13 @@ def _solo_lectura() -> dict:
     )
 
 
-def _no_disponible_demo() -> dict:
+def _no_disponible_demo(principal=None) -> dict:
     """M1 (resuelto 2026-11-23): prueba ya NO recibe facturas, citas
     ni contactos reales por chat. Precios, señales, análisis, clases
     y novedades siguen disponibles."""
+    etiqueta = _etiqueta_principal(principal)
     return _respuesta(
-        "No disponible en la demo: tu rol (prueba) puede "
+        f"No disponible en la demo: tu rol ({etiqueta}) puede "
         "consultar precios, señales, análisis, clases y novedades, "
         "pero no ver facturas, citas ni contactos reales. Pídele a un "
         "administrador que te dé acceso.",
@@ -530,6 +551,26 @@ def _registrar_pregunta(db: Session, pregunta: str):
     return row
 
 
+# Fase 1 (2026-11-23, mejoras óptimas): las preguntas sin respuesta
+# de INVITADO no se guardan en la bandeja de enseñanza (un anónimo
+# podría llenarla de spam); solo se cuentan en memoria.
+_sin_respuesta_invitado: int = 0
+
+
+def invitado_sin_respuesta_total() -> int:
+    """Contador de preguntas sin respuesta de invitados (para tests)."""
+    return _sin_respuesta_invitado
+
+
+def _registrar_pregunta_para(principal, db: Session, pregunta: str):
+    """Bandeja para usuarios; solo conteo para invitados."""
+    global _sin_respuesta_invitado
+    if isinstance(principal, Guest):
+        _sin_respuesta_invitado += 1
+        return None
+    return _registrar_pregunta(db, pregunta)
+
+
 def _extraer_despues(mensaje: str, patrones: tuple[str, ...]) -> str:
     """Texto tras la primera orden que coincida (regex insensible a
     mayúsculas, con acentos opcionales en las vocales)."""
@@ -725,7 +766,7 @@ def _h_analisis(db: Session) -> dict:
 
 def _h_crear_nota(db: Session, user: User, mensaje: str) -> dict:
     if not user.is_admin:
-        return _solo_lectura()
+        return _solo_lectura(user)
     texto = _extraer_despues(mensaje, (r"crea una nota", r"crear una nota", r"nueva nota", r"anota"))
     if not texto:
         return _respuesta(
@@ -749,7 +790,7 @@ def _h_crear_nota(db: Session, user: User, mensaje: str) -> dict:
 
 def _h_crear_tarea(db: Session, user: User, mensaje: str) -> dict:
     if not user.is_admin:
-        return _solo_lectura()
+        return _solo_lectura(user)
     texto = _extraer_despues(mensaje, (r"crea una tarea", r"crear una tarea", r"nueva tarea", r"pendiente"))
     if not texto:
         return _respuesta(
@@ -773,7 +814,7 @@ def _h_crear_tarea(db: Session, user: User, mensaje: str) -> dict:
 
 def _h_crear_borrador(db: Session, user: User, mensaje: str) -> dict:
     if not user.is_admin:
-        return _solo_lectura()
+        return _solo_lectura(user)
     # Patrones anclados a un verbo de creación: el "borrador" suelto
     # ya no extrae tema (A1). Si no hay verbo, tema queda vacío y se
     # pregunta el tema en vez de crear nada.
@@ -824,7 +865,7 @@ def _h_crear_borrador(db: Session, user: User, mensaje: str) -> dict:
 def _h_listar_citas(db: Session, user: User) -> dict:
     # M1 (resuelto 2026-11-23): prueba no ve citas reales por chat.
     if not user.is_admin:
-        return _no_disponible_demo()
+        return _no_disponible_demo(user)
     ahora = dt.datetime.now(dt.timezone.utc)
     rows = (
         db.query(Appointment)
@@ -892,7 +933,7 @@ def _parse_cita(mensaje_norm: str) -> tuple[dt.datetime | None, str, str]:
 
 def _h_crear_cita(db: Session, user: User, mensaje: str, norm: str) -> dict:
     if not user.is_admin:
-        return _solo_lectura()
+        return _solo_lectura(user)
     starts_at, cliente, servicio = _parse_cita(norm)
     if starts_at is None:
         return _respuesta(
@@ -954,7 +995,7 @@ def _h_crear_cita(db: Session, user: User, mensaje: str, norm: str) -> dict:
 def _h_facturas(db: Session, user: User) -> dict:
     # M1 (resuelto 2026-11-23): prueba no ve facturas reales por chat.
     if not user.is_admin:
-        return _no_disponible_demo()
+        return _no_disponible_demo(user)
     facturas = db.query(Invoice).all()
     total_pagado = Decimal("0")
     total_enviado = Decimal("0")
@@ -982,7 +1023,7 @@ def _h_facturas(db: Session, user: User) -> dict:
 def _h_contactos(db: Session, user: User) -> dict:
     # M1 (resuelto 2026-11-23): prueba no ve contactos reales por chat.
     if not user.is_admin:
-        return _no_disponible_demo()
+        return _no_disponible_demo(user)
     rows = db.query(Contact).order_by(Contact.id.desc()).limit(10).all()
     if not rows:
         return _respuesta("No hay contactos registrados en el CRM.",
@@ -1109,21 +1150,24 @@ class ChatIn(BaseModel):
 
 
 @router.get("/capacidades")
-def capacidades(user: User = Depends(get_current_user),
+def capacidades(principal: Principal = Depends(guest_read_guard),
                 db: Session = Depends(get_db)):
     # B1 (corrida seguridad 2026-11-23): cliente vinculado -> 403
     # (mismo patrón que crm.py:105). Solo bloquea a clientes
     # vinculados; el rol prueba sin vínculo no cambia (decisión M1
-    # de Rubén, pendiente).
-    deny_linked_reader(db, user)
+    # de Rubén, pendiente). El invitado pasa: deny_linked_reader
+    # devuelve None para Guest (sin id, sin vínculo posible).
+    deny_linked_reader(db, principal)
     return {"comandos": COMANDOS}
 
 
 @router.post("/chat")
-def chat(payload: ChatIn, user: User = Depends(get_current_user),
-          db: Session = Depends(get_db)):
+def chat(payload: ChatIn, request: Request,
+         principal: Principal = Depends(get_current_principal),
+         db: Session = Depends(get_db)):
     # B1: cliente vinculado -> 403 (ver capacidades()).
-    deny_linked_reader(db, user)
+    deny_linked_reader(db, principal)
+    user = principal
     mensaje = (payload.mensaje or "")
     if not mensaje.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -1133,7 +1177,16 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
                             detail=f"El mensaje no puede superar {MAX_MENSAJE} caracteres.")
     # B2: limiter por usuario (20/min, como ai_ask). Tras la
     # validación: los 400 no consumen presupuesto.
-    if not asistente_limiter.allow(f"asistente_chat:{user.id}"):
+    # Fase 1 (2026-11-23): el invitado no tiene user.id — su limiter
+    # es por IP, 5/min, con Retry-After.
+    if isinstance(principal, Guest):
+        client_ip = request.client.host if request.client else "unknown"
+        if not guest_chat_limiter.allow(f"guest_chat:{client_ip}"):
+            raise too_many_requests(
+                "Demasiadas preguntas como invitado. Espera un minuto.",
+                guest_chat_limiter.window,
+            )
+    elif not asistente_limiter.allow(f"asistente_chat:{user.id}"):
         raise too_many_requests(
             "Demasiadas preguntas al asistente. Espera un minuto.",
             asistente_limiter.window,
@@ -1217,7 +1270,7 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
     # la vía rápida: saludos y sinsentidos caen a la bandeja sin
     # esperar al presupuesto de Internet.
     if _sin_respuesta_rapida(norm):
-        _registrar_pregunta(db, mensaje.strip())
+        _registrar_pregunta_para(principal, db, mensaje.strip())
         return _h_sin_respuesta()
     hallazgo = buscar_en_internet(mensaje.strip())
     if hallazgo is not None:
@@ -1232,8 +1285,9 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
             sugerencias=_SUGERENCIAS_LECTURA,
         )
     # Sin fuente: respuesta clara + registro en la bandeja para que
-    # el admin la enseñe. No se inventa nada.
-    _registrar_pregunta(db, mensaje.strip())
+    # el admin la enseñe. No se inventa nada. (Invitado: solo conteo,
+    # sin fila en la bandeja — ver _registrar_pregunta_para.)
+    _registrar_pregunta_para(principal, db, mensaje.strip())
     return _h_sin_respuesta()
 
 

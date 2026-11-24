@@ -59,7 +59,10 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     tiene_invertir = "invertir" in modulos
     es_admin = bool(user.is_admin)
     return {
-        "system": _safe("system", lambda: _dump(system.system_status(user))),
+        # Fase 5 (2026-11-23): system_status necesita la sesión para
+        # la última ingesta real — el dashboard ya la tiene y la pasa
+        # (antes se llamaba sin db porque no la usaba).
+        "system": _safe("system", lambda: _dump(system.system_status(user, db))),
         # Portfolio now computes from paper rows, so it needs the session
         # (Fase 3, M17) — the dashboard already holds one, pass it through.
         "balances": _safe("balances", lambda: _dump(portfolio.balances(user, db))) if tiene_invertir else None,

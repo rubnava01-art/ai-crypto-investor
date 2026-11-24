@@ -6,10 +6,11 @@ import ErrorPage from "../error";
  * en este módulo muestra el error de la app sin tumbar el resto de la
  * navegación; reutiliza la página de error raíz, sin textos nuevos. */
 export default function RouteError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <ErrorPage reset={reset} />;
+  return <ErrorPage error={error} reset={reset} />;
 }

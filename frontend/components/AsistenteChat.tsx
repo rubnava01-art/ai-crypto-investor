@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ApiError, getToken } from "../lib/api/client";
+import { ApiError, getToken, isGuest } from "../lib/api/client";
 import { api } from "../lib/api";
 import { loginUrl } from "../lib/session";
 import { safeHttpHref } from "../lib/urls";
@@ -16,6 +16,7 @@ import {
 } from "../lib/asistente";
 import { useLanguage } from "../lib/i18n";
 import { PreguntasEnsenar } from "./PreguntasEnsenar";
+import { catalogMemo } from "../lib/api/memo";
 
 /**
  * Asistente — chat personalizado dentro de la web.
@@ -25,9 +26,9 @@ import { PreguntasEnsenar } from "./PreguntasEnsenar";
  * Las respuestas llegan en español desde el backend y se muestran tal cual;
  * si el backend devuelve accion null con texto de solo-lectura (rol prueba),
  * también se muestra tal cual.
- * Tras una acción se muestra la confirmación; no hay mecanismo global de
- * refresco de paneles en la plataforma, así que la lista afectada se
- * actualiza la próxima vez que se visite (ver audit-agente-1.md §5).
+ * Tras una acción se muestra la confirmación y se invalida el memo del
+ * cliente (P2, 2026-11-23): la lista afectada se vuelve a pedir al
+ * visitar el módulo, en vez de mostrar datos viejos hasta recargar.
  */
 
 type ChatMsg = {
@@ -238,8 +239,11 @@ function AsistenteChatBody() {
   const sendingRef = useRef(false);
 
   // Capacidades (chips de comandos) al montar, solo con sesión.
+  // Invitado (Fase 1): sin /me ni capacidades — /me con token de
+  // invitado no tiene fila de usuario y un 401 expulsaría la prueba; el
+  // invitado nunca es admin y los chips llegan con las respuestas.
   useEffect(() => {
-    if (!getToken()) return;
+    if (!getToken() || isGuest()) return;
     let cancelled = false;
     (async () => {
       try {
@@ -280,6 +284,10 @@ function AsistenteChatBody() {
       setSugerencias([]);
       try {
         const res = await postChat(text);
+        // Refresco de paneles (P2): si el Asistente ejecutó una acción,
+        // los catálogos memoizados quedan viejos — se invalidan para que
+        // el módulo afectado se vuelva a pedir al visitarlo.
+        if (res.accion) catalogMemo.clear();
         setMessages((prev) => [
           ...prev,
           {
@@ -371,6 +379,20 @@ function AsistenteChatBody() {
         )}
       </div>
 
+      {/* Invitación a registrarse tras 5 mensajes de invitado (Fase 1):
+          el chat sigue funcionando, pero guardar el progreso exige cuenta. */}
+      {isGuest() && messages.filter((m) => m.role === "user").length >= 5 && (
+        <div role="status" className="border-t border-emerald-800/60 bg-emerald-500/10 px-4 py-3">
+          <p className="text-sm leading-relaxed text-emerald-200">{t.guest.inviteChat}</p>
+          <Link
+            href="/login?mode=register"
+            className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          >
+            {t.guest.bannerCta}
+          </Link>
+        </div>
+      )}
+
       {!hasSession && (
         <div className="border-t border-zinc-800 px-4 py-3">
           <p className="text-sm text-zinc-300">{t.asistente.errLogin}</p>
@@ -458,7 +480,7 @@ export function AsistenteChat() {
   // asume prueba (mismo fallback que ModuleNav), así admin/prueba
   // quedan como hoy. Sin sesión no hay cliente vinculado posible: se
   // muestra como hoy.
-  const [perfil, setPerfil] = useState<"loading" | "admin" | "prueba" | "cliente">(() =>
+  const [perfil, setPerfil] = useState<"loading" | "admin" | "prueba" | "cliente" | "invitado">(() =>
     getToken() ? "loading" : "prueba",
   );
 
@@ -473,20 +495,51 @@ export function AsistenteChat() {
       })
       .catch(() => {
         if (cancelled) return;
-        setPerfil("prueba");
+        // Invitado sin perfil (backend aún sin invitado): el FAB se
+        // muestra igual; el chat con token invitado es de solo lectura.
+        setPerfil(isGuest() ? "invitado" : "prueba");
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // Focus trap + retorno de foco (P2, 2026-11-23): al abrir, el foco va
+  // al input del chat; Tab cicla dentro del panel; al cerrar, el foco
+  // vuelve al botón flotante. Escape también cierra.
+  const fabRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
+    const panel = panelRef.current;
+    panel?.querySelector<HTMLInputElement>("input")?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      fabRef.current?.focus();
+    };
   }, [open ]);
 
   if (pathname === "/login" || pathname === "/asistente") return null;
@@ -497,6 +550,7 @@ export function AsistenteChat() {
     <>
       {open && (
         <section
+          ref={panelRef}
           aria-label={t.asistente.title}
           className="fixed inset-x-4 bottom-40 z-50 flex h-[min(70dvh,560px)] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl sm:inset-x-auto sm:bottom-24 sm:right-6 sm:w-[380px]"
         >
@@ -529,6 +583,7 @@ export function AsistenteChat() {
         </section>
       )}
       <button
+        ref={fabRef}
         type="button"
         aria-label={open ? t.asistente.closeAria : t.asistente.openAria}
         aria-expanded={open}

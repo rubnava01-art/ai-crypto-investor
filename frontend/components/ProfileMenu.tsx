@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, type MeResponse, type UserProfile } from "../lib/api";
+import Link from "next/link";
+import { api, ApiError, isGuest, type MeResponse, type UserProfile } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { isSafeAvatarSrc } from "../lib/urls";
 
@@ -221,11 +222,15 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // Invitado (Fase 1): sin /me ni perfil — no hay fila de usuario y un
+  // 401 expulsaría la prueba. Menú mínimo: crear cuenta o salir.
+  const guest = isGuest();
 
   useEffect(() => {
+    if (guest) return;
     api.me().then(setMe).catch(() => setMe(null));
     api.getMyProfile().then(setProfile).catch(() => setProfile(null));
-  }, []);
+  }, [guest]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -249,7 +254,9 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const displayName = profile?.display_name?.trim() || me?.username || "…";
+  const displayName = guest
+    ? t.guest.menuName
+    : profile?.display_name?.trim() || me?.username || "…";
   const initial = displayName.slice(0, 1).toUpperCase();
   // Demo-word cleanup (2026-10-28): the generic "modo demo" suffix is
   // removed from the role line. Trading simulation labels (DemoBadge,
@@ -279,16 +286,28 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <div role="menu" aria-label={t.perfil.menuAria} className="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
           <div className="border-b border-zinc-800 px-4 py-3">
             <p className="truncate text-sm font-semibold text-zinc-100">{displayName}</p>
-            <p className="truncate text-xs text-zinc-400">{me?.username}</p>
-            <p className="mt-0.5 text-xs text-zinc-400">{roleText}</p>
+            {!guest && <p className="truncate text-xs text-zinc-400">{me?.username}</p>}
+            {!guest && <p className="mt-0.5 text-xs text-zinc-400">{roleText}</p>}
+            {guest && <p className="mt-0.5 text-xs text-zinc-400">{t.guest.banner}</p>}
           </div>
-          <button
-            role="menuitem"
-            onClick={() => { setOpen(false); setEditing(true); }}
-            className="block w-full px-4 py-3 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            {t.perfil.title}
-          </button>
+          {guest ? (
+            <Link
+              role="menuitem"
+              href="/login?mode=register"
+              onClick={() => setOpen(false)}
+              className="block w-full px-4 py-3 text-left text-sm font-semibold text-emerald-300 transition-colors hover:bg-zinc-800 hover:text-emerald-200"
+            >
+              {t.guest.bannerCta}
+            </Link>
+          ) : (
+            <button
+              role="menuitem"
+              onClick={() => { setOpen(false); setEditing(true); }}
+              className="block w-full px-4 py-3 text-left text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              {t.perfil.title}
+            </button>
+          )}
           <button
             role="menuitem"
             onClick={() => { setOpen(false); onLogout(); }}

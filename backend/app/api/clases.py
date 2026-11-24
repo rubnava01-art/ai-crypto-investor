@@ -15,7 +15,12 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user, require_admin
+from app.core.security import (
+    Principal,
+    get_current_user,
+    guest_read_guard,
+    require_admin,
+)
 from app.database import get_db
 from app.models.tables import EduClass, User
 
@@ -78,7 +83,8 @@ def _class_out(c: EduClass) -> EduClassOut:
 @router.get("/classes", response_model=list[EduClassOut])
 def list_classes(
     kind: str | None = None,
-    user: User = Depends(get_current_user),
+    # Fase 1 (2026-11-23): listado abierto a invitado (solo lectura).
+    user: Principal = Depends(guest_read_guard),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

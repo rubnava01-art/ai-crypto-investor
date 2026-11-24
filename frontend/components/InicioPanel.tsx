@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from "../lib/api";
+import { api, ApiError, isGuest, type HomeComment, type HomePost, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { novedadesOrdenadas } from "../lib/novedades";
 import { Panel } from "./Panel";
@@ -50,7 +50,9 @@ export function InicioPanel() {
   const isAdmin = !!me?.is_admin;
 
   useEffect(() => {
-    api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
+    // Invitado (Fase 1): nunca es admin y /me no tiene fila de usuario —
+    // no se pide, para que un 401 no expulse la prueba.
+    if (!isGuest()) api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
   }, [isCancelled]);
 
   const loadComments = useCallback(async (postId: number) => {

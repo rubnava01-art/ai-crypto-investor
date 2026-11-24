@@ -3,8 +3,15 @@
 import { useLanguage } from "../lib/i18n";
 
 /** Página de error propia (corrida 3 agentes 2026-10-29): antes caía en la
- * página genérica de Next.js, en inglés y fuera del tema oscuro. */
-export default function ErrorPage({ reset }: { reset: () => void }) {
+ * página genérica de Next.js, en inglés y fuera del tema oscuro.
+ * P2 (2026-11-23): muestra error.digest cuando existe, para reportarlo. */
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   const { t } = useLanguage();
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-zinc-950 px-4 py-10 text-center">
@@ -15,6 +22,11 @@ export default function ErrorPage({ reset }: { reset: () => void }) {
       <p role="alert" className="mt-2 max-w-sm text-sm leading-relaxed text-zinc-400 [text-wrap:balance]">
         {t.misc.errorBody}
       </p>
+      {error?.digest ? (
+        <p className="mt-3 font-mono text-xs text-zinc-500">
+          {t.misc.errorDigest.replace("{digest}", error.digest)}
+        </p>
+      ) : null}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <button
           onClick={reset}

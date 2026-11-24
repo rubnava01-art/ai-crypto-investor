@@ -18,7 +18,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.rate_limit import RateLimiter, too_many_requests
-from app.core.security import get_current_user, require_admin
+from app.core.security import (
+    Principal,
+    get_current_user,
+    guest_read_guard,
+    require_admin,
+)
 from app.database import get_db
 from app.models.tables import HomeComment, HomePost, User
 
@@ -131,7 +136,9 @@ def _comment_out(
 def list_posts(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: User = Depends(get_current_user),
+    # Fase 1 (2026-11-23): lectura abierta a invitado (nombres
+    # redactados: Guest.is_admin es False).
+    user: Principal = Depends(guest_read_guard),
     db: Session = Depends(get_db),
 ):
     rows = (
@@ -211,7 +218,9 @@ def list_comments(
     post_id: int,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: User = Depends(get_current_user),
+    # Fase 1 (2026-11-23): lectura de comentarios abierta a invitado.
+    # Crear comentarios sigue exigiendo get_current_user (403 invitado).
+    user: Principal = Depends(guest_read_guard),
     db: Session = Depends(get_db),
 ):
     post = db.get(HomePost, post_id)

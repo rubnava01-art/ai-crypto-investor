@@ -23,6 +23,40 @@ if (typeof window !== "undefined" && !process.env.NEXT_PUBLIC_API_URL) {
   );
 }
 const TOKEN_KEY = "aci_token";
+// Sesión de invitado (Fase 1, 2026-11-23): el token invitado vive en el
+// mismo almacenamiento que el de cuenta, con una marca aparte
+// (`aci_guest=1`) para que la UI sepa que es una prueba sin registro
+// (menú filtrado, banner, sin /me ni perfil). Sin PII, sin persistencia.
+const GUEST_KEY = "aci_guest";
+
+export function isGuest(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(GUEST_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Guarda un token de invitado (contrato POST /api/auth/guest). */
+export function setGuestToken(token: string) {
+  setToken(token);
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(GUEST_KEY, "1");
+  } catch {
+    /* almacenamiento no disponible: la sesión sigue valiendo */
+  }
+}
+
+function clearGuestFlag() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(GUEST_KEY);
+  } catch {
+    /* nada que limpiar */
+  }
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -51,6 +85,7 @@ export function setToken(token: string | null) {
 export function logout() {
   if (typeof window === "undefined") return;
   setToken(null);
+  clearGuestFlag();
   try {
     window.sessionStorage.removeItem("grow-correo-borrador");
   } catch {
@@ -209,6 +244,13 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 export function handleUnauthorized() {
   if (typeof window === "undefined") return;
   if (window.location.pathname === "/login") return;
+  // Invitado (Fase 1): su token dura 15 min; al caducar vuelve a la
+  // landing pública con el aviso, no al login (no tiene cuenta).
+  if (isGuest()) {
+    logout();
+    window.location.replace("/?guest=expired");
+    return;
+  }
   // F1 (2026-11-23): la expiración también es un cierre de sesión:
   // token + borrador + datos locales, no solo el token.
   logout();
@@ -250,9 +292,10 @@ export async function request<T>(
     timeoutMs?: number;
     /** Señal de cancelación del llamador (useAsyncLoad al desmontar). */
     signal?: AbortSignal;
-    /** Reintento opt-in (Fase 4, FE8): 1 reintento con backoff corto, solo
-     * para GETs idempotentes y solo ante fallos transitorios (red/timeout o
-     * 502/503/504). Nunca se reintentan POST/PUT/PATCH/DELETE ni 4xx. */
+    /** Reintento opt-in (Fase 4, FE8; backoff Fase 5): hasta 2 reintentos
+     * con backoff 600 ms / 1,5 s, solo para GETs idempotentes y solo ante
+     * fallos transitorios (red/timeout o 502/503/504). Nunca se reintentan
+     * POST/PUT/PATCH/DELETE ni 4xx. */
     retry?: boolean;
   } = {},
 ): Promise<T> {
@@ -266,7 +309,10 @@ export async function request<T>(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const method = opts.method ?? "GET";
   const canRetry = opts.retry === true && method === "GET";
-  const attempts = canRetry ? 2 : 1;
+  // Fase 5 (2026-11-23): backoff 600 ms → 1,5 s en 3 intentos (antes 1×
+  // 600 ms): el cold start del free tier suele durar más que un reintento.
+  const attempts = canRetry ? 3 : 1;
+  const backoffMs = [600, 1500];
 
   for (let i = 0; i < attempts; i++) {
     if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -285,17 +331,17 @@ export async function request<T>(
         opts.signal,
       );
     } catch (err) {
-      // Fallo de red/timeout: reintentar una vez si es opt-in; si no, sale.
+      // Fallo de red/timeout: reintentar con backoff si es opt-in; si no, sale.
       if (canRetry && err instanceof ApiError && err.status === 0 && i < attempts - 1) {
-        await sleep(600, opts.signal);
+        await sleep(backoffMs[i] ?? 1500, opts.signal);
         continue;
       }
       throw err;
     }
     if (!res.ok) {
-      // 502/503/504 (típico cold start del free tier): un reintento opt-in.
+      // 502/503/504 (típico cold start del free tier): reintentos opt-in con backoff.
       if (canRetry && (res.status === 502 || res.status === 503 || res.status === 504) && i < attempts - 1) {
-        await sleep(600, opts.signal);
+        await sleep(backoffMs[i] ?? 1500, opts.signal);
         continue;
       }
       if (res.status === 401 && opts.auth) handleUnauthorized();

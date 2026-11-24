@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  api, getToken, logout as logoutSession, setToken, ApiError,
+  api, getToken, isGuest, logout as logoutSession, setToken, ApiError,
   type SystemStatus, type BalancesResponse, type PerformanceResponse,
   type SignalsResponse, type StrategyOut, type SimulationModes,
   type OperationsResponse, type RiskLimits, type LogEntry,
@@ -20,6 +20,7 @@ import { DemoBadge, StatusDot, EmptyState } from "../components/badges";
 import { LanguageToggle, useLanguage } from "../lib/i18n";
 import { Footer } from "../components/Footer";
 import { Landing } from "../components/Landing";
+import { ColdStartNotice } from "../components/ColdStartNotice";
 import { ultimaNovedadSistema } from "../lib/novedades";
 import dynamic from "next/dynamic";
 import { MetricCardSkeleton, Skeleton } from "../components/Skeleton";
@@ -190,6 +191,13 @@ export default function DashboardPage() {
     // visitante entra o se registra desde ahí. Con token, el dashboard
     // de siempre (y si el token expiró, load() redirige a /login).
     if (!getToken()) { setChecked(true); return; }
+    // Invitado (Fase 1): Invertir no está en sus módulos — su portada es
+    // /inicio, no el dashboard.
+    if (isGuest()) {
+      setChecked(true);
+      router.replace("/inicio");
+      return;
+    }
     setAuthed(true);
     loadCancelledRef.current = false;
     setChecked(true);
@@ -319,6 +327,7 @@ export default function DashboardPage() {
       )}
 
       {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}
+      <ColdStartNotice loading={refreshing && !balances && !offline} onRetry={load} />
       {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
       {actionError && (
         <p role="alert" className="mb-5 rounded-lg bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-400">

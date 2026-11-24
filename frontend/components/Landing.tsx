@@ -6,10 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "../lib/i18n";
 import { PublicNav } from "./PublicNav";
 import { CompoundCalculator } from "./CompoundCalculator";
-import { landingModuleKeys } from "./ModuleNav";
+import { landingModuleKeys, landingModulesByCategory, CATEGORY_TITLE_KEY } from "./ModuleNav";
 import { SkipLink } from "./ui";
 import { Footer } from "./Footer";
 import { Hero } from "./Hero";
+import { GuestTrialButton } from "./GuestTrial";
 import { TrustStrip } from "./TrustStrip";
 import { Skeleton } from "./Skeleton";
 
@@ -20,7 +21,7 @@ import { Skeleton } from "./Skeleton";
 // Rediseño fintech 2026-11-14 (Agente 2): el héroe lo compone <Hero />
 // (Agente UX/UI) con la calculadora existente como children; la franja
 // de confianza la compone <TrustStrip /> con SOLO números reales
-// derivados del código (24 módulos, 4 pilares, 3 planes, 14 días
+// derivados del código (25 módulos, 4 pilares, 3 planes, 14 días
 // gratis, 2 idiomas). Fallbacks de carga con <Skeleton />.
 const sectionLoading = () => <SectionLoadingSkeleton />;
 function SectionLoadingSkeleton() {
@@ -111,9 +112,13 @@ export function Landing() {
   // Resto de módulos reales (ModuleNav / t.nav), fuera de los 4 pilares
   // (Invertir, Estudiar, Crear ya son tarjetas) y de Inicio (la propia
   // portada). Se deriva de MODULES (M8): si el menú cambia, la lista y
-  // el "24 módulos" cambian solos. Solo nombres: la lista completa vive
+  // el "25 módulos" cambian solos. Solo nombres: la lista completa vive
   // en el menú al entrar.
   const moreModules = landingModuleKeys();
+  // Módulos extra agrupados por categoría (Fase 4): las 4 categorías +
+  // Sistema aparte, sin cambiar rutas ni claves.
+  const moreModulesByCategory = landingModulesByCategory();
+  const categoryTitle = (cat: string) => l[CATEGORY_TITLE_KEY[cat]] ?? cat;
   const steps = [
     { n: "1", title: l.howStep1Title, desc: l.howStep1Desc },
     { n: "2", title: l.howStep2Title, desc: l.howStep2Desc },
@@ -132,6 +137,34 @@ export function Landing() {
     { stage: l.stageGrowTitle, name: p.nameCrecimiento, tag: p.tagCrecimiento, href: "#plan-crecimiento" },
     { stage: l.stageScaleTitle, name: p.nameTotal, tag: p.tagTotal, href: "#plan-total" },
   ];
+  // Seguridad y Transparencia (Fase 2, 2026-11-23): solo hechos reales
+  // sobre la plataforma — qué se guarda, cómo se protege la cuenta,
+  // quién está detrás, para qué sirve y el aviso de simulación. Nada
+  // inventado: sin equipo, fotos, sellos ni certificaciones.
+  const securityItems = [
+    { title: l.securityDataTitle, body: l.securityDataBody },
+    { title: l.securityAccountTitle, body: l.securityAccountBody },
+    { title: l.securityWhoTitle, body: l.securityWhoBody },
+    { title: l.securityPurposeTitle, body: l.securityPurposeBody },
+    { title: l.securitySimTitle, body: l.securitySimBody },
+  ];
+  // FAQ (Fase 4, 2026-11-23): respuestas directas y breves.
+  const faqItems = [
+    { q: l.faqQ1, a: l.faqA1 },
+    { q: l.faqQ2, a: l.faqA2 },
+    { q: l.faqQ3, a: l.faqA3 },
+    { q: l.faqQ4, a: l.faqA4 },
+  ];
+  // Aviso de prueba caducada (?guest=expired, tras 15 min de invitado):
+  // se lee de la URL en el cliente, sin useSearchParams (sin Suspense).
+  const [guestExpired, setGuestExpired] = useState(false);
+  useEffect(() => {
+    try {
+      setGuestExpired(new URLSearchParams(window.location.search).get("guest") === "expired");
+    } catch {
+      setGuestExpired(false);
+    }
+  }, []);
   // Mini-índice de las 5 herramientas de Clases (mini-panel Estudiar).
   const classTools = [
     { name: c.calcTitle, desc: l.pillarEstudiarTool1Desc },
@@ -141,7 +174,7 @@ export function Landing() {
     { name: c.btcTitle, desc: l.pillarEstudiarTool5Desc },
   ];
   // Franja de confianza: SOLO números reales derivados del código.
-  // 24 = módulos reales del menú; pilares y planes se derivan de sus
+  // 25 = módulos reales del menú; pilares y planes se derivan de sus
   // listas (si cambia una lista, la franja cambia sola); 14 días de
   // prueba gratis; 2 idiomas (ES/EN). Nada de usuarios, volumen ni
   // testimonios: no existen datos verificados para eso.
@@ -159,26 +192,31 @@ export function Landing() {
       <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 outline-none sm:px-6">
         <SkipLink label={t.shell.skipLink} />
         {/* Héroe: lo compone <Hero /> (Agente UX/UI) con doble CTA —
-            primario sólido a registro, secundario con borde a la
-            sección pública de IA (#ia, 13 herramientas reales) — y la
-            calculadora de interés compuesto existente como children.
-            La calculadora es 100 % navegador (sin red, sin auth) y
-            reutiliza t.clases.calc*. El secundario YA NO apunta a
-            /estudiar: esa ruta exige sesión (ModuleShell redirige a
-            /login) y "Ver demo" sería un muro de login (A-1). */}
+            primario sólido a registro, secundario "Probar sin registro"
+            (Fase 1: reto matemático → sesión de invitado 15 min) — y la
+            calculadora de interés compuesto existente como children. */}
         <section ref={heroRef}>
+          {guestExpired && (
+            <div role="status" className="mb-4 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3.5 text-sm leading-relaxed text-amber-300">
+              {t.guest.expired}{" "}
+              <Link href="/login?mode=register" className="font-semibold text-amber-200 underline">
+                {t.guest.bannerCta}
+              </Link>
+            </div>
+          )}
           <Hero
             eyebrow={l.eyebrow}
+            simBadge={l.heroSimBadge}
+            simNote={l.simNote}
             title={l.title}
             subtitle={l.subtitle}
             primaryLabel={l.ctaStartFree}
             primaryHref="/login?mode=register"
-            secondaryLabel={l.ctaDemo}
-            secondaryHref="#ia"
+            secondaryButton={<GuestTrialButton />}
           >
             <h2 className="text-lg font-bold text-slate-50">{c.calcTitle}</h2>
             <div className="mt-3">
-              <CompoundCalculator idPrefix="hero-calc" />
+              <CompoundCalculator idPrefix="hero-calc" compact />
             </div>
           </Hero>
         </section>
@@ -234,7 +272,7 @@ export function Landing() {
         </section>
 
         {/* Módulos: 4 bloques verticales (uno por pilar) con mini-panel
-            honesto y CTA propio; después, la lista de 24 módulos. Los
+            honesto y CTA propio; después, la lista de 25 módulos. Los
             mini-paneles son estáticos (sin fetch, sin token, sin datos
             falsos); el contenido de ejemplo va etiquetado "Ejemplo". */}
         <section aria-label={l.modulesTitle} className="border-t border-slate-800/80 py-10 sm:py-12">
@@ -322,17 +360,42 @@ export function Landing() {
           </div>
           <h3 className="mt-8 text-lg font-bold text-slate-50">{l.moreModulesTitle}</h3>
           <p className="mt-1 text-sm leading-relaxed text-slate-400">{l.moreModulesIntro}</p>
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {moreModules.map(({ key, adminOnly }) => (
-              <li
-                key={key}
-                className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors duration-200 hover:border-emerald-500/40 hover:text-white"
-              >
-                {t.nav[key].label}
-                {adminOnly && <span className="text-slate-400"> ({l.adminOnlyTag})</span>}
-              </li>
+          <div className="mt-4 space-y-5">
+            {moreModulesByCategory.map((group) => (
+              <div key={group.category}>
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
+                  {categoryTitle(group.category)}
+                </h4>
+                <ul className="flex flex-wrap gap-2">
+                  {group.items.map(({ key, adminOnly }) => (
+                    <li
+                      key={key}
+                      className="rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-sm font-medium text-slate-200 transition-colors duration-200 hover:border-emerald-500/40 hover:text-white"
+                    >
+                      {t.nav[key].label}
+                      {adminOnly && <span className="text-slate-400"> ({l.adminOnlyTag})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
+        </section>
+
+        {/* Seguridad y Transparencia: solo hechos reales (Fase 2). */}
+        <section aria-label={l.securityTitle} className="border-t border-slate-800/80 py-10 sm:py-12">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">{l.securityTitle}</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
+            {l.securityIntro}
+          </p>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {securityItems.map((item) => (
+              <article key={item.title} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+                <h3 className="text-base font-bold text-slate-50">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">{item.body}</p>
+              </article>
+            ))}
+          </div>
         </section>
 
         {/* Sección IA y Automatización (13 herramientas reales). */}
@@ -399,6 +462,22 @@ export function Landing() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* Preguntas frecuentes: respuestas directas (Fase 4). */}
+        <section aria-label={l.faqTitle} className="border-t border-slate-800/80 py-10 sm:py-12">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">{l.faqTitle}</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
+            {l.faqIntro}
+          </p>
+          <dl className="mt-6 space-y-4">
+            {faqItems.map((item) => (
+              <div key={item.q} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+                <dt className="text-base font-bold text-slate-50">{item.q}</dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-slate-400">{item.a}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         {/* Cierre final: CTA + microcopy de activación por admin. */}

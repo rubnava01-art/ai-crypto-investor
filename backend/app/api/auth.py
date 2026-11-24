@@ -27,11 +27,18 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.hardening import audit
-from app.core.rate_limit import LoginLockout, login_limiter, login_lockout
+from app.core.rate_limit import (
+    LoginLockout,
+    guest_issue_limiter,
+    login_limiter,
+    login_lockout,
+)
 from app.core.security import (
+    GUEST_TOKEN_EXPIRE_SECONDS,
     PENDING_DETAIL,
     check_password_bytes,
     create_access_token,
+    create_guest_token,
     effective_role,
     get_current_user,
     hash_password,
@@ -182,6 +189,49 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
             user.username, user_id=user.id, token_version=user.token_version or 0
         )
     )
+
+
+class GuestRequest(BaseModel):
+    challenge_id: str = Field(min_length=1)
+    challenge_answer: int
+
+
+@router.post("/guest")
+def guest(payload: GuestRequest, request: Request):
+    """Sesión de invitado (Fase 1, 2026-11-23, mejoras óptimas):
+    demo sin registro. Reutiliza el challenge matemático de un solo
+    uso del registro (misma bolsa _CHALLENGES, TTL 300 s). Emite un
+    JWT HS256 sub "guest:<uuid>", role "invitado", exp 15 min, sin
+    refresh y SIN fila User. Límite de emisión: 3/min por IP.
+    Respuesta: {access_token, token_type, expires_in: 900,
+    perfil: "invitado", modulos: ["inicio","estudiar","planes",
+    "asistente"]}. El invitado solo llega a lecturas públicas y al
+    Asistente de solo lectura (ver get_current_principal y
+    MODULOS_INVITADO); todo lo demás le responde 403."""
+    from app.core.perfiles import MODULOS_INVITADO
+
+    client_ip = request.client.host if request.client else "unknown"
+    if not guest_issue_limiter.allow(f"guest_issue:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas sesiones de invitado. Espera un minuto.",
+            headers={"Retry-After": "60"},
+        )
+    _prune_challenges()
+    expected = _CHALLENGES.pop(payload.challenge_id, None)
+    if expected is None or expected[0] != payload.challenge_answer:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verificación incorrecta o vencida. Pide una pregunta nueva.",
+        )
+    token, _guest_id = create_guest_token()
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": GUEST_TOKEN_EXPIRE_SECONDS,
+        "perfil": "invitado",
+        "modulos": sorted(MODULOS_INVITADO),
+    }
 
 
 @router.get("/me")

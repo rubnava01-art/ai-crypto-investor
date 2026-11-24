@@ -8,13 +8,17 @@ exchange_connected follows the read-only adapter configuration (no
 network call), and health carries the build git_sha + timestamp so a
 stale Render deploy is visible instead of guessed.
 """
+import datetime as dt
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app import database
 from app.config import build_git_sha, build_timestamp_utc, settings
 from app.core.security import get_current_user, require_admin
 from app.core.state import state
+from app.database import get_db
 from app.exchange import adapter
 from app.models.tables import User
 from app.schemas.api import HealthResponse, SystemStatus, utc_now_iso
@@ -49,7 +53,10 @@ def health():
 
 
 @router.get("/api/system/status", response_model=SystemStatus)
-def system_status(user: User = Depends(get_current_user)):
+def system_status(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     live = bool(settings.real_trading_enabled)
     return SystemStatus(
         mode="live" if live else "demo",
@@ -58,8 +65,45 @@ def system_status(user: User = Depends(get_current_user)):
         simulation_mode=state.simulation_mode,  # type: ignore[arg-type]
         kill_switch=state.kill_switch,
         data_source="LIVE" if live else "DEMO",
-        last_update_utc=utc_now_iso(),
+        # Fase 5 (2026-11-23, P2-2): última ingesta REAL, no now().
+        # Máxima open_time de las velas guardadas; si aún no hay
+        # velas, último evento de scanner; si tampoco hay, None
+        # ("sin ingesta todavía") en vez de una hora inventada.
+        last_update_utc=_last_ingest_utc(db),
     )
+
+
+def _last_ingest_utc(db: Session | None) -> str | None:
+    """Última ingesta real de mercado (o None si nunca hubo).
+
+    Si `db` no es una sesión real (llamada directa sin sesión, p.
+    ej. desde otro handler), abre una propia con SessionLocal.
+    """
+    from sqlalchemy import func
+
+    from app.models.tables import MarketCandle, SystemEvent
+
+    if db is None or not isinstance(db, Session):
+        own = database.SessionLocal()
+        try:
+            return _last_ingest_utc(own)
+        finally:
+            own.close()
+    ultima_vela = db.query(func.max(MarketCandle.open_time_utc)).scalar()
+    if ultima_vela is not None:
+        value = ultima_vela
+    else:
+        ultimo_scanner = (
+            db.query(func.max(SystemEvent.created_at))
+            .filter(SystemEvent.category == "scanner")
+            .scalar()
+        )
+        value = ultimo_scanner
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=dt.timezone.utc)
+    return value.isoformat()
 
 
 @router.get("/api/system/metrics")

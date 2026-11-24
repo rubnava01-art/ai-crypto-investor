@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { isGuest } from "../lib/api/client";
+import { GUEST_MODULES } from "../lib/api/guest";
 import { useLanguage, type NavKey } from "../lib/i18n";
 
 /** Small professional stroke icons (currentColor, 16px) — no emoji, no images. */
@@ -345,7 +347,7 @@ export function landingModuleKeys(): { key: NavKey; adminOnly: boolean }[] {
   }));
 }
 
-/** Familias de navegación (Fase 5, F1): las 26 rutas, sin borrar ni
+/** Familias de navegación (Fase 5, F1): las 29 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
  * que la propuesta no nombraba se ubican por afinidad y se reportan:
  * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
@@ -427,6 +429,49 @@ export function familyForHref(href: string): string {
   return g ? g.key : "invertir";
 }
 
+/** Categorías de presentación (Fase 4, 2026-11-23): las 6 familias se
+ * presentan bajo 4 categorías, SIN cambiar rutas ni claves de módulos:
+ * Simulación de Inversión (invertir), Academia (estudiar), Contenido
+ * (crear), Gestión (negocio + personal) y Sistema aparte. */
+export const CATEGORIES: { key: string; groups: string[] }[] = [
+  { key: "sim", groups: ["invertir"] },
+  { key: "academia", groups: ["estudiar"] },
+  { key: "contenido", groups: ["crear"] },
+  { key: "gestion", groups: ["negocio", "personal"] },
+  { key: "sistema", groups: ["sistema"] },
+];
+
+/** Clave i18n (t.landing) del título de cada categoría. */
+export const CATEGORY_TITLE_KEY: Record<string, string> = {
+  sim: "catSimTitle",
+  academia: "catAcademyTitle",
+  contenido: "catContentTitle",
+  gestion: "catManageTitle",
+  sistema: "catSystemTitle",
+};
+
+export function categoryForHref(href: string): string {
+  const family = familyForHref(href);
+  const cat = CATEGORIES.find((c) => c.groups.includes(family));
+  return cat ? cat.key : "sim";
+}
+
+const HREF_BY_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(KEY_BY_HREF).map(([href, key]) => [key, href]),
+);
+
+/** Módulos de la landing agrupados por categoría (M8 + Fase 4). */
+export function landingModulesByCategory(): {
+  category: string;
+  items: { key: NavKey; adminOnly: boolean }[];
+}[] {
+  const all = landingModuleKeys();
+  return CATEGORIES.map((c) => ({
+    category: c.key,
+    items: all.filter((m) => categoryForHref(HREF_BY_KEY[m.key] ?? "") === c.key),
+  })).filter((g) => g.items.length > 0);
+}
+
 export function ModuleNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
@@ -436,7 +481,7 @@ export function ModuleNav() {
   // se muestra ningún módulo; si /me o el perfil falla, solo el
   // conjunto mínimo de prueba. El backend refuerza cada endpoint: el
   // menú solo deja de prometer lo que no le toca.
-  const [role, setRole] = useState<"loading" | "admin" | "prueba" | "cliente">("loading");
+  const [role, setRole] = useState<"loading" | "admin" | "prueba" | "cliente" | "invitado">("loading");
   const [modulos, setModulos] = useState<Set<string> | null>(null);
   const isAdmin = role === "admin";
   const isCliente = role === "cliente";
@@ -448,38 +493,62 @@ export function ModuleNav() {
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-  // Móvil: solo la familia de la ruta actual empieza abierta.
+  // Móvil: solo la categoría de la ruta actual empieza abierta.
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const o: Record<string, boolean> = {};
-    GROUPS.forEach((g) => {
-      o[g.key] = g.hrefs.includes(pathname);
+    CATEGORIES.forEach((c) => {
+      o[c.key] = c.groups.some((gk) => GROUPS.find((g) => g.key === gk)?.hrefs.includes(pathname));
     });
     return o;
   });
-  // Sincronizar los grupos colapsables con la ruta: al navegar, abrir la
-  // familia destino sin cerrar las que el usuario abrió a mano.
+  // Sincronizar las categorías colapsables con la ruta: al navegar, abrir
+  // la categoría destino sin cerrar las que el usuario abrió a mano.
   useEffect(() => {
     setOpen((prev) => {
       const next = { ...prev };
-      GROUPS.forEach((g) => {
-        if (g.hrefs.includes(pathname)) next[g.key] = true;
+      CATEGORIES.forEach((c) => {
+        if (c.groups.some((gk) => GROUPS.find((g) => g.key === gk)?.hrefs.includes(pathname))) next[c.key] = true;
       });
       return next;
     });
   }, [pathname]);
+  // Buscador de módulos (Fase 4, 2026-11-23, solo escritorio): filtra por
+  // etiqueta/hint, sin reordenar. La búsqueda ignora acentos y mayúsculas.
+  const [query, setQuery] = useState("");
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const matchesQuery = useCallback(
+    (m: (typeof MODULES)[number]) => {
+      const q = norm(query.trim());
+      if (!q) return true;
+      const navText = t.nav[KEY_BY_HREF[m.href]];
+      const label = navText?.label ?? m.label;
+      const hint = navText?.hint ?? m.hint;
+      return norm(`${label} ${hint}`).includes(q);
+    },
+    [query, t],
+  );
   useEffect(() => {
     let cancelled = false;
     api
       .getPerfil()
       .then((p) => {
         if (cancelled) return;
+        // Invitado (Fase 1): el backend devuelve role "invitado" con su
+        // conjunto fijo (inicio, estudiar, planes, asistente).
         setRole(p.role === "super_admin" || p.role === "admin" ? "admin" : p.role);
         setModulos(new Set(p.modulos));
       })
       .catch(() => {
         if (cancelled) return;
         // Perfil sin implementar o sin respuesta: conjunto mínimo de
-        // prueba, nunca todo el menú (fail-closed).
+        // prueba, nunca todo el menú (fail-closed). Con sesión de
+        // invitado, el conjunto fijo del contrato, no el de prueba.
+        if (isGuest()) {
+          setRole("invitado");
+          setModulos(new Set(GUEST_MODULES));
+          return;
+        }
         setRole("prueba");
         setModulos(new Set(PRUEBA_MIN_KEYS));
       });
@@ -550,6 +619,17 @@ export function ModuleNav() {
           cliente vinculado, el de su portal. Admin/super no ven aviso.
           El aviso de prueba vivía solo en el dashboard (/); ahora lo
           lleva el menú y se ve en todos los módulos. */}
+      {role === "invitado" && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-700/60 bg-emerald-500/10 px-4 py-3 text-sm leading-relaxed text-emerald-300"
+        >
+          {t.guest.banner}{" "}
+          <Link href="/login?mode=register" className="font-semibold text-emerald-200 underline">
+            {t.guest.bannerCta}
+          </Link>
+        </div>
+      )}
       {role === "prueba" && (
         <div
           role="status"
@@ -598,36 +678,58 @@ export function ModuleNav() {
               {t.nav.checkingRole}
             </p>
           )}
-          {/* Móvil: familias colapsables, una a una, sin scroll horizontal de 25 ítems. */}
+          {/* Móvil: categorías colapsables (Fase 4): las 6 familias se
+              presentan bajo las 4 categorías + Sistema aparte. */}
           <div className="space-y-2">
-            {GROUPS.map((g) => {
-              const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
-              if (items.length === 0) return null;
-              const isOpen = !!open[g.key];
-              const groupLabel = t.navGroups[g.key] ?? g.key;
-              const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+            {CATEGORIES.map((cat) => {
+              const groups = cat.groups
+                .map((gk) => GROUPS.find((g) => g.key === gk))
+                .filter((g): g is (typeof GROUPS)[number] => !!g)
+                .map((g) => ({
+                  g,
+                  items: g.hrefs
+                    .map((h) => byHref.get(h))
+                    .filter((m): m is (typeof MODULES)[number] => !!m)
+                    .filter(matchesQuery),
+                }))
+                .filter(({ items }) => items.length > 0);
+              if (groups.length === 0) return null;
+              const isOpen = !!open[cat.key] || query.trim() !== "";
+              const catLabel = t.landing[CATEGORY_TITLE_KEY[cat.key]] ?? cat.key;
+              const accent = FAMILY_ACCENT[cat.groups[0]] ?? FAMILY_ACCENT.invertir;
               return (
-                <div key={g.key} className="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/50 backdrop-blur">
+                <div key={cat.key} className="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/50 backdrop-blur">
                   <button
                     type="button"
                     aria-expanded={isOpen}
-                    onClick={() => setOpen((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
+                    onClick={() => setOpen((prev) => ({ ...prev, [cat.key]: !prev[cat.key] }))}
                     className={`flex min-h-[44px] w-full items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-800/80 focus-visible:outline-none focus-visible:ring-2 ${accent.ring}`}
                   >
                     <span className="flex items-center gap-2">
                       <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
-                      {groupLabel}
+                      {catLabel}
                     </span>
                     <span aria-hidden="true" className="text-slate-400">{isOpen ? "▾" : "▸"}</span>
                   </button>
-                  {isOpen && <div className="flex flex-col gap-2 p-2 pt-0">{items.map(link)}</div>}
+                  {isOpen && (
+                    <div className="space-y-3 p-2 pt-0">
+                      {groups.map(({ g, items }) => (
+                        <div key={g.key}>
+                          <p className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
+                            {t.navGroups[g.key] ?? g.key}
+                          </p>
+                          <div className="flex flex-col gap-2">{items.map(link)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
       )}
-      {/* Escritorio: Inicio + familias seccionadas, todo visible. */}
+      {/* Escritorio: buscador + Inicio + categorías seccionadas, todo visible. */}
       <div className="hidden sm:block">
         {inicio && <div className="mb-2 sm:mb-4">{link(inicio)}</div>}
         {role === "loading" && (
@@ -635,22 +737,65 @@ export function ModuleNav() {
             {t.nav.checkingRole}
           </p>
         )}
-        <div className="space-y-4">
-          {GROUPS.map((g) => {
-            const items = g.hrefs.map((h) => byHref.get(h)).filter((m): m is (typeof MODULES)[number] => !!m);
-            if (items.length === 0) return null;
-            const groupLabel = t.navGroups[g.key] ?? g.key;
-            const accent = FAMILY_ACCENT[g.key] ?? FAMILY_ACCENT.invertir;
+        <div className="mb-4">
+          <input
+            data-no-swipe
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t.landing.modulesSearchPlaceholder}
+            aria-label={t.landing.modulesSearchAria}
+            className="min-h-[44px] w-full max-w-sm rounded-lg border border-slate-700 bg-slate-900/60 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+          />
+        </div>
+        <div className="space-y-5">
+          {CATEGORIES.map((cat) => {
+            const groups = cat.groups
+              .map((gk) => GROUPS.find((g) => g.key === gk))
+              .filter((g): g is (typeof GROUPS)[number] => !!g)
+              .map((g) => ({
+                g,
+                items: g.hrefs
+                  .map((h) => byHref.get(h))
+                  .filter((m): m is (typeof MODULES)[number] => !!m)
+                  .filter(matchesQuery),
+              }))
+              .filter(({ items }) => items.length > 0);
+            if (groups.length === 0) return null;
+            const catLabel = t.landing[CATEGORY_TITLE_KEY[cat.key]] ?? cat.key;
+            const accent = FAMILY_ACCENT[cat.groups[0]] ?? FAMILY_ACCENT.invertir;
             return (
-              <section key={g.key} aria-label={groupLabel}>
-                <h2 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              <section key={cat.key} aria-label={catLabel}>
+                <h2 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300">
                   <span aria-hidden="true" className={`inline-block h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
-                  {groupLabel}
+                  {catLabel}
                 </h2>
-                <div className="flex flex-wrap gap-2">{items.map(link)}</div>
+                <div className="space-y-3">
+                  {groups.map(({ g, items }) => (
+                    <div key={g.key}>
+                      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
+                        {t.navGroups[g.key] ?? g.key}
+                      </h3>
+                      <div className="flex flex-wrap gap-2">{items.map(link)}</div>
+                    </div>
+                  ))}
+                </div>
               </section>
             );
           })}
+          {query.trim() !== "" &&
+            !CATEGORIES.some((cat) =>
+              cat.groups.some((gk) =>
+                GROUPS.find((g) => g.key === gk)?.hrefs.some((h) => {
+                  const m = byHref.get(h);
+                  return m ? matchesQuery(m) : false;
+                }),
+              ),
+            ) && (
+              <p role="status" className="px-1 py-2 text-sm text-slate-400">
+                {t.landing.modulesSearchNoResults}
+              </p>
+            )}
         </div>
       </div>
     </nav>

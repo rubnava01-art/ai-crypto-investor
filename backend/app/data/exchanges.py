@@ -13,11 +13,26 @@ The breaker is fail-fast only: callers already treat failures as
 import threading
 import time
 
-import ccxt
-
 from app.data import _compat
 
 _compat.apply_shims()
+
+# Fase 5 (2026-11-23, mejoras óptimas, P1-4): ccxt es el import más
+# pesado del arranque (~1-2 s) y solo se usa cuando se toca un
+# exchange. Ya NO se importa a nivel de módulo: se carga bajo
+# demanda dentro de make_exchange() (vía _get_ccxt()) y se cachea.
+# El primer /api/market paga la carga una vez; el arranque no.
+_ccxt = None
+
+
+def _get_ccxt():
+    """Import perezoso de ccxt (cacheado tras la primera carga)."""
+    global _ccxt
+    if _ccxt is None:
+        import ccxt as _mod
+
+        _ccxt = _mod
+    return _ccxt
 
 SUPPORTED = ("kraken", "coinbase")
 SYMBOLS = ("BTC/USD", "ETH/USD")
@@ -56,7 +71,7 @@ def _breaker_reset(exchange_id: str) -> None:
 def make_exchange(exchange_id: str):
     if exchange_id not in SUPPORTED:
         raise ValueError(f"unsupported exchange: {exchange_id}")
-    cls = getattr(ccxt, exchange_id)
+    cls = getattr(_get_ccxt(), exchange_id)
     return cls(
         {
             "enableRateLimit": True,
@@ -78,12 +93,12 @@ def fetch_ohlcv(exchange_id: str, symbol: str, timeframe: str = "1h", limit: int
             result = ex.fetch_ohlcv(symbol, timeframe, limit=limit)
             _breaker_reset(exchange_id)
             return result
-        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+        except (_get_ccxt().NetworkError, _get_ccxt().ExchangeError) as e:
             last_err = e
             time.sleep(2 ** attempt)
     # Only network death trips the breaker: an ExchangeError means the
     # exchange answered (bad symbol, rate limit shape, ...) — alive.
-    if isinstance(last_err, ccxt.NetworkError):
+    if isinstance(last_err, _get_ccxt().NetworkError):
         _breaker_trip(exchange_id)
     raise last_err  # type: ignore[misc]
 
@@ -98,9 +113,9 @@ def fetch_ticker(exchange_id: str, symbol: str, attempts: int = 3) -> dict:
             result = ex.fetch_ticker(symbol)
             _breaker_reset(exchange_id)
             return result
-        except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+        except (_get_ccxt().NetworkError, _get_ccxt().ExchangeError) as e:
             last_err = e
             time.sleep(2 ** attempt)
-    if isinstance(last_err, ccxt.NetworkError):
+    if isinstance(last_err, _get_ccxt().NetworkError):
         _breaker_trip(exchange_id)
     raise last_err  # type: ignore[misc]

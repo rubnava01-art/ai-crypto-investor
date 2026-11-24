@@ -62,6 +62,22 @@ class RateLimiter:
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
+# Perfil invitado (corrida 2026-11-23, mejoras óptimas, Fase 1):
+# limiters propios por IP — un invitado no tiene user.id, así que la
+# clave es la IP (con la limitación documentada arriba: tras el proxy
+# de Render la IP puede colapsar; por eso los umbrales son bajos y el
+# invitado solo llega a lecturas públicas + chat de solo lectura).
+# Emisión de token 3/min, chat 5/min, resto de lecturas 30/min.
+guest_issue_limiter = RateLimiter(max_requests=3, window_seconds=60)
+guest_chat_limiter = RateLimiter(max_requests=5, window_seconds=60)
+guest_read_limiter = RateLimiter(max_requests=30, window_seconds=60)
+
+# Mercado público (corrección P0-1, 2026-11-23): /api/public/market/*
+# sirve solo datos públicos de mercado a cualquier principal
+# autenticado (incluido invitado). Límite propio por IP, 30/min,
+# separado del de lecturas de invitado para no mezclar presupuestos.
+public_market_limiter = RateLimiter(max_requests=30, window_seconds=60)
+
 # Trabajo pesado por usuario (corrida 3 agentes): backtest y auditoría web
 # eran ilimitados y accesibles al rol prueba; un bucle bastaba para agotar
 # el pool de hilos del tier gratuito. Límites generosos para no romper el

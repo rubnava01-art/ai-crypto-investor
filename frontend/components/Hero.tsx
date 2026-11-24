@@ -8,23 +8,33 @@ import type { ReactNode } from "react";
 
 export type HeroProps = {
   eyebrow?: string;
+  /** Badge de simulación junto al eyebrow (Fase 2, 2026-11-23). */
+  simBadge?: string;
+  /** Disclaimer de simulación bajo los CTAs (texto existente, sube de posición). */
+  simNote?: string;
   title: string;
   subtitle?: string;
   primaryLabel: string;
   primaryHref: string;
-  secondaryLabel: string;
-  secondaryHref: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+  /** Si se pasa, sustituye al enlace secundario (p. ej. el botón de
+   * prueba sin registro, que abre el reto matemático en vez de navegar). */
+  secondaryButton?: ReactNode;
   children?: ReactNode;
 };
 
 export function Hero({
   eyebrow,
+  simBadge,
+  simNote,
   title,
   subtitle,
   primaryLabel,
   primaryHref,
   secondaryLabel,
   secondaryHref,
+  secondaryButton,
   children,
 }: HeroProps) {
   return (
@@ -40,9 +50,16 @@ export function Hero({
 
       <div className="relative grid grid-cols-1 items-start gap-8 lg:grid-cols-2">
         <div className="min-w-0">
-          {eyebrow ? (
-            <p className="fintech-eyebrow mb-3">{eyebrow}</p>
-          ) : null}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {eyebrow ? (
+              <p className="fintech-eyebrow">{eyebrow}</p>
+            ) : null}
+            {simBadge ? (
+              <span className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-300">
+                {simBadge}
+              </span>
+            ) : null}
+          </div>
           {/* Titular masivo, móvil primero: 36px a 390px, 48px en sm,
               60px en escritorio. Sin desbordamiento: tracking ajustado
               y palabras largas con balanceo. */}
@@ -60,10 +77,18 @@ export function Hero({
             <Link href={primaryHref} className="fintech-btn fintech-btn-primary">
               {primaryLabel}
             </Link>
-            <Link href={secondaryHref} className="fintech-btn fintech-btn-secondary">
-              {secondaryLabel}
-            </Link>
+            {secondaryButton ??
+              (secondaryLabel && secondaryHref ? (
+                <Link href={secondaryHref} className="fintech-btn fintech-btn-secondary">
+                  {secondaryLabel}
+                </Link>
+              ) : null)}
           </div>
+          {simNote ? (
+            <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-amber-400">
+              {simNote}
+            </p>
+          ) : null}
         </div>
 
         {children ? (

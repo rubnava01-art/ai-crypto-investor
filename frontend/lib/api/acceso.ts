@@ -12,7 +12,7 @@
 import { request } from "./client";
 import { catalogMemo } from "./memo";
 
-export type PerfilRole = "super_admin" | "admin" | "prueba" | "cliente";
+export type PerfilRole = "super_admin" | "admin" | "prueba" | "cliente" | "invitado";
 
 export type PerfilResponse = {
   role: PerfilRole;

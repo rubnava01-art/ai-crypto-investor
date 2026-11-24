@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  api, ApiError,
+  api, ApiError, isGuest,
   type EduClass, type EduClassKind, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
@@ -285,6 +285,13 @@ export function ClasesPanel() {
   const isAdmin = !!me?.is_admin;
 
   const loadMe = useCallback(async () => {
+    // Invitado (Fase 1): nunca es admin y /me no tiene fila de usuario —
+    // no se pide, para que un 401 no expulse la prueba.
+    if (isGuest()) {
+      setMe(null);
+      setMeError(null);
+      return;
+    }
     try {
       const v = await api.me();
       if (isCancelled()) return;

@@ -236,7 +236,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import academy, acceso, ajustador, analizador, asistente, auth, auditor, backtest, bi, business, chat, clases, contenido, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, marketing, misc, portfolio, portal, privacidad, profile, recomendaciones, referrals, signals, strategy, system, talento_riesgos_planillas, tendencias, users
+    from app.api import academy, acceso, ajustador, analizador, asistente, auth, auditor, backtest, bi, business, chat, clases, contenido, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, marketing, misc, portfolio, portal, privacidad, profile, public_market, recomendaciones, referrals, signals, strategy, system, talento_riesgos_planillas, tendencias, users
 
     app = FastAPI(
         title=settings.app_name,
@@ -309,6 +309,9 @@ def create_app() -> FastAPI:
     app.include_router(misc.risk_router)
     app.include_router(misc.logs_router)
     app.include_router(market.router)
+    # Corrección P0-1 (2026-11-23): mercado público de solo lectura para
+    # invitado/prueba, junto al router de mercado (misma caché/servicio).
+    app.include_router(public_market.router)
     app.include_router(strategy.router)
     app.include_router(backtest.router)
     app.include_router(exchange.router)

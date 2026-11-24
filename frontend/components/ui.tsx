@@ -65,6 +65,7 @@ export function PanelLoading() {
   return (
     <div
       role="status"
+      data-panel-loading
       className="fintech-card px-4 py-6 text-sm text-slate-400"
     >
       {t.dashboard.panelLoading}

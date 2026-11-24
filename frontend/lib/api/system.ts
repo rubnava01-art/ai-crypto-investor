@@ -1,5 +1,6 @@
 // Dominio system del API (extraído de lib/api.ts en Fase 4, sin cambios de comportamiento).
 import { request, AI_TIMEOUT_MS, fetchMe } from "./client";
+import { marketBasePath } from "./market";
 import type { AIAskResponse, AILessonsResponse, AIStatusResponse, BalancesResponse, DashboardResponse, HealthResponse, KillSwitchResponse, LogEntry, MarketPricesResponse, MeResponse, OperationsResponse, OrderOut, PerformanceResponse, RiskLimits, ScannerState, SignalsResponse, SimulationModes, StrategyOut, SystemStatus, TokenResponse } from "./types";
 
 export const systemApi = {
@@ -35,8 +36,12 @@ export const systemApi = {
     }),
   aiLessons: () => request<AILessonsResponse>("/api/ai/lessons", { auth: true }),
   me: fetchMe,
-  marketPrices: (opts?: { signal?: AbortSignal }) =>
-    request<MarketPricesResponse>("/api/market/prices", { auth: true, retry: true, signal: opts?.signal }),
+  // P0-1 (2026-11-23): como ticker/velas/indicadores, el invitado lee
+  // precios por /api/public/market/prices (misma base por perfil).
+  marketPrices: async (opts?: { signal?: AbortSignal }) => {
+    const base = await marketBasePath();
+    return request<MarketPricesResponse>(`${base}/prices`, { auth: true, retry: true, signal: opts?.signal });
+  },
   dashboard: (opts?: { signal?: AbortSignal }) =>
     request<DashboardResponse>("/api/dashboard", { auth: true, retry: true, signal: opts?.signal }),
   createOrder: (

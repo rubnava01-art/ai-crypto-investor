@@ -27,7 +27,7 @@ con este helper: su aislamiento ya es por contacto, no por módulo.
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import effective_role, get_current_user
+from app.core.security import Guest, effective_role, get_current_principal
 from app.database import get_db
 from app.models.tables import User
 
@@ -59,10 +59,20 @@ MODULOS_PRUEBA = frozenset(
 # funcionalidad aparte (opción A del dictamen) y se re-añade aquí.
 MODULOS_CLIENTE = frozenset({"inicio", "portal", "perfil"})
 
+# Invitado (sin registro, Fase 1, 2026-11-23): conjunto fijo, sin
+# fila User y sin persistencia. Solo lectura pública de Inicio y
+# Estudiar, vista de precios/planes y Asistente de solo lectura.
+MODULOS_INVITADO = frozenset({"inicio", "estudiar", "planes", "asistente"})
+
 
 def es_cliente_vinculado(db: Session, user: User) -> bool:
     """True si el usuario no-admin tiene un Contact vinculado."""
     if user.is_admin:
+        return False
+    # Un Guest (id None) nunca está vinculado: sin este guard,
+    # `Contact.user_id == None` se traduce a IS NULL y podría casar
+    # con un contacto sin vínculo.
+    if getattr(user, "id", None) is None:
         return False
     from app.models.tables import Contact
 
@@ -76,14 +86,18 @@ def contacto_vinculado_id(db: Session, user: User) -> int | None:
     """Id del Contact vinculado, o None (admin o sin vínculo)."""
     if user.is_admin:
         return None
+    if getattr(user, "id", None) is None:
+        return None
     from app.models.tables import Contact
 
     contact = db.query(Contact).filter(Contact.user_id == user.id).first()
     return contact.id if contact else None
 
 
-def modulos_para(usuario: User, db: Session) -> set:
+def modulos_para(usuario: User | Guest, db: Session) -> set:
     """Módulos visibles para el usuario (ver docstring del módulo)."""
+    if isinstance(usuario, Guest):
+        return set(MODULOS_INVITADO)
     rol = effective_role(usuario, db)
     if rol in ("super_admin", "admin"):
         return set(MODULOS_TODOS)
@@ -92,7 +106,7 @@ def modulos_para(usuario: User, db: Session) -> set:
     return set(MODULOS_PRUEBA)
 
 
-def assert_modulo_visible(db: Session, usuario: User, modulo: str) -> None:
+def assert_modulo_visible(db: Session, usuario: User | Guest, modulo: str) -> None:
     """403 si el módulo no está en la lista del perfil."""
     if modulo not in modulos_para(usuario, db):
         raise HTTPException(
@@ -106,11 +120,17 @@ def require_modulo(modulo: str):
 
     Uso: `APIRouter(dependencies=[Depends(require_modulo("crm"))])`
     o por ruta: `user: User = Depends(require_modulo("crm"))`.
+
+    El gate resuelve el principal con get_current_principal(): un
+    User pasa por su lista de módulos y un Guest por su conjunto
+    fijo (MODULOS_INVITADO); un Guest fuera de esos módulos recibe
+    403, igual que un prueba fuera de los suyos.
     """
 
     def _gate(
-        user: User = Depends(get_current_user), db: Session = Depends(get_db)
-    ) -> User:
+        user: User | Guest = Depends(get_current_principal),
+        db: Session = Depends(get_db),
+    ) -> User | Guest:
         assert_modulo_visible(db, user, modulo)
         return user
 

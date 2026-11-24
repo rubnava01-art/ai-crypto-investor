@@ -5,8 +5,13 @@
   place orders by construction: no order methods exist on this class.
 - Live verification requires the user to create read-only API keys
   (no withdrawal permission + IP whitelist) and set them in .env.
+
+Fase 5 (2026-11-23, mejoras óptimas, P1-4): ccxt ya NO se importa
+a nivel de módulo — este módulo se importa en el arranque (vía
+/api/system) y ccxt es el import más pesado. Se importa bajo demanda
+en __init__; is_configured() no toca la red ni ccxt.
 """
-import ccxt
+from app.config import settings
 
 from app.config import settings
 from app.data import _compat
@@ -22,6 +27,8 @@ class ReadOnlyAdapter:
     exchange_id = "kraken"  # spec: Coinbase Advanced first, Kraken after
 
     def __init__(self):
+        import ccxt  # perezoso (Fase 5, 2026-11-23): no en arranque.
+
         key = (settings.kraken_api_key or "").strip()
         secret = (settings.kraken_api_secret or "").strip()
         if not key or not secret:

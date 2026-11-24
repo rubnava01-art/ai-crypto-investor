@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-23",
+    title: "Prueba sin registro, calculadora mejorada y módulos por categoría",
+    body: "Publicado el 23 de noviembre: ya puedes probar la plataforma sin crear cuenta — botón 'Probar sin registro' en Inicio: entra como invitado con una sesión corta y prueba el Asistente con Internet, la calculadora de interés compuesto, el conversor de bitcoin, la gráfica y las guías de Estudiar, con invitaciones a registrarte para guardar tu progreso. Además, la página principal estrena título directo de beneficio con el aviso de simulación educativa visible y una sección de Seguridad y Transparencia con datos reales; la calculadora ahora tiene deslizadores, gráfica anual con tooltip y comparación con y sin aportes; los módulos van agrupados en cuatro categorías (Simulación de Inversión, Academia, Contenido y Gestión) con buscador; y la web carga con un aviso amable mientras despierta el servidor. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-23",
     title: "Seguridad: las lecturas de Negocio y Crear ya respetan el perfil de cada usuario",
     body: "Publicado el 23 de noviembre: refuerzo de seguridad — las lecturas de Negocio (notas y tareas), Marketing (campañas), Contenido (ideas y calendario), Referidos, Desarrollo y Recomendaciones ahora exigen el módulo que les toca, así que el rol prueba recibe 403 también en lectura y el cliente vinculado solo ve inicio, portal y perfil, como ya pasaba en los módulos que ya estaban cerrados. Además, el Asistente con Internet ahora valida el destino antes de traer una página (mismo control que el Auditor), con tope de tamaño y redirecciones revalidadas. Solo seguridad, sin cambiar funciones. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

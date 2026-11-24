@@ -4,7 +4,9 @@
 // (100% navegador), conversor BTC/USD en vivo, gráfica BTC 1h en SVG hecha
 // a mano (sin librerías nuevas), tira de indicadores y contenido educativo
 // estático sobre Bitcoin. Se monta UNA vez en ClasesPanel (no dentro de
-// ClassSection, que se duplica). Datos en vivo solo de /api/market/*:
+// ClassSection, que se duplica). Datos en vivo de /api/market/* — o de
+// /api/public/market/* con sesión de invitado (corrección P0-1,
+// 2026-11-23: la base la elige lib/api/market.ts según el perfil):
 // un 503 es "sin datos" y nunca se muestra un precio viejo como actual.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, isMarketNoData, type MarketCandlesResponse, type MarketIndicatorsResponse, type MarketTickerResponse } from "../lib/api";
@@ -213,6 +215,8 @@ function BtcChart() {
   const [data, setData] = useState<MarketCandlesResponse | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [error, setError] = useState<unknown>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
@@ -258,6 +262,27 @@ function BtcChart() {
       .map((v, i) => (v === null ? null : `${((i / Math.max(series.length - 1, 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / span) * (H - 8)).toFixed(1)}`))
       .filter((p): p is string => p !== null)
       .join(" ");
+  // Tooltip + alternativa textual (Fase 3, 2026-11-23): la gráfica sola
+  // no era accesible (audit-agente-1 §7.1). Índice desde la posición del
+  // cursor/toque; la tabla de últimos valores y el resumen son la
+  // alternativa para lector de pantalla.
+  const lastIdx = closes.length - 1;
+  const lastNonNull = (series: (number | null)[]): number | null => {
+    for (let i = series.length - 1; i >= 0; i--) if (series[i] !== null) return series[i];
+    return null;
+  };
+  const hoverClose = hoverIdx !== null ? closes[hoverIdx] ?? null : null;
+  const hoverSma20 = hoverIdx !== null ? sma20[hoverIdx] ?? null : null;
+  const hoverSma50 = hoverIdx !== null ? sma50[hoverIdx] ?? null : null;
+  const idxFromEvent = (e: React.MouseEvent | React.TouchEvent): number | null => {
+    const el = svgRef.current;
+    if (!el || closes.length < 2) return null;
+    const rect = el.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0]?.clientX : e.clientX;
+    if (clientX === undefined) return null;
+    return Math.min(closes.length - 1, Math.max(0, Math.round(((clientX - rect.left) / rect.width) * (closes.length - 1))));
+  };
+  const lastRows = data?.candles.slice(-5) ?? [];
 
   return (
     <ToolCard
@@ -277,18 +302,93 @@ function BtcChart() {
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
       {status === "ready" && data && closes.length >= 2 && (
         <>
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg border border-zinc-800 bg-zinc-950" role="img" aria-label={t.clases.chartTitle}>
-            <polyline points={pts(sma50)} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinejoin="round" />
-            <polyline points={pts(sma20)} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
-            <polyline points={pts(ema20)} fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeDasharray="4 3" strokeLinejoin="round" />
-            <polyline points={pts(closes.map((v) => v))} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-          </svg>
+          <div className="relative">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${W} ${H}`}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950"
+              role="img"
+              tabIndex={0}
+              aria-label={`${t.clases.chartTitle}: ${t.clases.chartHoverHint}`}
+              onMouseMove={(e) => setHoverIdx(idxFromEvent(e))}
+              onMouseLeave={() => setHoverIdx(null)}
+              onTouchStart={(e) => setHoverIdx(idxFromEvent(e))}
+              onTouchMove={(e) => setHoverIdx(idxFromEvent(e))}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight") setHoverIdx((v) => Math.min(lastIdx, (v ?? -1) + 1));
+                if (e.key === "ArrowLeft") setHoverIdx((v) => Math.max(0, (v ?? 1) - 1));
+              }}
+            >
+              <polyline points={pts(sma50)} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinejoin="round" />
+              <polyline points={pts(sma20)} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeLinejoin="round" />
+              <polyline points={pts(ema20)} fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeDasharray="4 3" strokeLinejoin="round" />
+              <polyline points={pts(closes.map((v) => v))} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+              {hoverIdx !== null && hoverClose !== null && (
+                <>
+                  <line x1={(hoverIdx / Math.max(closes.length - 1, 1)) * W} y1={4} x2={(hoverIdx / Math.max(closes.length - 1, 1)) * W} y2={H - 4} stroke="#64748b" strokeWidth="1" strokeDasharray="3 3" />
+                  <circle cx={(hoverIdx / Math.max(closes.length - 1, 1)) * W} cy={H - 4 - ((hoverClose - min) / span) * (H - 8)} r="4.5" fill="#10b981" stroke="#030712" strokeWidth="1.5" />
+                </>
+              )}
+            </svg>
+            {hoverIdx !== null && hoverClose !== null && data.candles[hoverIdx] && (
+              <div
+                role="status"
+                className="pointer-events-none absolute left-2 top-2 max-w-[90%] rounded-lg border border-zinc-700 bg-zinc-950/95 px-3 py-2 text-xs leading-relaxed text-zinc-200 shadow-lg"
+              >
+                <p className="font-semibold">{fmtTime(data.candles[hoverIdx].openTimeUtc, locale)}</p>
+                <p>
+                  {t.clases.chartClose}: <span className="font-semibold tabular-nums text-emerald-400">{fmtUsd(hoverClose, "en-US")}</span>
+                </p>
+                <p>
+                  {t.clases.chartSma20}: <span className="tabular-nums">{hoverSma20 !== null ? fmtUsd(hoverSma20, "en-US") : t.clases.indNoValue}</span>
+                  {" · "}
+                  {t.clases.chartSma50}: <span className="tabular-nums">{hoverSma50 !== null ? fmtUsd(hoverSma50, "en-US") : t.clases.indNoValue}</span>
+                </p>
+              </div>
+            )}
+          </div>
           <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span><span className="text-emerald-400">—</span> {t.clases.chartClose}</span>
             <span><span className="text-amber-400">—</span> {t.clases.chartSma20}</span>
             <span><span className="text-sky-400">—</span> {t.clases.chartSma50}</span>
             <span><span className="text-violet-400">- -</span> {t.clases.chartEma20}</span>
           </p>
+          <p className="mt-1 text-xs text-zinc-400">{t.clases.chartHoverHint}</p>
+          {/* Resumen textual + tabla compacta de últimos valores. */}
+          <p className="mt-2 text-sm leading-relaxed text-zinc-200">
+            {t.clases.chartSummary
+              .replace("{close}", fmtUsd(closes[lastIdx], "en-US"))
+              .replace("{sma20}", lastNonNull(sma20) !== null ? fmtUsd(lastNonNull(sma20) as number, "en-US") : t.clases.indNoValue)
+              .replace("{sma50}", lastNonNull(sma50) !== null ? fmtUsd(lastNonNull(sma50) as number, "en-US") : t.clases.indNoValue)}
+          </p>
+          <details className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+            <summary className="cursor-pointer py-1 text-sm font-semibold text-zinc-200">{t.clases.chartTableTitle}</summary>
+            <div className="overflow-auto">
+              <table className="mt-2 w-full text-left text-sm tabular-nums">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide text-zinc-400">
+                    <th scope="col" className="py-1.5 pr-2 font-semibold">{t.clases.chartTableTime}</th>
+                    <th scope="col" className="py-1.5 pr-2 font-semibold">{t.clases.chartTableClose}</th>
+                    <th scope="col" className="py-1.5 pr-2 font-semibold">{t.clases.chartTableSma20}</th>
+                    <th scope="col" className="py-1.5 font-semibold">{t.clases.chartTableSma50}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lastRows.map((c) => {
+                    const i = data.candles.indexOf(c);
+                    return (
+                      <tr key={c.openTimeUtc} className="border-t border-zinc-800/80 text-zinc-200">
+                        <th scope="row" className="py-1.5 pr-2 font-normal">{fmtTime(c.openTimeUtc, locale)}</th>
+                        <td className="py-1.5 pr-2">{fmtUsd(c.close, "en-US")}</td>
+                        <td className="py-1.5 pr-2">{sma20[i] !== null ? fmtUsd(sma20[i] as number, "en-US") : "—"}</td>
+                        <td className="py-1.5">{sma50[i] !== null ? fmtUsd(sma50[i] as number, "en-US") : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
           <p className={`mt-1.5 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-400"}`}>
             {t.clases.chartSource.replace("{source}", data.source)} ·{" "}
             {t.clases.chartNewest.replace("{time}", fmtTime(data.newest_candle_utc, locale))}

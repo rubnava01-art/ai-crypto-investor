@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  api, ApiError,
+  api, ApiError, isGuest,
   type AcademyCourse, type AcademyEnrollment, type CrmContact, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
@@ -225,7 +225,9 @@ export function AcademyPanel() {
   const [openId, setOpenId] = useState<number | null>(null);
 
   useEffect(() => {
-    api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
+    // Invitado (Fase 1): nunca es admin y /me no tiene fila de usuario —
+    // no se pide, para que un 401 no expulse la prueba.
+    if (!isGuest()) api.me().then((v) => { if (!isCancelled()) setMe(v); }).catch(() => { if (!isCancelled()) setMe(null); });
     api.listCourses().then((v) => { if (!isCancelled()) setCourses(v); }).catch(() => { if (!isCancelled()) setCourses([]); });
     api.listContacts().then((v) => { if (!isCancelled()) setContacts(v); }).catch(() => { if (!isCancelled()) setContacts([]); });
   }, []);
