@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,7 @@ import { isPlanKey, planNameForKey, type PlanKey } from "../../components/Planes
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
 import { PublicNav } from "../../components/PublicNav";
+import { ColdStartNotice } from "../../components/ColdStartNotice";
 import { SkipLink } from "../../components/ui";
 
 /** Login restyled (paquete 2026-10-28): clean and minimal, inspired by
@@ -94,6 +95,43 @@ function LoginPageInner() {
     : "text-emerald-700";
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
+  // F1-7: si la carga del reto falla se muestra el error con reintento,
+  // en vez de dejar el botón deshabilitado sin explicación.
+  const [challengeError, setChallengeError] = useState(false);
+  // F1-3: error estructurado del login — el mensaje i18n preciso, si el
+  // fallo admite reintento y, en 429, hasta cuándo (cuenta atrás).
+  const [canRetryLogin, setCanRetryLogin] = useState(false);
+  const [isPendingAccount, setIsPendingAccount] = useState(false);
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const lastLoginRef = useRef<{ username: string; password: string } | null>(null);
+  // F1-4: segundos de espera del login en curso (ColdStartNotice, ~5 s).
+  const [loginElapsed, setLoginElapsed] = useState(0);
+  useEffect(() => {
+    if (!loading) {
+      setLoginElapsed(0);
+      return;
+    }
+    const start = Date.now();
+    const id = setInterval(() => setLoginElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [loading]);
+  // Cuenta atrás del 429: tictac de 1 s hasta que se cumple el plazo.
+  useEffect(() => {
+    if (rateLimitUntil == null) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [rateLimitUntil]);
+  const rateRemaining = rateLimitUntil == null ? 0 : Math.max(0, Math.ceil((rateLimitUntil - nowMs) / 1000));
+  useEffect(() => {
+    if (rateLimitUntil != null && rateRemaining === 0) {
+      setRateLimitUntil(null);
+      // Plazo cumplido: el reintento ya vale y el mensaje deja de
+      // mostrar segundos viejos.
+      setCanRetryLogin(true);
+      setError(t.login.errorTooManyAttemptsNoWait);
+    }
+  }, [rateLimitUntil, rateRemaining, t]);
 
   // A5: con sesión válida, /login no es destino — volver al destino
   // pedido (o al dashboard). Con expired=1 NO se redirige: el aviso de
@@ -101,6 +139,9 @@ function LoginPageInner() {
   // F8 (2026-11-23, B4): un token caducado es como no tener token — se
   // borra y NO se redirige al dashboard (evita el rebote dashboard →
   // 401 → /login).
+  // F1-6 (chat-potencia 2026-11-24): antes de redirigir, el token se
+  // valida contra el servidor con GET /api/auth/me (memo 60 s): un token
+  // revocado pero no caducado ya no rebota a / y de vuelta a /login.
   useEffect(() => {
     if (sessionExpired) return;
     const token = getToken();
@@ -109,25 +150,38 @@ function LoginPageInner() {
       logout();
       return;
     }
-    router.replace(nextDest);
+    let cancelled = false;
+    api.me().then(() => {
+      if (!cancelled) router.replace(nextDest);
+    }).catch((err) => {
+      if (cancelled) return;
+      // Token inválido/revocado: se borra y se queda en /login. Un fallo
+      // de red también se queda: el usuario entra a mano con el formulario.
+      if (err instanceof ApiError && err.status === 401) logout();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [sessionExpired, nextDest, router]);
 
   const loadChallenge = useCallback(async () => {
+    setChallengeError(false);
     try {
       setChallenge(await api.registerChallenge());
     } catch {
       setChallenge(null);
+      setChallengeError(true);
     }
   }, []);
 
-  // Precargar el reto anti-bots al montar la página, no solo al cambiar a
-  // "registro": así el primer clic en "Crear cuenta" ya tiene la pregunta
-  // (o un spinner) en vez de texto plano. El reto NO se cachea en cliente:
-  // cada llamada pide uno nuevo al servidor (B3) y un registro fallido lo
-  // renueva.
+  // F1-1: el reto de registro solo se pide en modo registro — en modo
+  // Entrar no se usa y su GET era un viaje innecesario por visita. Al
+  // cambiar a registro, switchMode lo pide (abajo).
   useEffect(() => {
-    loadChallenge();
-  }, [loadChallenge]);
+    if (mode === "register") loadChallenge();
+    // Solo al montar: el cambio de modo lo cubre switchMode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // M12: cambiar de modo ya NO borra el usuario ni la contraseña: si el
   // usuario escribió sus credenciales en "Entrar" y toca "Registrarse"
@@ -148,30 +202,122 @@ function LoginPageInner() {
     }
   }, [searchParams, mode, switchMode]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // F1-2: validación temprana en cliente, antes de gastar un POST:
+  // usuario vacío tras recortar y clave de menos de 12 caracteres.
+  function validateCredentials(user: string, pass: string): string | null {
+    if (!user.trim()) return t.login.errorUserEmpty;
+    if (pass.length < 12) return t.login.errorPasswordShort;
+    return null;
+  }
+
+  function clearLoginError() {
     setError(null);
-    setNotice(null);
-    setRegisteredPlan(null);
+    setCanRetryLogin(false);
+    setIsPendingAccount(false);
+    setRateLimitUntil(null);
+  }
+
+  // F1-3: el error del login se mapea por estado a un mensaje i18n
+  // preciso; el detail crudo del backend nunca se muestra. Red/timeout
+  // y 429 admiten reintento; 401/403 no (repetir no ayudaría).
+  function loginErrorFrom(err: unknown): {
+    message: string;
+    canRetry: boolean;
+    pending?: boolean;
+    retryAfter?: number | null;
+  } {
+    if (err instanceof ApiError) {
+      if (err.status === 401) return { message: t.login.errorWrongCredentials, canRetry: false };
+      if (err.status === 403) return { message: t.login.errorPending, canRetry: false, pending: true };
+      if (err.status === 429) {
+        const seconds = err.retryAfter;
+        return {
+          message:
+            seconds != null
+              ? t.login.errorTooManyAttempts.replace("{seconds}", String(seconds))
+              : t.login.errorTooManyAttemptsNoWait,
+          canRetry: seconds == null,
+          retryAfter: seconds ?? null,
+        };
+      }
+      if (err.key === "network") return { message: t.login.errorNetwork, canRetry: true };
+      if (err.key === "timeout") return { message: t.login.errorTimeout, canRetry: true };
+      if (err.status >= 500) return { message: t.login.errorLogin, canRetry: true };
+    }
+    return { message: t.login.errorLogin, canRetry: false };
+  }
+
+  async function attemptLogin(user: string, pass: string) {
     setLoading(true);
     try {
       // M6: el login también recorta el usuario (el registro ya lo hacía):
       // " ruben " no debe fallar cuando la cuenta es "ruben".
-      const res = await api.login(username.trim(), password);
+      const res = await api.login(user.trim(), pass);
       setToken(res.access_token);
-      router.replace(nextDest);
+      // F1-6: validar el token recién emitido con /me antes de redirigir.
+      try {
+        await api.me();
+        router.replace(nextDest);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          logout();
+          setError(t.login.errorLogin);
+        } else {
+          // Fallo de red validando: el login tuvo éxito y el token es
+          // nuevo; redirigir igual en vez de dejar al usuario atascado.
+          router.replace(nextDest);
+        }
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.login.errorLogin);
+      const mapped = loginErrorFrom(err);
+      setError(mapped.message);
+      setCanRetryLogin(mapped.canRetry);
+      setIsPendingAccount(mapped.pending ?? false);
+      if (mapped.retryAfter != null) {
+        setRateLimitUntil(Date.now() + mapped.retryAfter * 1000);
+        setNowMs(Date.now());
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  async function onRegister(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    clearLoginError();
     setNotice(null);
     setRegisteredPlan(null);
+    const validationError = validateCredentials(username, password);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    lastLoginRef.current = { username, password };
+    await attemptLogin(username, password);
+  }
+
+  // Reintento del login (F1-3): reenvía las credenciales ya escritas, sin
+  // que el usuario las reescriba. Solo existe tras red/timeout/429/5xx.
+  async function retryLogin() {
+    const last = lastLoginRef.current;
+    if (!last) return;
+    // Sin guarda de `loading`: el reintento del ColdStartNotice existe
+    // justo para una petición colgada; el botón de error ya se deshabilita
+    // mientras carga.
+    clearLoginError();
+    await attemptLogin(last.username, last.password);
+  }
+
+  async function onRegister(e: React.FormEvent) {
+    e.preventDefault();
+    clearLoginError();
+    setNotice(null);
+    setRegisteredPlan(null);
+    const validationError = validateCredentials(username, password);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     // M6: la respuesta matemática debe ser un entero. Sin esto, Number(" ")
     // es 0, "1e2" es 100 y "abc" es NaN (null en JSON → 422 crudo).
     const trimmedAnswer = answer.trim();
@@ -199,21 +345,14 @@ function LoginPageInner() {
       setPassword("");
       setAnswer("");
     } catch (err) {
-      // F6 (2026-11-23, M1): el 409 NO revela que el nombre ya existe —
-      // se muestra el mismo aviso genérico de cuenta pendiente que un
-      // registro correcto (el backend, B8, hace lo mismo en su lado).
-      if (err instanceof ApiError && err.status === 409) {
-        setNotice(t.login.noticePending);
-        setRegisteredPlan(planName);
-        setMode("login");
-        setPassword("");
-        setAnswer("");
-      } else if (err instanceof ApiError && err.status === 422) {
-        // M6: el 422 del reto (respuesta no entera o reto vencido) se
-        // muestra con texto i18n, no con el detalle crudo del backend.
+      // S-1 (chat-potencia): el registro ya no devuelve 409 — el backend
+      // responde con el mismo cuerpo en duplicado y nuevo, así que la
+      // rama 409 era código muerto y se elimina. Un 422 del reto se
+      // muestra con texto i18n, no con el detalle crudo del backend.
+      if (err instanceof ApiError && err.status === 422) {
         setError(t.login.errorAnswerInvalid);
       } else {
-        setError(err instanceof ApiError ? err.message : t.login.errorCreate);
+        setError(t.login.errorCreate);
       }
       loadChallenge();
     } finally {
@@ -227,7 +366,8 @@ function LoginPageInner() {
   return (
     <div className="flex min-h-dvh flex-col bg-blue-700">
       <PublicNav variant="onBlue" />
-      <main data-login className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-12">
+      <main data-login id="contenido" tabIndex={-1} className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 py-12 outline-none">
+      {/* SkipLink a <main> (a11y): antes apuntaba al <form>. */}
       <SkipLink label={t.shell.skipLink} />
       {/* Mosaicos estilo Metro: cuadrados planos blancos semitransparentes,
        * decorativos, sin movimiento. */}
@@ -264,7 +404,6 @@ function LoginPageInner() {
       </div>
 
       <form
-        id="contenido"
         onSubmit={mode === "login" ? onSubmit : onRegister}
         style={introStyle(350)}
         className={`relative w-full max-w-sm overflow-hidden rounded-none border-0 bg-white p-6 shadow-2xl shadow-blue-900/40 sm:p-8${introCls ? " login-intro" : ""}`}
@@ -378,6 +517,17 @@ function LoginPageInner() {
             </span>
             {challenge ? (
               <p className="mb-2 text-sm text-zinc-900">{challenge.question}</p>
+            ) : challengeError ? (
+              <div className="mb-2">
+                <p role="alert" className="text-sm leading-relaxed text-red-700">{t.login.errorChallenge}</p>
+                <button
+                  type="button"
+                  onClick={loadChallenge}
+                  className="mt-2 inline-flex min-h-[44px] items-center rounded-none border border-zinc-300 px-3 py-2.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                >
+                  {t.login.retry}
+                </button>
+              </div>
             ) : (
               <p role="status" className="mb-2 flex items-center gap-2 text-sm text-zinc-600">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
@@ -441,14 +591,41 @@ function LoginPageInner() {
         )}
 
         {error && (
-          <p role="alert" className="mb-5 rounded-none bg-red-50 px-3.5 py-2.5 text-sm leading-relaxed text-red-700 ring-1 ring-red-200">
-            {error}
-          </p>
+          <div role="alert" className="mb-5 rounded-none bg-red-50 px-3.5 py-2.5 ring-1 ring-red-200">
+            <p className="text-sm leading-relaxed text-red-700">{error}</p>
+            {isPendingAccount && (
+              <p className="mt-2">
+                <Link href="/contacto" className="text-sm font-semibold text-red-800 underline underline-offset-2 hover:text-red-900">
+                  {t.login.contactLink}
+                </Link>
+              </p>
+            )}
+            {/* F1-3: reintento sin reescribir credenciales (red, timeout,
+                429 cumplido, 5xx). En 429 con cuenta atrás, el botón
+                aparece cuando el plazo termina. */}
+            {canRetryLogin && rateRemaining === 0 && (
+              <button
+                type="button"
+                onClick={retryLogin}
+                disabled={loading}
+                className="mt-2 inline-flex min-h-[44px] items-center rounded-none border border-red-300 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                {t.login.retryLogin}
+              </button>
+            )}
+          </div>
         )}
+
+        {/* F1-4: aviso de arranque en frío a partir de ~5 s de espera. */}
+        <ColdStartNotice
+          loading={loading}
+          elapsedSeconds={loginElapsed}
+          onRetry={mode === "login" ? retryLogin : undefined}
+        />
 
         <button
           type="submit"
-          disabled={loading || (mode === "register" && !challenge)}
+          disabled={loading || (mode === "register" && !challenge) || rateRemaining > 0}
           className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-none bg-blue-600 px-3 py-3 text-[15px] font-bold uppercase tracking-wide text-white transition hover:bg-blue-700 motion-safe:active:scale-[0.99] disabled:opacity-50"
         >
           {loading && (

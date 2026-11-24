@@ -101,6 +101,18 @@ export const dictEs: Dictionary = {
       errorChallenge: "No se pudo cargar la verificación. Inténtalo de nuevo.",
       errorCreate: "No se pudo crear la cuenta.",
       errorLogin: "No se pudo iniciar sesión.",
+      // F1-2/F1-3 (chat-potencia 2026-11-24): validación temprana y errores
+      // precisos por estado; nunca se muestra el detail crudo del backend.
+      errorUserEmpty: "Escribe tu usuario.",
+      errorPasswordShort: "La contraseña debe tener al menos 12 caracteres.",
+      errorWrongCredentials: "Usuario o contraseña incorrectos. Revísalos e inténtalo de nuevo.",
+      errorPending: "Tu cuenta aún está pendiente de activación por un administrador. Cuando te aprueben podrás entrar.",
+      errorTooManyAttempts: "Demasiados intentos. Espera {seconds} s e inténtalo de nuevo.",
+      errorTooManyAttemptsNoWait: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+      errorNetwork: "No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.",
+      errorTimeout: "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
+      retry: "Reintentar",
+      retryLogin: "Reintentar inicio de sesión",
       showPassword: "Mostrar contraseña",
       hidePassword: "Ocultar contraseña",
       secureNote: "Conexión segura",
@@ -413,9 +425,31 @@ export const dictEs: Dictionary = {
       errNetwork: "No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.",
       errTimeout: "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
       errServer: "El asistente no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.",
+      errTooManyRequests: "Demasiadas preguntas seguidas. Espera un momento e inténtalo de nuevo.",
+      errNotFound: "El asistente no encontró ese recurso en el servidor. Inténtalo de nuevo.",
       errForbidden: "Tu cuenta no tiene permiso para esta acción.",
       errGeneric: "Algo salió mal. Inténtalo de nuevo.",
       retry: "Reintentar",
+      // F2-7: el reintento de un mensaje que quizá sí se ejecutó (red o
+      // timeout sin respuesta) pide confirmación antes de reenviar.
+      retryMaybeExecuted:
+        "No se supo si tu mensaje llegó al servidor. Si era una orden de creación, reenviarla podría duplicarla. ¿Reenviarlo de todos modos?",
+      // F3-1: fallback explícito cuando el backend no trae fuente.
+      platformSource: "Datos de la plataforma",
+      // F3-3: pregunta aclaratoria del backend (burbuja con opciones).
+      clarificationTitle: "Para ayudarte mejor:",
+      // Confianza del match (F2-1, backend): 0–100, nunca inventada.
+      confidence: "Confianza: {pct}%",
+      // F4-3: recursos de la biblioteca como tarjetas clicables.
+      resourcesTitle: "Recursos",
+      resourceTypeEbook: "Libro",
+      resourceTypeGuia: "Guía",
+      resourceTypePack: "Pack",
+      resourceTypeAcademia: "Academia",
+      resourceTypeClaseGrabada: "Clase grabada",
+      resourceTypeClaseEnVivo: "Clase en vivo",
+      resourceTypeVideo: "Video",
+      resourceTypeHerramienta: "Herramienta",
       actionDone: "Acción realizada: {tipo}",
       sourceOnly: "Fuente: {nombre}",
       consultedAt: "consultado {fecha}",

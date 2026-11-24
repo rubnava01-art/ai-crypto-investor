@@ -229,7 +229,10 @@ class CourseOut(BaseModel):
     buy_url: str
     delivery_note: str
     sort_order: int
-    students_count: int
+    # F4-5 (corrida 2026-11-24, A3 H-24): el nº de alumnos solo lo ve
+    # el admin; para invitado/prueba el campo llega como null (no como
+    # 0: 0 sería un dato falso, null es "no lo ves").
+    students_count: int | None = None
     downloads: list[CourseDownload] = []
     created_at: str | None = None
     updated_at: str | None = None
@@ -299,11 +302,15 @@ def _downloads_for(db: Session, c: Course) -> list[CourseDownload]:
     return []
 
 
-def _course_out(db: Session, c: Course) -> CourseOut:
+def _course_out(db: Session, c: Course, include_students: bool = False) -> CourseOut:
     count = (
-        db.query(CourseEnrollment)
-        .filter(CourseEnrollment.course_id == c.id)
-        .count()
+        (
+            db.query(CourseEnrollment)
+            .filter(CourseEnrollment.course_id == c.id)
+            .count()
+        )
+        if include_students
+        else None
     )
     return CourseOut(
         id=c.id,
@@ -375,7 +382,9 @@ def list_courses(
     courses = (
         db.query(Course).order_by(Course.sort_order.asc(), Course.id.asc()).offset(offset).limit(limit).all()
     )
-    return [_course_out(db, c) for c in courses]
+    # F4-5: students_count solo para admin (invitado/prueba -> null).
+    es_admin = isinstance(user, User) and bool(user.is_admin)
+    return [_course_out(db, c, include_students=es_admin) for c in courses]
 
 
 @router.get("/courses/{course_id}/download")
@@ -434,7 +443,7 @@ def update_course(
         course.delivery_note = payload.delivery_note
     db.commit()
     db.refresh(course)
-    return _course_out(db, course)
+    return _course_out(db, course, include_students=True)
 
 
 @router.get("/courses/{course_id}/students", response_model=list[EnrollmentOut])

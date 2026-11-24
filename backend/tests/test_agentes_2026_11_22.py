@@ -105,6 +105,16 @@ def _manana(hora: int, minuto: int = 0) -> str:
     return dt.datetime.combine(dia, dt.time(hora, minuto), tzinfo=dt.timezone.utc).isoformat()
 
 
+def _manana_la(hora: int, minuto: int = 0) -> str:
+    """Mañana a una hora de Los Ángeles, en ISO UTC (F2-5, corrida
+    2026-11-24: el chat interpreta las horas en America/Los_Angeles)."""
+    from zoneinfo import ZoneInfo
+    la = ZoneInfo("America/Los_Angeles")
+    dia = (dt.datetime.now(la) + dt.timedelta(days=1)).date()
+    return dt.datetime.combine(dia, dt.time(hora, minuto), tzinfo=la).astimezone(
+        dt.timezone.utc).isoformat()
+
+
 # ------------------------------------------------------------------ contrato --
 
 def test_capacidades_lista_comandos(client, admin_headers):
@@ -135,7 +145,9 @@ def test_sin_token_401(client):
 def test_mensaje_vacio_400_y_largo_400(client, admin_headers):
     assert _chat(client, admin_headers, "").status_code == 400
     assert _chat(client, admin_headers, "   ").status_code == 400
-    assert _chat(client, admin_headers, "x" * 1001).status_code == 400
+    # Corrida 2026-11-24: el tope de 1000 caracteres ahora lo impone
+    # ChatIn con max_length de Pydantic, así que es 422 (no 400).
+    assert _chat(client, admin_headers, "x" * 1001).status_code == 422
 
 
 # ------------------------------------------------------------------ lecturas --
@@ -331,9 +343,11 @@ def test_crear_cita_admin_ok(client, admin_headers, contacto, app):
 
 
 def test_crear_cita_solape_no_crea_nada(client, admin_headers, contacto, app):
+    # La cita existente está a las 10:00 de Los Ángeles (el chat
+    # interpreta "10:30" también en LA: solapan 10:00-11:00 y 10:30).
     r = client.post("/api/business/marketing/citas",
                     json={"contact_id": contacto["id"], "client_name": contacto["name"],
-                          "service_type": "consulta", "starts_at": _manana(10),
+                          "service_type": "consulta", "starts_at": _manana_la(10),
                           "duration_min": 60},
                     headers=admin_headers)
     assert r.status_code == 201, r.text

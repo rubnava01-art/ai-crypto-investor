@@ -69,8 +69,12 @@ def test_register_creates_pending_and_login_blocked(client, admin_headers):
 
 
 def test_approve_enables_login(client, admin_headers):
-    body = _register(client, "pend2")
-    r = client.post(f"/api/users/{body['id']}/approve", headers=admin_headers)
+    _register(client, "pend2")
+    # S-1 (corrida 2026-11-24): el registro ya no devuelve el id (null
+    # en nuevo y duplicado); el admin lo resuelve por el listado, como
+    # en el panel de Control de usuarios.
+    user_id = _list_users(client, admin_headers)["pend2"]["id"]
+    r = client.post(f"/api/users/{user_id}/approve", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "active"
 
@@ -80,8 +84,10 @@ def test_approve_enables_login(client, admin_headers):
 
 
 def test_reject_deletes_account(client, admin_headers):
-    body = _register(client, "pend3")
-    r = client.post(f"/api/users/{body['id']}/reject", headers=admin_headers)
+    _register(client, "pend3")
+    # S-1: id por el listado (ver test_approve_enables_login).
+    user_id = _list_users(client, admin_headers)["pend3"]["id"]
+    r = client.post(f"/api/users/{user_id}/reject", headers=admin_headers)
     assert r.status_code == 204, r.text
 
     users = _list_users(client, admin_headers)
@@ -91,7 +97,9 @@ def test_reject_deletes_account(client, admin_headers):
 
 
 def test_non_admin_cannot_approve_or_reject(client, admin_headers):
-    body = _register(client, "pend4")
+    _register(client, "pend4")
+    # S-1: id por el listado (ver test_approve_enables_login).
+    body = _list_users(client, admin_headers)["pend4"]
     # Prueba activa creada por el admin para intentar aprobar/rechazar.
     r = client.post(
         "/api/users",

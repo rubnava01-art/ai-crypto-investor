@@ -119,8 +119,18 @@ export default function DashboardPage() {
     const attempts = [0, 1];
     for (const i of attempts) {
       try {
-        // Una sola petición agregada (antes eran 9): carga mucho más rápida.
-        const d = await api.dashboard();
+        // F1-5 (chat-potencia): dashboard, perfil y /me van en paralelo
+        // con Promise.all (antes en serie: dashboard → perfil → me).
+        // Solo el dashboard puede fallar el intento; perfil y /me se
+        // toleran por separado, como antes.
+        const [d, perfil, meSettled] = await Promise.all([
+          api.dashboard(),
+          accesoApi.getPerfil().catch(() => null),
+          api.me().then(
+            (m) => ({ ok: true as const, value: m }),
+            (err: unknown) => ({ ok: false as const, error: err }),
+          ),
+        ]);
         if (loadCancelledRef.current) return;
         setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
         setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
@@ -138,12 +148,6 @@ export default function DashboardPage() {
         // una sección que este perfil sí debería ver (system/signals para
         // todos; Invertir con el módulo; logs solo admin). Si el perfil no
         // resuelve, se mantiene el aviso anterior (fail-closed).
-        let perfil: { modulos: string[]; is_admin: boolean } | null = null;
-        try {
-          perfil = await accesoApi.getPerfil();
-        } catch {
-          perfil = null;
-        }
         if (loadCancelledRef.current) return;
         const puedeInvertir = perfil == null || perfil.modulos.includes("invertir");
         const puedeLogs = perfil == null || perfil.is_admin;
@@ -159,11 +163,12 @@ export default function DashboardPage() {
         // M10: un fallo de /me distinto de 401 se muestra (antes se
         // tragaba en silencio y el usuario perdía los paneles de admin
         // sin ningún mensaje). Un 401 ya disparó el redirect central.
-        api.me().then((m) => { if (!loadCancelledRef.current) setMe(m); }).catch((err) => {
-          if (loadCancelledRef.current) return;
+        if (meSettled.ok) {
+          setMe(meSettled.value);
+        } else {
           setMe(null);
-          if (!(err instanceof ApiError && err.status === 401)) setLoadError(err);
-        });
+          if (!(meSettled.error instanceof ApiError && meSettled.error.status === 401)) setLoadError(meSettled.error);
+        }
         setRefreshing(false);
         return;
       } catch (err) {

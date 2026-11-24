@@ -32,3 +32,23 @@ test("errorDetail: detail lista de strings usa el primero", async () => {
 test("errorDetail: cuerpo no-JSON cae al statusText", async () => {
   assert.equal(await errorDetail(res("<html>proxy</html>", "Bad Gateway")), "Bad Gateway");
 });
+
+// F1-3 (chat-potencia 2026-11-24): Retry-After en segundos o fecha HTTP.
+import { parseRetryAfter } from "./client";
+
+test("parseRetryAfter: segundos tal cual", () => {
+  assert.equal(parseRetryAfter("120"), 120);
+  assert.equal(parseRetryAfter("0"), 0);
+});
+
+test("parseRetryAfter: fecha HTTP futura → segundos hasta entonces", () => {
+  const now = Date.parse("2026-11-24T10:00:00Z");
+  assert.equal(parseRetryAfter("Tue, 24 Nov 2026 10:01:30 GMT", now), 90);
+});
+
+test("parseRetryAfter: ausente o inválido → null; pasado → 0", () => {
+  assert.equal(parseRetryAfter(null), null);
+  assert.equal(parseRetryAfter("nope"), null);
+  const now = Date.parse("2026-11-24T10:00:00Z");
+  assert.equal(parseRetryAfter("Tue, 24 Nov 2026 09:59:00 GMT", now), 0);
+});

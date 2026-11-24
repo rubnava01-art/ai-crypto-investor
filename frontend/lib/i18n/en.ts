@@ -101,6 +101,18 @@ export const dictEn: Dictionary = {
       errorChallenge: "Could not load the verification. Try again.",
       errorCreate: "Could not create the account.",
       errorLogin: "Could not log in.",
+      // F1-2/F1-3 (chat-potencia 2026-11-24): early validation and precise
+      // per-status errors; the raw backend detail is never shown.
+      errorUserEmpty: "Enter your username.",
+      errorPasswordShort: "Your password must be at least 12 characters.",
+      errorWrongCredentials: "Wrong username or password. Check them and try again.",
+      errorPending: "Your account is still pending activation by an administrator. Once approved you will be able to log in.",
+      errorTooManyAttempts: "Too many attempts. Wait {seconds} s and try again.",
+      errorTooManyAttemptsNoWait: "Too many attempts. Wait a few minutes and try again.",
+      errorNetwork: "No connection to the server. Check your connection and try again.",
+      errorTimeout: "The server took too long to answer. Try again.",
+      retry: "Retry",
+      retryLogin: "Retry log in",
       showPassword: "Show password",
       hidePassword: "Hide password",
       secureNote: "Secure connection",
@@ -413,9 +425,31 @@ export const dictEn: Dictionary = {
       errNetwork: "No connection to the server. Check your connection and try again.",
       errTimeout: "The server took too long to answer. Try again.",
       errServer: "The assistant is not available right now. Try again in a few minutes.",
+      errTooManyRequests: "Too many messages in a row. Wait a moment and try again.",
+      errNotFound: "The assistant could not find that resource on the server. Try again.",
       errForbidden: "Your account does not have permission for this action.",
       errGeneric: "Something went wrong. Try again.",
       retry: "Retry",
+      // F2-7: retrying a message that may have reached the server (network
+      // or timeout with no response) asks for confirmation first.
+      retryMaybeExecuted:
+        "It is unknown whether your message reached the server. If it was a creation request, resending it could duplicate it. Resend it anyway?",
+      // F3-1: explicit fallback when the backend sends no source.
+      platformSource: "Platform data",
+      // F3-3: backend clarification question (bubble with options).
+      clarificationTitle: "To help you better:",
+      // Match confidence (F2-1, backend): 0–100, never invented.
+      confidence: "Confidence: {pct}%",
+      // F4-3: library resources as clickable cards.
+      resourcesTitle: "Resources",
+      resourceTypeEbook: "Book",
+      resourceTypeGuia: "Guide",
+      resourceTypePack: "Pack",
+      resourceTypeAcademia: "Academy",
+      resourceTypeClaseGrabada: "Recorded class",
+      resourceTypeClaseEnVivo: "Live class",
+      resourceTypeVideo: "Video",
+      resourceTypeHerramienta: "Tool",
       actionDone: "Action completed: {tipo}",
       sourceOnly: "Source: {nombre}",
       consultedAt: "consulted {fecha}",

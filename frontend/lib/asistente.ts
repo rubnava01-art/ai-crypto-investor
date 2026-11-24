@@ -40,21 +40,73 @@ export type AsistenteFuente = {
   url: string | null;
 };
 
+/** Sugerencia del backend (chat-potencia 2026-11-24): el backend nuevo
+ * la marca con `requiere_admin`; el formato antiguo (string plano) se
+ * sigue aceptando y se trata como sugerencia sin marca. */
+export type AsistenteSugerencia = {
+  label: string;
+  requiere_admin?: boolean;
+};
+
+/** Pregunta aclaratoria del backend cuando no puede decidir. */
+export type AsistenteAclaracion = {
+  pregunta: string;
+  opciones?: string[];
+};
+
+/** Recurso de la biblioteca de Estudiar (frente 4). */
+export type AsistenteRecurso = {
+  id: string;
+  tipo: "ebook" | "guia" | "pack" | "academia" | "clase_grabada" | "clase_en_vivo" | "video" | "herramienta";
+  titulo: string;
+  descripcion?: string | null;
+  enlace?: string | null;
+  ruta?: string | null;
+  precio_usd?: number | null;
+};
+
 export type AsistenteChatResponse = {
   respuesta: string;
   accion: AsistenteAccion | null;
-  sugerencias: string[];
+  /** Sugerencias: strings (formato antiguo) u objetos con `requiere_admin`. */
+  sugerencias: Array<string | AsistenteSugerencia>;
   /** Fuente externa consultada (p. ej. Wikipedia) o null si la respuesta
    * viene de los datos de la plataforma. La fecha es ISO UTC. */
   fuente?: AsistenteFuente | null;
   consultado_en?: string | null;
   /** true cuando el Asistente no encontró información sobre el tema. */
   sin_respuesta?: boolean;
+  /** Motivo del sin_respuesta (contrato aditivo, backend Agente 2). */
+  motivo?: "via_rapida" | "internet_sin_resultado" | "biblioteca_sin_resultado";
+  /** Calidad del match de la regla/intención, 0–100 (backend; nunca se
+   * inventa en cliente). */
+  confianza?: number;
+  /** Pregunta aclaratoria con opciones (F3-3). */
+  aclaracion?: AsistenteAclaracion | null;
+  /** Recursos de la biblioteca (F4-3). */
+  recursos?: AsistenteRecurso[] | null;
   /** Pasos de ayuda numerados, cuando la respuesta es una guía. */
   pasos?: string[];
   /** Ruta del módulo al que lleva la ayuda (p. ej. "/facturas"). */
   ruta?: string | null;
 };
+
+/** Normaliza sugerencias del backend a objetos; tolera el formato
+ * antiguo (string) y entradas inválidas (se ignoran). */
+export function normalizeSugerencias(
+  raw: Array<string | AsistenteSugerencia> | null | undefined,
+): AsistenteSugerencia[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AsistenteSugerencia[] = [];
+  for (const s of raw) {
+    if (typeof s === "string") {
+      if (s.trim()) out.push({ label: s });
+    } else if (s && typeof s.label === "string" && s.label.trim()) {
+      out.push({ label: s.label, requiere_admin: !!s.requiere_admin });
+    }
+  }
+  return out;
+}
 
 /** Pregunta pendiente de enseñar (bandeja solo-admin, 2026-11-23). */
 export type AsistentePregunta = {

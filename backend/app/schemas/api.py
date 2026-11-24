@@ -20,6 +20,17 @@ class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
 
+    # S-1b (corrida 2026-11-24): validar tras strip — "   " es 422 y
+    # " ruben " entra como "ruben" (el strip vive aquí, no solo en el
+    # endpoint, para que ningún otro llamador vea el nombre sin recortar).
+    @field_validator("username")
+    @classmethod
+    def _strip_username(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("username no puede estar vacío")
+        return v
+
     @field_validator("password")
     @classmethod
     def _password_within_bcrypt_cap(cls, v: str) -> str:

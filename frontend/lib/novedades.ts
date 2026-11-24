@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-24",
+    title: "Chat más potente y preciso, con la biblioteca de Estudiar y un login más claro",
+    body: "Publicado el 24 de noviembre: el Asistente ahora responde con más potencia y precisión — ordena las respuestas por relevancia y confianza, dice siempre su fuente y su fecha, y cuando una pregunta es ambigua pregunta antes de adivinar en vez de suponer; las ventas que reporta son solo las pagadas. Además, el chat consulta primero la biblioteca real de Estudiar — guías, clases, videos de YouTube y manuales — y enlaza al recurso exacto, y resume cualquier módulo de la plataforma. En accesos, el login quedó más claro: validación temprana, errores precisos según el caso y menos viajes al servidor. Solo chat y entrada, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-24",
     title: "Mejoras diarias: caché en Gestión, contador filtrado en Riesgos y acceso directo en el login",
     body: "Publicado el 24 de noviembre: tres mejoras del día — en velocidad, las listas de Talento humano, Gestión de Riesgos y Planillas ahora se guardan en caché 60 segundos y cargan más rápido al navegar, con invalidación inmediata al crear o borrar; en Gestión de Riesgos, el contador muestra cuántos riesgos coinciden con el filtro (visibles / total) y el mensaje de vacío distingue entre no tener riesgos y no haber coincidencias; y en accesos, al abrir el login el cursor ya cae directo en el campo de usuario. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

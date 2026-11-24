@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
@@ -53,6 +54,9 @@ def list_messages(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # F2-9 (corrida 2026-11-24, A3 H-03): cliente vinculado -> 403
+    # (el chat en vivo es compartido; el vinculado solo tiene portal).
+    deny_linked_reader(db, user)
     rows = (
         db.query(ChatMessage)
         .order_by(ChatMessage.id.desc())
@@ -69,6 +73,8 @@ def post_message(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # F2-9: cliente vinculado -> 403 también al escribir.
+    deny_linked_reader(db, user)
     text = payload.text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="El mensaje no puede estar vacío.")

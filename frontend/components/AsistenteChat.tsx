@@ -9,11 +9,16 @@ import { loginUrl } from "../lib/session";
 import { safeHttpHref } from "../lib/urls";
 import {
   getCapacidades,
+  normalizeSugerencias,
   postChat,
   type AsistenteAccion,
+  type AsistenteAclaracion,
   type AsistenteComando,
   type AsistenteFuente,
+  type AsistenteRecurso,
+  type AsistenteSugerencia,
 } from "../lib/asistente";
+import { splitLinks } from "../lib/linkify";
 import { useLanguage } from "../lib/i18n";
 import { PreguntasEnsenar } from "./PreguntasEnsenar";
 import { catalogMemo } from "../lib/api/memo";
@@ -35,13 +40,21 @@ type ChatMsg = {
   id: number;
   role: "user" | "assistant" | "error";
   text: string;
+  /** Marca temporal local (F3-1): se pone al crear el mensaje. */
+  created_at: number;
   accion?: AsistenteAccion | null;
   /** Mensaje original que falló, para el botón de reintento. */
   failedInput?: string;
+  /** Clave del error que falló el envío (F2-7): con red/timeout el
+   * reintento pide confirmación, porque la primera quizá sí se ejecutó. */
+  failedKey?: ApiError["key"];
   /** Fuente externa consultada + fecha (contrato 2026-11-23). */
   fuente?: AsistenteFuente | null;
   consultado_en?: string | null;
   sin_respuesta?: boolean;
+  confianza?: number;
+  aclaracion?: AsistenteAclaracion | null;
+  recursos?: AsistenteRecurso[] | null;
   pasos?: string[];
   ruta?: string | null;
 };
@@ -58,9 +71,12 @@ function errorKeyToString(key: ApiError["key"], t: ReturnType<typeof useLanguage
       return t.asistente.errTimeout;
     case "forbidden":
       return t.asistente.errForbidden;
-    case "server":
-    case "notFound":
     case "tooManyRequests":
+      // F2-8: el 429 del chat tiene mensaje propio, no el genérico.
+      return t.asistente.errTooManyRequests;
+    case "notFound":
+      return t.asistente.errNotFound;
+    case "server":
       return t.asistente.errServer;
     default:
       return t.asistente.errGeneric;
@@ -95,20 +111,45 @@ type ChatBubbleLabels = {
   actionDone: string;
   consultedAt: string;
   sourceOnly: string;
+  platformSource: string;
+  clarificationTitle: string;
+  confidence: string;
+  resourcesTitle: string;
+  resourceType: (tipo: string) => string;
   retry: string;
+  retryMaybeExecuted: string;
+  cancel: string;
+  send: string;
 };
 
 const ChatBubble = memo(function ChatBubble({
   m,
   labels,
   fmtConsultado,
+  fmtTime,
   onRetry,
+  onSend,
 }: {
   m: ChatMsg;
   labels: ChatBubbleLabels;
   fmtConsultado: (iso: string | null | undefined) => string | null;
+  fmtTime: (ts: number) => string;
   onRetry: (msg: ChatMsg) => void;
+  onSend: (text: string) => void;
 }) {
+  // F2-7: si el fallo fue de red/timeout no se sabe si el mensaje llegó;
+  // el primer toque del reintento pide confirmación en línea (puede
+  // duplicar una orden de creación). Otros errores reenvían directo.
+  const [confirmingRetry, setConfirmingRetry] = useState(false);
+  const retryNeedsConfirm = m.failedKey === "network" || m.failedKey === "timeout";
+  const onRetryClick = () => {
+    if (retryNeedsConfirm && !confirmingRetry) {
+      setConfirmingRetry(true);
+      return;
+    }
+    setConfirmingRetry(false);
+    onRetry(m);
+  };
   return (
     <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
       <div
@@ -120,15 +161,61 @@ const ChatBubble = memo(function ChatBubble({
               : "rounded-bl-md border border-zinc-700 bg-zinc-800 text-zinc-100"
         }`}
       >
-        <p className="whitespace-pre-wrap">{m.text}</p>
+        {/* F4-3: URLs del texto como enlaces (safeHttpHref), sin
+            dangerouslySetInnerHTML: React renderiza nodos <a> normales. */}
+        <p className="whitespace-pre-wrap">
+          {splitLinks(m.text).map((seg, i) =>
+            seg.href ? (
+              <a
+                key={i}
+                href={seg.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-emerald-300 underline underline-offset-2 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              >
+                {seg.text}
+              </a>
+            ) : (
+              <span key={i}>{seg.text}</span>
+            ),
+          )}
+        </p>
+        {/* F3-1: marca temporal local en cada mensaje. */}
+        <p className="mt-1 text-[11px] leading-relaxed text-zinc-300">
+          {fmtTime(m.created_at)}
+        </p>
         {m.role === "assistant" && m.sin_respuesta && (
           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
             {labels.noAnswer}
           </p>
         )}
+        {/* F3-3: pregunta aclaratoria con botones de opción que envían
+            la respuesta; sin opciones, el usuario responde escribiendo. */}
+        {m.role === "assistant" && m.aclaracion && (
+          <div className="mt-2 rounded-lg border border-zinc-700 bg-zinc-900/60 px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+              {labels.clarificationTitle}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-100">{m.aclaracion.pregunta}</p>
+            {m.aclaracion.opciones && m.aclaracion.opciones.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {m.aclaracion.opciones.map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => onSend(op)}
+                    className="min-h-[36px] rounded-full border border-emerald-600 bg-emerald-700/20 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  >
+                    {op}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {m.role === "assistant" && m.pasos && m.pasos.length > 0 && (
           <div className="mt-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
               {labels.stepsTitle}
             </p>
             <ol className="mt-1 list-decimal space-y-1 pl-5">
@@ -148,30 +235,91 @@ const ChatBubble = memo(function ChatBubble({
             )}
           </div>
         )}
-        {m.role === "assistant" && m.fuente && (
-          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-            {(() => {
-              const fecha = fmtConsultado(m.consultado_en);
-              const href = safeHttpHref(m.fuente?.url);
-              const label = labels.sourceOnly.replace("{nombre}", m.fuente?.nombre ?? "");
-              return (
+        {/* F4-3: recursos de la biblioteca como tarjetas clicables. La
+            ruta interna usa Link; el enlace externo, safeHttpHref. */}
+        {m.role === "assistant" && m.recursos && m.recursos.length > 0 && (
+          <div className="mt-2 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+              {labels.resourcesTitle}
+            </p>
+            {m.recursos.map((r) => {
+              const href = r.ruta && r.ruta.startsWith("/") ? r.ruta : safeHttpHref(r.enlace);
+              const inner = (
                 <>
-                  {href ? (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                    >
-                      {label} ↗
-                    </a>
-                  ) : (
-                    label
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-zinc-100">{r.titulo}</span>
+                    <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                      {labels.resourceType(r.tipo)}
+                    </span>
+                  </span>
+                  {r.descripcion && (
+                    <span className="mt-0.5 block text-xs leading-relaxed text-zinc-300">{r.descripcion}</span>
                   )}
-                  {fecha ? ` · ${labels.consultedAt.replace("{fecha}", fecha)}` : ""}
+                  {typeof r.precio_usd === "number" && (
+                    <span className="mt-0.5 block text-xs font-semibold text-zinc-200">
+                      ${r.precio_usd.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </>
               );
-            })()}
+              const cls =
+                "block rounded-lg border border-zinc-700 bg-zinc-900/60 px-3 py-2 text-left hover:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
+              return href ? (
+                r.ruta && r.ruta.startsWith("/") ? (
+                  <Link key={r.id} href={href} className={cls}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <a key={r.id} href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+                    {inner}
+                  </a>
+                )
+              ) : (
+                <div key={r.id} className={cls}>
+                  {inner}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {/* F3-1: fuente + fecha SIEMPRE en respuestas del asistente. Sin
+            fuente del backend, fallback explícito "Datos de la plataforma"
+            con la hora local del mensaje (nunca se omite en silencio). */}
+        {m.role === "assistant" && (
+          <p className="mt-2 text-xs leading-relaxed text-zinc-300">
+            {m.fuente ? (
+              (() => {
+                const fecha = fmtConsultado(m.consultado_en);
+                const href = safeHttpHref(m.fuente?.url);
+                const label = labels.sourceOnly.replace("{nombre}", m.fuente?.nombre ?? "");
+                return (
+                  <>
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      >
+                        {label} ↗
+                      </a>
+                    ) : (
+                      label
+                    )}
+                    {fecha ? ` · ${labels.consultedAt.replace("{fecha}", fecha)}` : ""}
+                  </>
+                );
+              })()
+            ) : (
+              <>
+                {labels.platformSource}
+                {" · "}
+                {labels.consultedAt.replace("{fecha}", fmtConsultado(m.consultado_en) ?? fmtTime(m.created_at))}
+              </>
+            )}
+            {typeof m.confianza === "number" && (
+              <>{" · "}{labels.confidence.replace("{pct}", String(Math.round(m.confianza)))}</>
+            )}
           </p>
         )}
         {m.accion && (
@@ -181,13 +329,31 @@ const ChatBubble = memo(function ChatBubble({
           </p>
         )}
         {m.role === "error" && m.failedInput && (
-          <button
-            type="button"
-            onClick={() => onRetry(m)}
-            className="mt-2 block min-h-[36px] rounded-lg border border-red-400/60 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
-          >
-            {labels.retry}
-          </button>
+          <div className="mt-2">
+            {confirmingRetry && (
+              <p role="alert" className="mb-2 text-xs leading-relaxed text-red-200">
+                {labels.retryMaybeExecuted}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onRetryClick}
+                className="min-h-[36px] rounded-lg border border-red-400/60 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+              >
+                {confirmingRetry ? labels.send : labels.retry}
+              </button>
+              {confirmingRetry && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRetry(false)}
+                  className="min-h-[36px] rounded-lg border border-zinc-600 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                >
+                  {labels.cancel}
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -209,6 +375,12 @@ function AsistenteChatBody() {
     },
     [locale],
   );
+  // Hora local corta (F3-1) para la marca temporal de cada mensaje.
+  const fmtTime = useCallback(
+    (ts: number): string =>
+      new Date(ts).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
+    [locale],
+  );
   // Etiquetas de la burbuja, estables por idioma: con ellas ChatBubble
   // (memo) no se re-renderiza al teclear.
   const bubbleLabels: ChatBubbleLabels = useMemo(
@@ -219,17 +391,34 @@ function AsistenteChatBody() {
       actionDone: t.asistente.actionDone,
       consultedAt: t.asistente.consultedAt,
       sourceOnly: t.asistente.sourceOnly,
+      platformSource: t.asistente.platformSource,
+      clarificationTitle: t.asistente.clarificationTitle,
+      confidence: t.asistente.confidence,
+      resourcesTitle: t.asistente.resourcesTitle,
+      resourceType: (tipo: string) =>
+        tipo === "ebook" ? t.asistente.resourceTypeEbook
+        : tipo === "guia" ? t.asistente.resourceTypeGuia
+        : tipo === "pack" ? t.asistente.resourceTypePack
+        : tipo === "academia" ? t.asistente.resourceTypeAcademia
+        : tipo === "clase_grabada" ? t.asistente.resourceTypeClaseGrabada
+        : tipo === "clase_en_vivo" ? t.asistente.resourceTypeClaseEnVivo
+        : tipo === "video" ? t.asistente.resourceTypeVideo
+        : tipo === "herramienta" ? t.asistente.resourceTypeHerramienta
+        : tipo,
       retry: t.asistente.retry,
+      retryMaybeExecuted: t.asistente.retryMaybeExecuted,
+      cancel: t.common.cancel,
+      send: t.asistente.send,
     }),
     [t],
   );
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { id: 0, role: "assistant", text: t.asistente.greeting },
+    { id: 0, role: "assistant", text: t.asistente.greeting, created_at: Date.now() },
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [comandos, setComandos] = useState<AsistenteComando[]>([]);
-  const [sugerencias, setSugerencias] = useState<string[]>([]);
+  const [sugerencias, setSugerencias] = useState<AsistenteSugerencia[]>([]);
   // F3 (2026-11-23): rol para filtrar los chips de creación de admin.
   // Empieza en false (fail-closed, como ModuleNav) hasta que /me confirme.
   const [isAdmin, setIsAdmin] = useState(false);
@@ -279,7 +468,7 @@ function AsistenteChatBody() {
       }
       sendingRef.current = true;
       setTyping(true);
-      setMessages((prev) => [...prev, { id: nextMsgId++, role: "user", text }]);
+      setMessages((prev) => [...prev, { id: nextMsgId++, role: "user", text, created_at: Date.now() }]);
       setInput("");
       setSugerencias([]);
       try {
@@ -294,22 +483,29 @@ function AsistenteChatBody() {
             id: nextMsgId++,
             role: "assistant",
             text: res.respuesta,
+            created_at: Date.now(),
             accion: res.accion ?? null,
             fuente: res.fuente ?? null,
             consultado_en: res.consultado_en ?? null,
             sin_respuesta: res.sin_respuesta ?? false,
+            confianza: typeof res.confianza === "number" ? res.confianza : undefined,
+            aclaracion: res.aclaracion ?? null,
+            recursos: res.recursos ?? null,
             pasos: res.pasos ?? [],
             ruta: res.ruta ?? null,
           },
         ]);
-        setSugerencias(res.sugerencias ?? []);
+        // F2-8: las sugerencias llegan normalizadas (string antiguo u
+        // objeto con requiere_admin); el filtrado por rol es por la
+        // marca, no por el prefijo "Crea ".
+        setSugerencias(normalizeSugerencias(res.sugerencias));
       } catch (err) {
         // Un 401 con sesión expirada ya redirige al login desde el cliente
         // central; aquí solo queda el resto de fallos, sin trazas técnicas.
         const key = err instanceof ApiError ? err.key : "unknown";
         setMessages((prev) => [
           ...prev,
-          { id: nextMsgId++, role: "error", text: errorKeyToString(key, t), failedInput: text },
+          { id: nextMsgId++, role: "error", text: errorKeyToString(key, t), created_at: Date.now(), failedInput: text, failedKey: key },
         ]);
       } finally {
         setTyping(false);
@@ -331,20 +527,20 @@ function AsistenteChatBody() {
   // Chips: tras cada respuesta mandan las sugerencias del backend; al
   // inicio, los ejemplos de las capacidades. Un chip rellena el input y
   // pone el foco (no envía solo: evita ejecutar una acción por un toque).
-  // F3 (2026-11-23, M5): a prueba NO se le ofrecen los chips de creación
-  // de admin (el backend ya los rechaza; la UI no debe prometerlos). Los
-  // chips de lectura sensible SE mantienen visibles: la decisión M1 es
-  // de Rubén y está pendiente. Las sugerencias del backend son texto
-  // libre sin marca de rol, así que las de creación se filtran por el
-  // prefijo "Crea " — todos los ejemplos de creación del backend
-  // empiezan así y ningún comando de lectura lo hace.
+  // F2-8 (chat-potencia): las sugerencias de creación de admin se
+  // filtran por su marca `requiere_admin`, no por el prefijo "Crea " (que
+  // no funcionaba en inglés y era frágil ante cambios de redactado). Las
+  // de lectura sensible SE mantienen visibles: la decisión M1 es de Rubén
+  // y está pendiente. En `sin_respuesta` estas mismas sugerencias son los
+  // chips de reformulación, y el cuerpo es compartido: se ven igual en el
+  // flotante que en /asistente (F3-3).
   const chips: { label: string; title?: string; admin?: boolean }[] = (
     sugerencias.length > 0
-      ? sugerencias.map((s) => ({ label: s }))
+      ? sugerencias.map((s) => ({ label: s.label, admin: s.requiere_admin }))
       : comandos
           .filter((c) => isAdmin || !c.requiere_admin)
           .map((c) => ({ label: c.ejemplo, title: c.descripcion, admin: c.requiere_admin }))
-  ).filter((c) => isAdmin || !c.label.startsWith("Crea "));
+  ).filter((c) => isAdmin || !c.admin);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -361,7 +557,9 @@ function AsistenteChatBody() {
             m={m}
             labels={bubbleLabels}
             fmtConsultado={fmtConsultado}
+            fmtTime={fmtTime}
             onRetry={retry}
+            onSend={(text) => void send(text)}
           />
         ))}
         {typing && (
@@ -407,7 +605,7 @@ function AsistenteChatBody() {
 
       {chips.length > 0 && hasSession && (
         <div className="border-t border-zinc-800 px-4 pb-1 pt-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-300">
             {t.asistente.suggestionsTitle}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -475,11 +673,10 @@ export function AsistenteChat() {
   // tiene "asistente" en sus módulos (Agente 2 lo quita de
   // MODULOS_CLIENTE) y el backend le deniega el chat (403, B1); el FAB
   // no debe abrirle un chat que no puede usar. Mismo GET
-  // /api/acceso/perfil que consume ModuleNav. Fail-closed: mientras el
-  // perfil no resuelve, el FAB no se muestra; si la petición falla, se
-  // asume prueba (mismo fallback que ModuleNav), así admin/prueba
-  // quedan como hoy. Sin sesión no hay cliente vinculado posible: se
-  // muestra como hoy.
+  // /api/acceso/perfil que consume ModuleNav. F2-11 (2026-11-24): el FAB
+  // se muestra desde el primer render aunque el perfil aún cargue; solo
+  // se oculta cuando el perfil resuelve a cliente. Sin sesión no hay
+  // cliente vinculado posible: se muestra como hoy.
   const [perfil, setPerfil] = useState<"loading" | "admin" | "prueba" | "cliente" | "invitado">(() =>
     getToken() ? "loading" : "prueba",
   );
@@ -504,7 +701,14 @@ export function AsistenteChat() {
     };
   }, []);
 
-  // Focus trap + retorno de foco (P2, 2026-11-23): al abrir, el foco va
+  // F2-11 (chat-potencia): el FAB se muestra desde el primer render,
+  // sin esperar a que resuelva GET /api/acceso/perfil; el permiso se
+  // resuelve al abrir (y el backend sigue siendo la autoridad: un
+  // cliente vinculado recibe 403 al usar el chat). Si el perfil resuelve
+  // a cliente con el panel abierto, se cierra.
+  useEffect(() => {
+    if (open && perfil === "cliente") setOpen(false);
+  }, [open, perfil]);
   // al input del chat; Tab cicla dentro del panel; al cerrar, el foco
   // vuelve al botón flotante. Escape también cierra.
   const fabRef = useRef<HTMLButtonElement | null>(null);
@@ -543,8 +747,9 @@ export function AsistenteChat() {
   }, [open ]);
 
   if (pathname === "/login" || pathname === "/asistente") return null;
-  // Cliente vinculado (o perfil aún sin resolver): sin FAB ni panel.
-  if (perfil === "loading" || perfil === "cliente") return null;
+  // Cliente vinculado (perfil ya resuelto): sin FAB ni panel. Mientras el
+  // perfil carga ("loading") el FAB ya se muestra (F2-11).
+  if (perfil === "cliente") return null;
 
   return (
     <>
@@ -552,7 +757,7 @@ export function AsistenteChat() {
         <section
           ref={panelRef}
           aria-label={t.asistente.title}
-          className="fixed inset-x-4 bottom-40 z-50 flex h-[min(70dvh,560px)] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl sm:inset-x-auto sm:bottom-24 sm:right-6 sm:w-[380px]"
+          className="fixed inset-x-4 bottom-28 z-50 flex h-[min(70dvh,560px)] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl sm:inset-x-auto sm:bottom-24 sm:right-6 sm:w-[380px]"
         >
           <header className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3">
             <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">

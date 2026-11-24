@@ -128,12 +128,26 @@ export class ApiError extends Error {
   status: number;
   key: ApiErrorKey;
   detail?: string;
-  constructor(status: number, message: string, opts: { key?: ApiErrorKey; detail?: string } = {}) {
+  /** Segundos de espera del servidor (`Retry-After`, 429), si lo envió. */
+  retryAfter?: number;
+  constructor(status: number, message: string, opts: { key?: ApiErrorKey; detail?: string; retryAfter?: number } = {}) {
     super(message);
     this.status = status;
     this.key = opts.key ?? errorKeyForStatus(status);
     this.detail = opts.detail;
+    this.retryAfter = opts.retryAfter;
   }
+}
+
+/** Parsea `Retry-After`: segundos o fecha HTTP → segundos hasta poder
+ * reintentar (0 si ya pasó o no parsea). Corrida chat-potencia F1-3. */
+export function parseRetryAfter(raw: string | null | undefined, nowMs = Date.now()): number | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) return Math.max(0, Number(trimmed));
+  const dateMs = Date.parse(trimmed);
+  if (Number.isNaN(dateMs)) return null;
+  return Math.max(0, Math.ceil((dateMs - nowMs) / 1000));
 }
 
 
@@ -349,6 +363,8 @@ export async function request<T>(
       throw new ApiError(res.status, detail || res.statusText, {
         key: errorKeyForStatus(res.status),
         detail: detail || undefined,
+        // F1-3: la cuenta atrás del 429 sale del Retry-After del servidor.
+        retryAfter: parseRetryAfter(res.headers.get("Retry-After")) ?? undefined,
       });
     }
     if (res.status === 204) return undefined as T;

@@ -110,6 +110,7 @@ def normalize_requested_plan(value: str) -> str:
 
 
 class RegisterRequest(BaseModel):
+    # S-1b (corrida 2026-11-24): el username se valida tras strip.
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=12, max_length=128)
     challenge_id: str = Field(min_length=1)
@@ -117,6 +118,17 @@ class RegisterRequest(BaseModel):
     # Plan elegido en la landing (?plan=<clave>). Opcional: registrarse
     # sin elegir plan sigue funcionando y guarda NULL.
     plan: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def _strip_username(cls, v: str) -> str:
+        # S-1b: "   " -> "" (422 por min_length) y " ruben " -> "ruben".
+        # El validador corre tras la validación de longitud, así que un
+        # nombre de solo espacios llega aquí con len>=3 y se rechaza.
+        v = (v or "").strip()
+        if len(v) < 3:
+            raise ValueError("username debe tener al menos 3 caracteres")
+        return v
 
     @field_validator("password")
     @classmethod
@@ -379,13 +391,16 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     db.add(PendingActivation(user_id=user.id))
     db.commit()
     db.refresh(user)
+    # S-1 (corrida 2026-11-24, A3 H-01): el cuerpo es IDÉNTICO al del
+    # duplicado (id null, created_at null en ambos): devolver el id o la
+    # fecha solo en el registro nuevo delataba si el nombre ya existía.
     return {
-        "id": user.id,
+        "id": None,
         "username": user.username,
         "role": "prueba",
         "is_admin": False,
         "is_super_admin": False,
         "status": "pending",
         "requested_plan": user.requested_plan,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "created_at": None,
     }
