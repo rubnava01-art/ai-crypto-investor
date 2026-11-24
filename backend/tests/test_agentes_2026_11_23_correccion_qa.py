@@ -204,8 +204,9 @@ class _ClienteLento:
 
 def test_busqueda_internet_no_pasa_del_presupuesto_global(monkeypatch):
     """M2: con todas las fuentes lentas, la búsqueda no pasa de
-    ~10 s (antes: hasta ~32 s). El presupuesto se baja a 3 s en el
-    test para que corra rápido; el mecanismo es el mismo."""
+    ~5 s (antes: hasta ~32 s en serie; 10 s con el primer
+    presupuesto). El presupuesto se baja a 3 s en el test para que
+    corra rápido; el mecanismo es el mismo."""
     from app import internet
 
     monkeypatch.setattr(httpx, "Client", _ClienteLento)
@@ -220,10 +221,16 @@ def test_busqueda_internet_no_pasa_del_presupuesto_global(monkeypatch):
 
 
 def test_presupuesto_global_por_defecto_es_10s():
-    """M2: el presupuesto real es 10 s (no 32 s)."""
+    """M2: el presupuesto real es 10 s (no 32 s).
+
+    Chat-opt 2026-11-23 (cambio intencional, documentado en el plan):
+    el presupuesto baja a 5 s porque las fuentes ahora corren en
+    paralelo (4 s por fuente) y el peor caso medido con mocks lentos
+    es ~3 s. El nombre del test se conserva para no romper la
+    referencia M2; lo que afirma es el valor vigente."""
     from app import internet
 
-    assert internet.PRESUPUESTO_TOTAL_S == 10.0
+    assert internet.PRESUPUESTO_TOTAL_S == 5.0
 
 
 # ------------------------------------------- B2: URL de DDG codificada --

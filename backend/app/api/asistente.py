@@ -1039,6 +1039,69 @@ def _h_ayuda() -> dict:
                        sugerencias=_SUGERENCIAS_LECTURA)
 
 
+# ------------------------------------------------- vía rápida sin-respuesta --
+# (chat-opt 2026-11-23): un mensaje que claramente NO es una
+# pregunta de conocimiento general no debe esperar al presupuesto
+# de Internet (5 s) para caer en la bandeja: en producción esa
+# espera era el camino lento de cada saludo y cada sinsentido.
+# Criterio conservador (mismo resultado visible que antes, solo
+# más rápido): saludos/charla corta, o mensaje de 2+ palabras sin
+# ninguna marca de pregunta Y sin ninguna palabra española común.
+# Los temas sueltos de una palabra ("Bitcoin", "Fotosíntesis")
+# SIGUEN yendo a Internet: un tema sin más contexto sí puede
+# tener respuesta. El compromiso: un tema de 2+ palabras sin
+# marca de pregunta ("Donald Trump") ya no busca en Internet.
+_SALUDOS = (
+    "hola", "buenos dias", "buenas tardes", "buenas noches", "buenas",
+    "gracias", "muchas gracias", "adios", "hasta luego", "que tal",
+    "ok", "vale", "si", "no",
+)
+_MARCAS_PREGUNTA_GENERAL = (
+    "que es", "que son", "quien es", "quien son", "quienes son",
+    "cuando", "donde", "como", "por que", "porque", "cual", "cuales",
+    "cuanto", "cuanta", "cuantos", "cuantas", "dime", "explica",
+    "explicame", "busca", "investiga", "significa", "que fue",
+    "quien fue", "donde queda", "es el", "es la", "es un", "es una",
+    "son los", "son las", "hay ", "habia", "que significa",
+)
+_PALABRAS_COMUNES_ES = frozenset("""
+el la los las de en y a que es un una para con por se su al lo como mas pero
+sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta
+hay donde quien desde todo nos durante todos uno les ni contra eso ante
+ellos esto mi antes algunos yo otro otras otra el tanto esa estos mucho
+quienes nada muchos cual poco ella estar estas algunas algo nosotros mis
+tu te ti tus ellas tengo tiene tienes hacer puede pueden va van fue son
+del se tu su sus mi mis
+""".split())
+
+
+def _sin_respuesta_rapida(norm: str) -> bool:
+    """True si el mensaje no merece un viaje a Internet: saludo o
+    texto sin marca de pregunta y sin vocabulario español común."""
+    limpio = norm.strip("¿?¡!.,").strip()
+    if limpio in _SALUDOS or limpio.startswith("hola ") or limpio.startswith("hola,"):
+        return True
+    if any(m in norm for m in _MARCAS_PREGUNTA_GENERAL):
+        return False
+    palabras = norm.split()
+    if len(palabras) < 2:
+        return False
+    return not any(p in _PALABRAS_COMUNES_ES for p in palabras)
+
+
+def _h_sin_respuesta() -> dict:
+    """Respuesta estándar cuando nada respondió (va a la bandeja)."""
+    return _respuesta(
+        "No encontré información sobre eso. Puedo consultar precios, "
+        "señales y análisis del mercado, listar clases y novedades, y "
+        "(si eres admin) crear notas, tareas, borradores y citas. Tu "
+        "pregunta quedó registrada para que el administrador le enseñe "
+        "una respuesta al asistente.",
+        sin_respuesta=True,
+        sugerencias=_SUGERENCIAS_LECTURA,
+    )
+
+
 # ------------------------------------------------------------------ endpoints --
 
 class ChatIn(BaseModel):
@@ -1103,6 +1166,14 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
         return _h_ayuda()
     if _es_orden_creacion(norm) and any(k in norm for k in ("crea una cita", "agenda una cita", "crear una cita", "agendar una cita", "nueva cita")):
         return _h_crear_cita(db, user, mensaje, norm)
+    # (c) Catálogo de ayuda: «¿cómo…?» y temas explícitos de ayuda.
+    # Va antes que los listados de lectura: «¿cómo creo una
+    # factura?» es ayuda, no un resumen de facturación, y «¿cómo
+    # creo una cita?» es ayuda, no el listado de citas (chat-opt
+    # 2026-11-23: antes caía en _h_listar_citas).
+    ayuda = _buscar_ayuda(norm)
+    if ayuda is not None:
+        return _h_ayuda_tema(ayuda)
     if any(k in norm for k in ("cita", "citas", "agenda")):
         return _h_listar_citas(db, user)
     if _es_orden_creacion(norm) and any(k in norm for k in ("crea una nota", "crear una nota", "nueva nota", "anota")):
@@ -1111,12 +1182,6 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
         return _h_crear_tarea(db, user, mensaje)
     if _es_orden_creacion(norm) and any(k in norm for k in ("borrador", "contenido", "publicacion", "post")):
         return _h_crear_borrador(db, user, mensaje)
-    # (c) Catálogo de ayuda: «¿cómo…?» y temas explícitos de ayuda.
-    # Va antes que los listados de lectura: «¿cómo creo una
-    # factura?» es ayuda, no un resumen de facturación.
-    ayuda = _buscar_ayuda(norm)
-    if ayuda is not None:
-        return _h_ayuda_tema(ayuda)
     # Prohibido, antes que cualquier intención de lectura: subcadenas
     # fijas y compra/venta de cripto con cantidad intermedia
     # ("compra 0.01 BTC").
@@ -1139,8 +1204,21 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
         return _h_clases(db)
     if any(k in norm for k in ("novedad", "novedades", "que hay nuevo")):
         return _h_novedades(db)
+    # Local primero (chat-opt 2026-11-23): "¿qué es el bitcoin?" tiene
+    # respuesta local (precio real) y NO debe ir a Internet. El precio
+    # ya casa con "cuanto vale/precio/cotizacion"; aquí cubre la
+    # pregunta de definición sobre BTC/ETH.
+    if re.search(r"\b(bitcoin|btc|ethereum|eth)\b", norm) and any(
+        k in norm for k in ("que es", "que son", "que significa")
+    ):
+        return _h_precio(db, norm)
     # (d) Internet como fallback: solo la pregunta genérica, nunca
-    # datos de la plataforma (ver app/internet.py).
+    # datos de la plataforma (ver app/internet.py). Antes de viajar,
+    # la vía rápida: saludos y sinsentidos caen a la bandeja sin
+    # esperar al presupuesto de Internet.
+    if _sin_respuesta_rapida(norm):
+        _registrar_pregunta(db, mensaje.strip())
+        return _h_sin_respuesta()
     hallazgo = buscar_en_internet(mensaje.strip())
     if hallazgo is not None:
         consultado = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -1156,15 +1234,7 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
     # Sin fuente: respuesta clara + registro en la bandeja para que
     # el admin la enseñe. No se inventa nada.
     _registrar_pregunta(db, mensaje.strip())
-    return _respuesta(
-        "No encontré información sobre eso. Puedo consultar precios, "
-        "señales y análisis del mercado, listar clases y novedades, y "
-        "(si eres admin) crear notas, tareas, borradores y citas. Tu "
-        "pregunta quedó registrada para que el administrador le enseñe "
-        "una respuesta al asistente.",
-        sin_respuesta=True,
-        sugerencias=_SUGERENCIAS_LECTURA,
-    )
+    return _h_sin_respuesta()
 
 
 # ------------------------------------------------- bandeja y reglas (solo admin) --

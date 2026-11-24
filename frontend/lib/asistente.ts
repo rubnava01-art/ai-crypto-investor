@@ -13,7 +13,15 @@
 // Sin persistencia: el historial vive solo en la sesión (estado React).
 // Usa el fetch central (lib/api/client.ts): JWT Bearer con auth:true,
 // timeout largo de IA para el POST y reintento opt-in solo en el GET.
-import { AI_TIMEOUT_MS, request } from "./api/client";
+import { request } from "./api/client";
+import { catalogMemo } from "./api/memo";
+
+// Timeout propio del chat (chat-opt 2026-11-23): el backend tiene un
+// presupuesto global de 5 s para el chat (Internet incluido), así que
+// 20 s deja margen de sobra para una BD lenta o un arranque en frío;
+// antes usaba AI_TIMEOUT_MS (120 s) y un backend colgado bloqueaba
+// la UI dos minutos. AI_TIMEOUT_MS sigue para /api/ai/ask y Crear.
+export const CHAT_TIMEOUT_MS = 20_000;
 
 export type AsistenteComando = {
   id: string;
@@ -72,11 +80,18 @@ export type AsistenteCapacidadesResponse = {
 };
 
 export function getCapacidades(opts?: { signal?: AbortSignal }) {
-  return request<AsistenteCapacidadesResponse>("/api/asistente/capacidades", {
-    auth: true,
-    retry: true,
-    signal: opts?.signal,
-  });
+  // Catálogo estático (chat-opt 2026-11-23): memo 60 s con dedup en
+  // vuelo — cada apertura del panel flotante volvía a pedirlo. Los
+  // errores no se guardan y el memo se vacía al cambiar el token.
+  return catalogMemo.get<AsistenteCapacidadesResponse>(
+    "/api/asistente/capacidades",
+    () =>
+      request<AsistenteCapacidadesResponse>("/api/asistente/capacidades", {
+        auth: true,
+        retry: true,
+        signal: opts?.signal,
+      }),
+  );
 }
 
 export function postChat(mensaje: string, opts?: { signal?: AbortSignal }) {
@@ -84,7 +99,7 @@ export function postChat(mensaje: string, opts?: { signal?: AbortSignal }) {
     method: "POST",
     auth: true,
     body: { mensaje },
-    timeoutMs: AI_TIMEOUT_MS,
+    timeoutMs: CHAT_TIMEOUT_MS,
     signal: opts?.signal,
   });
 }

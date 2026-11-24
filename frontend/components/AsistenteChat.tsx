@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ApiError, getToken } from "../lib/api/client";
@@ -80,18 +80,148 @@ function ChatIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+/** Una burbuja del historial, memoizada (chat-opt 2026-11-23): cada
+ * pulsación en el input re-renderizaba el cuerpo entero y con él
+ * todas las burbujas. Las props son estables (el mensaje es el mismo
+ * objeto mientras viva en el historial; las etiquetas son strings del
+ * diccionario; fmtConsultado/onRetry son useCallback), así que una
+ * burbuja ya pintada no se vuelve a pintar al teclear o al llegar un
+ * mensaje nuevo. */
+type ChatBubbleLabels = {
+  noAnswer: string;
+  stepsTitle: string;
+  goToModule: string;
+  actionDone: string;
+  consultedAt: string;
+  sourceOnly: string;
+  retry: string;
+};
+
+const ChatBubble = memo(function ChatBubble({
+  m,
+  labels,
+  fmtConsultado,
+  onRetry,
+}: {
+  m: ChatMsg;
+  labels: ChatBubbleLabels;
+  fmtConsultado: (iso: string | null | undefined) => string | null;
+  onRetry: (msg: ChatMsg) => void;
+}) {
+  return (
+    <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+          m.role === "user"
+            ? "rounded-br-md bg-emerald-700 text-white"
+            : m.role === "error"
+              ? "rounded-bl-md border border-red-800/70 bg-red-500/10 text-red-200"
+              : "rounded-bl-md border border-zinc-700 bg-zinc-800 text-zinc-100"
+        }`}
+      >
+        <p className="whitespace-pre-wrap">{m.text}</p>
+        {m.role === "assistant" && m.sin_respuesta && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+            {labels.noAnswer}
+          </p>
+        )}
+        {m.role === "assistant" && m.pasos && m.pasos.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              {labels.stepsTitle}
+            </p>
+            <ol className="mt-1 list-decimal space-y-1 pl-5">
+              {m.pasos.map((paso, i) => (
+                <li key={i} className="text-sm leading-relaxed text-zinc-200">
+                  {paso}
+                </li>
+              ))}
+            </ol>
+            {m.ruta && m.ruta.startsWith("/") && (
+              <Link
+                href={m.ruta}
+                className="mt-2 inline-flex min-h-[36px] items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+              >
+                {labels.goToModule} →
+              </Link>
+            )}
+          </div>
+        )}
+        {m.role === "assistant" && m.fuente && (
+          <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+            {(() => {
+              const fecha = fmtConsultado(m.consultado_en);
+              const href = safeHttpHref(m.fuente?.url);
+              const label = labels.sourceOnly.replace("{nombre}", m.fuente?.nombre ?? "");
+              return (
+                <>
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    >
+                      {label} ↗
+                    </a>
+                  ) : (
+                    label
+                  )}
+                  {fecha ? ` · ${labels.consultedAt.replace("{fecha}", fecha)}` : ""}
+                </>
+              );
+            })()}
+          </p>
+        )}
+        {m.accion && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+            <span aria-hidden="true">✓</span>
+            {labels.actionDone.replace("{tipo}", m.accion.tipo)}
+          </p>
+        )}
+        {m.role === "error" && m.failedInput && (
+          <button
+            type="button"
+            onClick={() => onRetry(m)}
+            className="mt-2 block min-h-[36px] rounded-lg border border-red-400/60 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+          >
+            {labels.retry}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
 /** Cuerpo del chat compartido por el panel flotante y la página /asistente. */
 function AsistenteChatBody() {
   const { t, lang } = useLanguage();
   const locale = lang === "en" ? "en-US" : "es-MX";
   // Fecha de consulta ("23 nov 2026, 17:58"): el backend manda ISO UTC;
   // si no parsea, no se muestra fecha en vez de inventar una.
-  const fmtConsultado = (iso: string | null | undefined): string | null => {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-    return `${d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
-  };
+  const fmtConsultado = useCallback(
+    (iso: string | null | undefined): string | null => {
+      if (!iso) return null;
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return null;
+      return `${d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
+    },
+    [locale],
+  );
+  // Etiquetas de la burbuja, estables por idioma: con ellas ChatBubble
+  // (memo) no se re-renderiza al teclear.
+  const bubbleLabels: ChatBubbleLabels = useMemo(
+    () => ({
+      noAnswer: t.asistente.noAnswer,
+      stepsTitle: t.asistente.stepsTitle,
+      goToModule: t.asistente.goToModule,
+      actionDone: t.asistente.actionDone,
+      consultedAt: t.asistente.consultedAt,
+      sourceOnly: t.asistente.sourceOnly,
+      retry: t.asistente.retry,
+    }),
+    [t],
+  );
   const [messages, setMessages] = useState<ChatMsg[]>([
     { id: 0, role: "assistant", text: t.asistente.greeting },
   ]);
@@ -181,11 +311,14 @@ function AsistenteChatBody() {
     [t],
   );
 
-  const retry = (msg: ChatMsg) => {
-    if (!msg.failedInput) return;
-    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
-    void send(msg.failedInput);
-  };
+  const retry = useCallback(
+    (msg: ChatMsg) => {
+      if (!msg.failedInput) return;
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      void send(msg.failedInput);
+    },
+    [send],
+  );
 
   // Chips: tras cada respuesta mandan las sugerencias del backend; al
   // inicio, los ejemplos de las capacidades. Un chip rellena el input y
@@ -215,87 +348,13 @@ function AsistenteChatBody() {
         className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
       >
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                m.role === "user"
-                  ? "rounded-br-md bg-emerald-700 text-white"
-                  : m.role === "error"
-                    ? "rounded-bl-md border border-red-800/70 bg-red-500/10 text-red-200"
-                    : "rounded-bl-md border border-zinc-700 bg-zinc-800 text-zinc-100"
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{m.text}</p>
-              {m.role === "assistant" && m.sin_respuesta && (
-                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
-                  {t.asistente.noAnswer}
-                </p>
-              )}
-              {m.role === "assistant" && m.pasos && m.pasos.length > 0 && (
-                <div className="mt-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                    {t.asistente.stepsTitle}
-                  </p>
-                  <ol className="mt-1 list-decimal space-y-1 pl-5">
-                    {m.pasos.map((paso, i) => (
-                      <li key={i} className="text-sm leading-relaxed text-zinc-200">
-                        {paso}
-                      </li>
-                    ))}
-                  </ol>
-                  {m.ruta && m.ruta.startsWith("/") && (
-                    <Link
-                      href={m.ruta}
-                      className="mt-2 inline-flex min-h-[36px] items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                    >
-                      {t.asistente.goToModule} →
-                    </Link>
-                  )}
-                </div>
-              )}
-              {m.role === "assistant" && m.fuente && (
-                <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-                  {(() => {
-                    const fecha = fmtConsultado(m.consultado_en);
-                    const href = safeHttpHref(m.fuente?.url);
-                    const label = t.asistente.sourceOnly.replace("{nombre}", m.fuente?.nombre ?? "");
-                    return (
-                      <>
-                        {href ? (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-semibold text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
-                          >
-                            {label} ↗
-                          </a>
-                        ) : (
-                          label
-                        )}
-                        {fecha ? ` · ${t.asistente.consultedAt.replace("{fecha}", fecha)}` : ""}
-                      </>
-                    );
-                  })()}
-                </p>
-              )}
-              {m.accion && (
-                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-                  <span aria-hidden="true">✓</span>
-                  {t.asistente.actionDone.replace("{tipo}", m.accion.tipo)}
-                </p>
-              )}
-              {m.role === "error" && m.failedInput && (
-                <button
-                  type="button"
-                  onClick={() => retry(m)}
-                  className="mt-2 block min-h-[36px] rounded-lg border border-red-400/60 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
-                >
-                  {t.asistente.retry}
-                </button>
-              )}
-            </div>
-          </div>
+          <ChatBubble
+            key={m.id}
+            m={m}
+            labels={bubbleLabels}
+            fmtConsultado={fmtConsultado}
+            onRetry={retry}
+          />
         ))}
         {typing && (
           <div className="flex justify-start">

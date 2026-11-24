@@ -78,29 +78,31 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * (correos, crm, usuarios) en [0] — y con la entrada de chat con
  * Internet + interfaces por perfil + visuales Semrush del 2026-11-23
  * antepuesta: todos los índices +1 y la entrada nueva (business, crear,
- * estudiar, invertir, usuarios, inicio, perfil, analisis, auditor) en [0]. */
+ * estudiar, invertir, usuarios, inicio, perfil, analisis, auditor) en [0] — y con
+ * la entrada de optimización del chat del 2026-11-23 antepuesta: todos los
+ * índices +1 y la entrada nueva (business, crear, estudiar, invertir) en [0]. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [0, 1, 3, 4, 7, 9, 10, 11, 12],
-  planes: [22],
-  terminal: [23],
-  flujos: [16, 23],
-  analizador: [23],
-  auditor: [0, 23, 26],
-  ajustador: [33],
-  correos: [2],
-  crear: [0, 1, 3, 6, 10, 25],
-  estudiar: [0, 1, 3, 4, 10, 14, 21, 23, 31, 33, 36, 37],
-  inicio: [0, 1, 10, 23, 34, 42],
-  perfil: [0, 5, 13, 35],
-  talento: [6, 14, 38],
-  riesgos: [7, 38],
-  planillas: [4, 10, 38],
-  crm: [2, 7, 38],
-  analisis: [0, 38],
-  invertir: [0, 1, 3, 10, 15, 19, 20, 24, 39, 41],
-  usuarios: [0, 1, 2, 5, 6, 8, 17, 41, 42],
-  espacio: [42],
-  facturas: [4, 10],
+  business: [0, 1, 2, 4, 5, 8, 10, 11, 12, 13],
+  planes: [23],
+  terminal: [24],
+  flujos: [17, 24],
+  analizador: [24],
+  auditor: [1, 24, 27],
+  ajustador: [34],
+  correos: [3],
+  crear: [0, 1, 2, 4, 7, 11, 26],
+  estudiar: [0, 1, 2, 4, 5, 11, 15, 22, 24, 32, 34, 37, 38],
+  inicio: [1, 2, 11, 24, 35, 43],
+  perfil: [1, 6, 14, 36],
+  talento: [7, 15, 39],
+  riesgos: [8, 39],
+  planillas: [5, 11, 39],
+  crm: [3, 8, 39],
+  analisis: [1, 39],
+  invertir: [0, 1, 2, 4, 11, 16, 20, 21, 25, 40, 42],
+  usuarios: [1, 2, 3, 6, 7, 9, 18, 42, 43],
+  espacio: [43],
+  facturas: [5, 11],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

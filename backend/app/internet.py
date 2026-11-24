@@ -1,33 +1,43 @@
 """Consulta en Internet SIN clave para el Asistente (corrida
-2026-11-23, Agente 2).
+2026-11-23, Agente 2; optimizado 2026-11-23, corrida chat-opt).
 
 Solo se envía la pregunta genérica del usuario (nunca datos de la
 plataforma: ni contactos, facturas, citas, precios internos ni
-nada del CRM). Fuentes, en orden:
+nada del CRM). Fuentes, en orden de preferencia:
 
 1. DuckDuckGo Instant Answer (sin clave).
 2. Wikipedia REST summary en español, con fallback en inglés.
 3. Fetch directo de una página pública (la URL del resumen de
    DuckDuckGo) como último recurso.
 
-Timeout 8 s por fuente, con un presupuesto global de 10 s para toda
-la búsqueda (M2, QA 2026-11-23): sin él, 4 fuentes lentas en serie
-podían tardar ~32 s dentro de una petición de chat. Cada petición
-usa min(8 s, tiempo restante del presupuesto); agotado el
-presupuesto, las fuentes que faltan se saltan. Caché en memoria con
-TTL 900 s (también para los "sin resultado", para no reintentar lo
-mismo sin parar).
-Sin dependencias nuevas: httpx ya está en requirements.txt.
+Optimización 2026-11-23 (chat-opt): las tres fuentes de la fase 1
+corren EN PARALELO (ThreadPoolExecutor, un httpx.Client propio por
+hilo) en vez de en serie, y el presupuesto global baja de 10 s a
+5 s (TIMEOUT_FUENTE_S=4 s por fuente). El peor caso medido con
+mocks lentos (3 s/fuente, sin resultado) pasa de ~9 s a ~3 s; el
+caso Wiki (DDG sin texto + Wikipedia ES) pasa de ~2.4 s a ~1.2 s
+con fuentes de 1.2 s. La preferencia se mantiene: DDG con texto
+gana siempre; si DDG no trae texto, gana Wikipedia ES, luego EN;
+el fetch directo solo se intenta si DDG dio URL sin texto y
+ninguna Wikipedia respondió. Caché en memoria con TTL 900 s
+(también para los "sin resultado", para no reintentar lo mismo
+sin parar). Sin dependencias nuevas: httpx ya está en requirements.txt.
 """
 import html
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote, quote_plus
 
 import httpx
 
-TIMEOUT_S = 8.0
-PRESUPUESTO_TOTAL_S = 10.0
+# Presupuesto por fuente y global (chat-opt 2026-11-23): 4 s por
+# fuente en paralelo + 1 s de margen para el fetch directo = 5 s
+# de peor caso. Antes: 8 s por fuente en serie, 10 s global.
+TIMEOUT_FUENTE_S = 4.0
+PRESUPUESTO_TOTAL_S = 5.0
+# Nombres viejos (compatibilidad con tests/imports existentes).
+TIMEOUT_S = TIMEOUT_FUENTE_S
 CACHE_TTL_S = 900
 
 _cache: dict[str, tuple[float, dict | None]] = {}
@@ -64,6 +74,18 @@ def _restante(deadline: float) -> float:
     return max(0.0, deadline - time.monotonic())
 
 
+def _nuevo_cliente() -> httpx.Client:
+    # trust_env=False: el cliente NO lee HTTP(S)_PROXY del entorno.
+    # En este VM el proxy de egress rompe el parseo de httpx
+    # (InvalidURL al construir el cliente); en producción
+    # (Render) no hay proxy y la salida es directa. Además, un
+    # fallo de red nunca debe tumbar el chat: todo se captura.
+    # Cada hilo crea SU propio cliente: httpx.Client no se comparte
+    # entre hilos.
+    return httpx.Client(timeout=TIMEOUT_FUENTE_S, follow_redirects=True,
+                        trust_env=False)
+
+
 def _desde_ddg(client: httpx.Client, pregunta: str, timeout: float) -> dict | None:
     try:
         r = client.get(
@@ -97,36 +119,44 @@ def _desde_ddg(client: httpx.Client, pregunta: str, timeout: float) -> dict | No
     return None
 
 
-def _desde_wikipedia(client: httpx.Client, titulo: str, deadline: float) -> dict | None:
+def _desde_wikipedia_idioma(client: httpx.Client, titulo: str, lang: str,
+                            timeout: float) -> dict | None:
+    """Resumen de Wikipedia en un idioma (una sola llamada)."""
     titulo_q = quote(titulo, safe="")
+    try:
+        r = client.get(
+            f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{titulo_q}",
+            timeout=timeout,
+        )
+    except httpx.HTTPError:
+        return None
+    if r.status_code != 200:
+        return None
+    try:
+        data = r.json()
+    except ValueError:
+        return None
+    if data.get("type") == "disambiguation":
+        return None
+    extract = (data.get("extract") or "").strip()
+    if not extract:
+        return None
+    url = (data.get("content_urls") or {}).get("desktop", {}).get("page") or ""
+    return {"nombre": f"Wikipedia ({lang})", "url": url, "texto": extract}
+
+
+def _desde_wikipedia(client: httpx.Client, titulo: str, deadline: float) -> dict | None:
+    """Resumen de Wikipedia ES con fallback EN (serie; la versión
+    paralela vive en buscar_en_internet). Se conserva para
+    compatibilidad con tests que la llaman directamente."""
     for lang in ("es", "en"):
         restante = _restante(deadline)
         if restante <= 0:
             break
-        try:
-            r = client.get(
-                f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{titulo_q}",
-                timeout=min(TIMEOUT_S, restante),
-            )
-        except httpx.HTTPError:
-            continue
-        if r.status_code != 200:
-            continue
-        try:
-            data = r.json()
-        except ValueError:
-            continue
-        if data.get("type") == "disambiguation":
-            continue
-        extract = (data.get("extract") or "").strip()
-        if not extract:
-            continue
-        url = (data.get("content_urls") or {}).get("desktop", {}).get("page") or ""
-        return {
-            "nombre": f"Wikipedia ({lang})",
-            "url": url,
-            "texto": extract,
-        }
+        resultado = _desde_wikipedia_idioma(
+            client, titulo, lang, timeout=min(TIMEOUT_FUENTE_S, restante))
+        if resultado:
+            return resultado
     return None
 
 
@@ -157,14 +187,24 @@ def _fetch_directo(client: httpx.Client, url: str, timeout: float) -> dict | Non
     return {"nombre": "Página pública", "url": url, "texto": texto}
 
 
+def _tarea_con_cliente(fn, *args):
+    """Ejecuta fn(cliente, *args) con un cliente propio del hilo."""
+    with _nuevo_cliente() as client:
+        return fn(client, *args)
+
+
 def buscar_en_internet(pregunta: str) -> dict | None:
     """Busca una pregunta genérica en Internet.
 
     Devuelve {"nombre", "url", "texto"} o None si ninguna fuente
     responde con algo útil. Nunca recibe ni envía datos de la
     plataforma: el llamador pasa solo la pregunta del usuario.
-    Presupuesto global PRESUPUESTO_TOTAL_S (10 s): el peor caso no
-    pasa de ~10 s aunque todas las fuentes sean lentas.
+    Presupuesto global PRESUPUESTO_TOTAL_S (5 s): el peor caso no
+    pasa de ~5 s aunque todas las fuentes sean lentas. Las tres
+    fuentes de la fase 1 (DDG, Wiki ES, Wiki EN) se lanzan en
+    paralelo; la preferencia DDG > Wiki ES > Wiki EN se mantiene
+    esperando a DDG primero (si trae texto, se devuelve sin esperar
+    a las Wikipedias) y luego a ES antes que a EN.
     """
     clave = (pregunta or "").strip().lower()
     if not clave:
@@ -174,31 +214,65 @@ def buscar_en_internet(pregunta: str) -> dict | None:
     if hit and ahora - hit[0] < CACHE_TTL_S:
         return hit[1]
     resultado: dict | None = None
+    ddg_url: str | None = None
     deadline = time.monotonic() + PRESUPUESTO_TOTAL_S
+    titulo = _titulo_desde_pregunta(pregunta)
     try:
-        # trust_env=False: el cliente NO lee HTTP(S)_PROXY del entorno.
-        # En este VM el proxy de egress rompe el parseo de httpx
-        # (InvalidURL al construir el cliente); en producción
-        # (Render) no hay proxy y la salida es directa. Además, un
-        # fallo de red nunca debe tumbar el chat: todo se captura.
-        with httpx.Client(timeout=TIMEOUT_S, follow_redirects=True,
-                          trust_env=False) as client:
-            restante = _restante(deadline)
-            ddg = _desde_ddg(client, pregunta.strip(),
-                             timeout=min(TIMEOUT_S, restante)) if restante > 0 else None
+        # Sin `with`: el __exit__ del executor esperaría (wait=True) a
+        # las tareas en vuelo y anularía la salida rápida cuando DDG
+        # ya respondió. Se cierra a mano sin esperar (las tareas que
+        # sigan corriendo terminan solas en su hilo).
+        ex = ThreadPoolExecutor(max_workers=3)
+        try:
+            ddg_f = ex.submit(_tarea_con_cliente, _desde_ddg,
+                              pregunta.strip(), TIMEOUT_FUENTE_S)
+            wiki_es_f = ex.submit(_tarea_con_cliente, _desde_wikipedia_idioma,
+                                  titulo, "es", TIMEOUT_FUENTE_S)
+            wiki_en_f = ex.submit(_tarea_con_cliente, _desde_wikipedia_idioma,
+                                  titulo, "en", TIMEOUT_FUENTE_S)
+            # DDG manda: si trae texto, no se espera a las Wikipedias.
+            try:
+                ddg = ddg_f.result(timeout=_restante(deadline))
+            except Exception:
+                ddg = None
             if ddg and ddg.get("texto"):
                 resultado = ddg
             else:
-                wiki = _desde_wikipedia(client, _titulo_desde_pregunta(pregunta), deadline)
+                if ddg and ddg.get("url"):
+                    ddg_url = ddg["url"]
+                # Wikipedia ES antes que EN (mismo orden que antes).
+                try:
+                    wiki = wiki_es_f.result(timeout=_restante(deadline))
+                except Exception:
+                    wiki = None
                 if wiki:
                     resultado = wiki
-                elif ddg and ddg.get("url"):
-                    restante = _restante(deadline)
-                    if restante > 0:
-                        directo = _fetch_directo(client, ddg["url"],
-                                                 timeout=min(TIMEOUT_S, restante))
+                else:
+                    try:
+                        wiki = wiki_en_f.result(timeout=_restante(deadline))
+                    except Exception:
+                        wiki = None
+                    if wiki:
+                        resultado = wiki
+            # El fetch directo solo usa la URL de DDG y solo si nada
+            # respondió con texto: último recurso, con lo que quede.
+            if resultado is None and ddg_url:
+                restante = _restante(deadline)
+                if restante > 0:
+                    try:
+                        directo = _tarea_con_cliente(
+                            _fetch_directo, ddg_url,
+                            min(TIMEOUT_FUENTE_S, restante))
                         if directo:
                             resultado = directo
+                    except Exception:
+                        pass
+        finally:
+            # Las tareas que sigan en vuelo ya no se necesitan: se
+            # cancelan las pendientes sin esperar a las que corren.
+            for f in (ddg_f, wiki_es_f, wiki_en_f):
+                f.cancel()
+            ex.shutdown(wait=False, cancel_futures=True)
     except Exception:
         resultado = None
     _cache[clave] = (ahora, resultado)

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-23",
+    title: "Chat más rápido: respuestas de Internet en paralelo y sin esperas",
+    body: "Publicado el 23 de noviembre: el Asistente ahora responde mucho más rápido — las consultas de Internet se hacen en paralelo en vez de una por una, con un presupuesto máximo de 5 segundos en vez de 10; las preguntas con respuesta en la plataforma (como el precio del bitcoin) ya no salen a Internet y se contestan al instante; y los saludos y mensajes sin respuesta caen de inmediato a la bandeja de enseñanza. Además, el perfil y los permisos se cargan una sola vez por sesión en vez de pedirlos en cada página, y el historial del chat ya no se vuelve a dibujar entero al escribir. Mismo Asistente, mismas respuestas, solo más rápido y más claro. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-23",
     title: "Chat con Internet, interfaz por perfil y visuales estilo Semrush",
     body: "Publicado el 23 de noviembre: el Asistente ahora consulta Internet (sin clave) y responde con fuente y fecha, además de guiar paso a paso por cada módulo — crear facturas, invitar clientes, crear citas y más — y de guardar las preguntas sin respuesta en una bandeja para que el admin les enseñe la respuesta, así el chat mejora solo. Además, cada perfil tiene ahora su propia interfaz: el rol prueba queda en demo sin Invertir ni datos reales, el cliente vinculado ve solo su portal, y nada se cruza entre clientes e inversión. Y la interfaz estrena visuales estilo Semrush: tarjetas de métricas y gráficas limpias en Inicio, Invertir, Análisis de datos y Auditor, con datos reales de la plataforma. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },
