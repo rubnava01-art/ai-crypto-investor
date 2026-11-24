@@ -147,13 +147,12 @@ def test_referrals_viewer_read_only(client, admin_headers, viewer_headers):
     rid = r.json()["id"]
 
     h = viewer_headers
-    # can read
+    # Fase 0 (2026-11-23, mejoras óptimas, P0-1): prueba recibe 403
+    # también en lectura (antes leía campañas y referidos).
     r = client.get("/api/referrals/campaigns", headers=h)
-    assert r.status_code == 200
-    assert any(x["id"] == cid for x in r.json())
+    assert r.status_code == 403
     r = client.get(f"/api/referrals/campaigns/{cid}/referrals", headers=h)
-    assert r.status_code == 200
-    assert any(x["id"] == rid for x in r.json())
+    assert r.status_code == 403
     # cannot write
     assert client.post("/api/referrals/campaigns", json=_campaign(), headers=h).status_code == 403
     assert client.put(f"/api/referrals/campaigns/{cid}", json={"status": "paused"}, headers=h).status_code == 403

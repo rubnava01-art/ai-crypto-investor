@@ -81,9 +81,12 @@ def test_business_auth_required(client):
 
 
 def test_business_viewer_read_only(client, viewer_headers, admin_headers):
-    # viewer can read
+    # Fase 0 (2026-11-23, mejoras óptimas, P0-1): prueba recibe 403
+    # también en lectura (antes leía notas y tareas).
     r = client.get("/api/business/administrativo/notes", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
+    r = client.get("/api/business/administrativo/tasks", headers=viewer_headers)
+    assert r.status_code == 403, r.text
     # viewer cannot write (403 on every write route)
     r = client.post(
         "/api/business/administrativo/notes",

@@ -9,12 +9,18 @@ vínculos 409/404; resumen solo propio.
 Fixtures compartidas. NINGÚN test hace login propio: tokens de
 clientes acuñados con create_access_token (precedente test_fase2).
 
-D-01 (fix 2026-11-17, Agente 2): tests 15-17 completan la matriz
+D-01 (fix 2026-11-17, Agente 2): tests 15-17 completaban la matriz
 (test 11): las listas de marketing/contenido fuera del portal
-(/contenido/ideas, /contenido/calendario, /campanas) fuerzan en
-servidor el filtro por el contacto vinculado del no-admin e ignoran
+(/contenido/ideas, /contenido/calendario, /campanas) forzaban en
+servidor el filtro por el contacto vinculado del no-admin e ignoraban
 cualquier ?contact_id=. D-02: test 18 acuña un token para una cuenta
 pendiente y verifica 403 en el portal.
+
+Fase 0 (2026-11-23, mejoras óptimas, P0-1): D-01/D3 quedan
+DEROGADAS para esos routers — el router entero exige el módulo
+"business" y tanto el cliente vinculado como prueba reciben 403;
+el filtro por contacto ya no se ejerce ahí (el cliente usa el
+portal). Los tests 15-17 fijan el nuevo comportamiento.
 """
 import datetime as dt
 import re
@@ -523,29 +529,22 @@ def _cal_range() -> tuple[str, str]:
 # 15. D-01 ideas: A solo ve las suyas; B y NULL invisibles ---------------
 
 def test_15_ideas_d01_solo_propias(client, app, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router de
+    # contenido exige el módulo "business" — el filtro D-01 por
+    # contacto ya no se ejerce aquí porque ni el cliente vinculado
+    # ni prueba llegan al router (403). El cliente vinculado ve sus
+    # datos en el portal. Este test fija el nuevo comportamiento;
+    # el admin sigue viendo todo, con ?contact_id= respetado.
     s = _seed_d01(client, app, admin_headers)
     r = client.get(f"{BASE}/contenido/ideas", headers=s["headers_a"])
-    assert r.status_code == 200, r.text
-    ids = [i["id"] for i in r.json()]
-    assert s["idea_a"]["id"] in ids
-    assert s["idea_b"]["id"] not in ids
-    assert s["idea_null"]["id"] not in ids
-    # ?contact_id= de B se ignora: A sigue viendo solo lo suyo.
+    assert r.status_code == 403, r.text
     r = client.get(
         f"{BASE}/contenido/ideas?contact_id={s['contact_b']['id']}",
         headers=s["headers_a"],
     )
-    assert r.status_code == 200, r.text
-    ids = [i["id"] for i in r.json()]
-    assert s["idea_a"]["id"] in ids
-    assert s["idea_b"]["id"] not in ids
-    assert s["idea_null"]["id"] not in ids
-    # B ve solo la suya.
+    assert r.status_code == 403, r.text
     r = client.get(f"{BASE}/contenido/ideas", headers=s["headers_b"])
-    ids = [i["id"] for i in r.json()]
-    assert s["idea_b"]["id"] in ids
-    assert s["idea_a"]["id"] not in ids
-    assert s["idea_null"]["id"] not in ids
+    assert r.status_code == 403, r.text
     # Admin ve todo, con ?contact_id= respetado.
     r = client.get(f"{BASE}/contenido/ideas", headers=admin_headers)
     ids = [i["id"] for i in r.json()]
@@ -560,72 +559,48 @@ def test_15_ideas_d01_solo_propias(client, app, admin_headers, viewer_headers):
     assert s["idea_b"]["id"] in ids
     assert s["idea_a"]["id"] not in ids
     assert s["idea_null"]["id"] not in ids
-    # Prueba sin vínculo: comportamiento documentado sin cambios (D3).
+    # Prueba sin vínculo: 403 (antes 200 por D3, derogada en Fase 0).
     r = client.get(f"{BASE}/contenido/ideas", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    ids = [i["id"] for i in r.json()]
-    assert s["idea_a"]["id"] in ids
-    assert s["idea_b"]["id"] in ids
-    assert s["idea_null"]["id"] in ids
+    assert r.status_code == 403, r.text
 
 
 # 16. D-01 calendario: igual que ideas ------------------------------------
 
 def test_16_calendario_d01_solo_propio(client, app, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23): como test_15 — vinculado y prueba 403;
+    # admin sigue viendo todo.
     s = _seed_d01(client, app, admin_headers)
     frm, to = _cal_range()
     url = f"{BASE}/contenido/calendario?from={frm}&to={to}"
     r = client.get(url, headers=s["headers_a"])
-    assert r.status_code == 200, r.text
-    ids = [i["id"] for i in r.json()]
-    assert s["item_a"]["id"] in ids
-    assert s["item_b"]["id"] not in ids
-    assert s["item_null"]["id"] not in ids
+    assert r.status_code == 403, r.text
     r = client.get(url, headers=s["headers_b"])
-    ids = [i["id"] for i in r.json()]
-    assert s["item_b"]["id"] in ids
-    assert s["item_a"]["id"] not in ids
-    assert s["item_null"]["id"] not in ids
+    assert r.status_code == 403, r.text
     r = client.get(url, headers=admin_headers)
     ids = [i["id"] for i in r.json()]
     assert s["item_a"]["id"] in ids
     assert s["item_b"]["id"] in ids
     assert s["item_null"]["id"] in ids
-    # Prueba sin vínculo: sin cambios (D3).
+    # Prueba sin vínculo: 403 (antes 200 por D3, derogada en Fase 0).
     r = client.get(url, headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    ids = [i["id"] for i in r.json()]
-    assert s["item_a"]["id"] in ids
-    assert s["item_b"]["id"] in ids
-    assert s["item_null"]["id"] in ids
+    assert r.status_code == 403, r.text
 
 
 # 17. D-01 campañas: igual que ideas --------------------------------------
 
 def test_17_campanas_d01_solo_propias(client, app, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23): como test_15 — vinculado y prueba 403;
+    # admin sigue viendo todo, con ?contact_id= respetado.
     s = _seed_d01(client, app, admin_headers)
     r = client.get(f"{BASE}/campanas", headers=s["headers_a"])
-    assert r.status_code == 200, r.text
-    ids = [c["id"] for c in r.json()]
-    assert s["camp_a"]["id"] in ids
-    assert s["camp_b"]["id"] not in ids
-    assert s["camp_null"]["id"] not in ids
-    # ?contact_id= de B se ignora.
+    assert r.status_code == 403, r.text
     r = client.get(
         f"{BASE}/campanas?contact_id={s['contact_b']['id']}",
         headers=s["headers_a"],
     )
-    assert r.status_code == 200, r.text
-    ids = [c["id"] for c in r.json()]
-    assert s["camp_a"]["id"] in ids
-    assert s["camp_b"]["id"] not in ids
-    assert s["camp_null"]["id"] not in ids
-    # B ve solo la suya.
+    assert r.status_code == 403, r.text
     r = client.get(f"{BASE}/campanas", headers=s["headers_b"])
-    ids = [c["id"] for c in r.json()]
-    assert s["camp_b"]["id"] in ids
-    assert s["camp_a"]["id"] not in ids
-    assert s["camp_null"]["id"] not in ids
+    assert r.status_code == 403, r.text
     # Admin ve todo, con ?contact_id= respetado.
     r = client.get(f"{BASE}/campanas", headers=admin_headers)
     ids = [c["id"] for c in r.json()]
@@ -640,13 +615,9 @@ def test_17_campanas_d01_solo_propias(client, app, admin_headers, viewer_headers
     assert s["camp_b"]["id"] in ids
     assert s["camp_a"]["id"] not in ids
     assert s["camp_null"]["id"] not in ids
-    # Prueba sin vínculo: sin cambios (D3).
+    # Prueba sin vínculo: 403 (antes 200 por D3, derogada en Fase 0).
     r = client.get(f"{BASE}/campanas", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    ids = [c["id"] for c in r.json()]
-    assert s["camp_a"]["id"] in ids
-    assert s["camp_b"]["id"] in ids
-    assert s["camp_null"]["id"] in ids
+    assert r.status_code == 403, r.text
 
 
 # 18. D-02: token acuñado para una cuenta pendiente -> 403 ----------------

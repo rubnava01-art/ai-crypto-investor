@@ -3,10 +3,10 @@
 A project tracks one company's digital adaptation: it links to an
 existing CRM contact (the company), moves through stages
 (diagnostico -> propuesta -> desarrollo -> entrega) and holds tasks
-and notes. Lists start EMPTY — nothing is invented. Any authenticated
-user reads; only admins create/update/delete (require_admin -> 403
-for prueba). Deleting a project deletes its tasks explicitly (SQLite
-may not enforce the FK cascade).
+and notes. Lists start EMPTY — nothing is invented. Only admins
+(módulo "desarrollo") read or write (Fase 0, 2026-11-23: prueba
+recibe 403 también en lectura). Deleting a project deletes its
+tasks explicitly (SQLite may not enforce the FK cascade).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
@@ -14,11 +14,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.portal import deny_linked_reader
+from app.core.perfiles import require_modulo
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, DigitalProject, DigitalTask, User
 
-router = APIRouter(prefix="/api/desarrollo", tags=["desarrollo"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "desarrollo" — prueba recibe 403 también en lectura.
+router = APIRouter(
+    prefix="/api/desarrollo",
+    tags=["desarrollo"],
+    dependencies=[Depends(require_modulo("desarrollo"))],
+)
 
 STAGES = ("diagnostico", "propuesta", "desarrollo", "entrega")
 

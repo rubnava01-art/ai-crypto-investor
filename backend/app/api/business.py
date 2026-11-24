@@ -6,20 +6,28 @@ takes the area in the path (or as a required filter) and only ever
 touches rows of that area.
 
 Permissions follow the platform RBAC (same as CRM / Referidos):
-- any authenticated user (admin or "prueba") can READ notes/tasks;
-- only admins can create, update or delete (require_admin -> 403
-  for prueba).
+- only admins (módulo "business") can read, create, update or
+  delete (Fase 0, 2026-11-23: prueba recibe 403 también en lectura;
+  antes cualquier autenticado leía).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.portal import deny_linked_reader
+from app.core.perfiles import require_modulo
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import BusinessNote, BusinessTask, User
 
-router = APIRouter(prefix="/api/business", tags=["business"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "business" — prueba (sin ese módulo) recibe 403 también
+# en lectura. Antes: cualquier autenticado leía notas y tareas.
+router = APIRouter(
+    prefix="/api/business",
+    tags=["business"],
+    dependencies=[Depends(require_modulo("business"))],
+)
 
 AREAS = ("marketing", "ventas", "legal", "administrativo")
 

@@ -40,9 +40,10 @@ def _mk_template(client, admin_headers, **over):
 
 def test_ideas_crud_y_validacion(client, admin_headers, viewer_headers):
     idea = _mk_idea(client, admin_headers)
+    # Fase 0 (2026-11-23, mejoras óptimas, P0-1): prueba recibe 403
+    # también en lectura (antes leía las ideas).
     r = client.get(f"{BASE}/ideas", headers=viewer_headers)
-    assert r.status_code == 200
-    assert any(i["id"] == idea["id"] for i in r.json())
+    assert r.status_code == 403
     # escritura solo admin
     r = client.post(f"{BASE}/ideas", json={"title": "X"}, headers=viewer_headers)
     assert r.status_code == 403

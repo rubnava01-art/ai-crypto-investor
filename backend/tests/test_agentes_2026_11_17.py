@@ -348,11 +348,12 @@ def test_s1_referidos_403_para_cliente_vinculado(client, app, admin_headers, vie
     )
     assert r.status_code == 200, r.text
     assert any(x["id"] == s["referral_b"]["id"] for x in r.json())
-    # Prueba sin vínculo: sin cambios (D3).
+    # Fase 0 (2026-11-23): prueba sin vínculo recibe 403 (antes 200
+    # por D3, derogada).
     r = client.get("/api/referrals/campaigns", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
     r = client.get(f"/api/referrals/campaigns/{s['ref_b']['id']}", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
 
 
 def test_s1_desarrollo_403_para_cliente_vinculado(client, app, admin_headers, viewer_headers):
@@ -373,13 +374,14 @@ def test_s1_desarrollo_403_para_cliente_vinculado(client, app, admin_headers, vi
     )
     assert r.status_code == 200, r.text
     assert any(t["id"] == s["task_b"]["id"] for t in r.json())
+    # Fase 0 (2026-11-23): prueba sin vínculo recibe 403 (antes 200).
     r = client.get("/api/desarrollo/projects", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
     r = client.get(
         f"/api/desarrollo/projects/{s['proj_b']['id']}/tasks",
         headers=viewer_headers,
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
 
 
 def test_s1_crear_copies_y_business_403_para_cliente_vinculado(
@@ -404,11 +406,16 @@ def test_s1_crear_copies_y_business_403_para_cliente_vinculado(
     assert any(t["id"] == s["btask_b"]["id"] for t in r.json())
     for path in (
         "/api/crear/copies",
+    ):
+        r = client.get(path, headers=viewer_headers)
+        assert r.status_code == 200, (path, r.text)
+    # Fase 0 (2026-11-23): prueba recibe 403 en las rutas de negocio.
+    for path in (
         "/api/business/marketing/notes",
         "/api/business/marketing/tasks",
     ):
         r = client.get(path, headers=viewer_headers)
-        assert r.status_code == 200, (path, r.text)
+        assert r.status_code == 403, (path, r.text)
 
 
 def test_s1_plantillas_contenido_403_para_cliente_vinculado(
@@ -420,9 +427,9 @@ def test_s1_plantillas_contenido_403_para_cliente_vinculado(
     r = client.get(f"{BASE}/contenido/plantillas", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert any(t["id"] == s["tpl_b"]["id"] for t in r.json())
+    # Fase 0 (2026-11-23): prueba recibe 403 también en lectura.
     r = client.get(f"{BASE}/contenido/plantillas", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    assert any(t["id"] == s["tpl_b"]["id"] for t in r.json())
+    assert r.status_code == 403, r.text
 
 
 def test_s1_portal_sigue_funcionando_para_cliente_vinculado(

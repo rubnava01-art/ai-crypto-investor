@@ -233,6 +233,13 @@ def test_solape_mismo_contacto_409_otro_contacto_ok(client, admin_headers):
 
 
 def test_cliente_crea_su_cita_y_no_para_otro(client, app, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router de
+    # marketing exige el módulo "business" — el cliente vinculado
+    # YA NO puede crear citas por POST /citas (403) ni ver la agenda
+    # (403). Su superficie es el portal
+    # (/api/business/marketing/portal/*). La auto-reserva por
+    # cliente queda cerrada hasta que exista un endpoint de reserva
+    # en el portal. Este test fija el nuevo comportamiento.
     user_a = _mk_user(client, admin_headers, _uid("cliA"))
     user_b = _mk_user(client, admin_headers, _uid("cliB"))
     contact_a = _mk_contact(client, admin_headers, _uid("CliA"))
@@ -240,13 +247,11 @@ def test_cliente_crea_su_cita_y_no_para_otro(client, app, admin_headers, viewer_
     _link(client, admin_headers, user_a["id"], contact_a["id"])
     _link(client, admin_headers, user_b["id"], contact_b["id"])
     headers_a = _headers_for(app, user_a["username"])
-    # sin contact_id: se deriva del token
+    # cliente vinculado: 403 también para su propia cita
     r = client.post(
         f"{BASE}/citas", json=_cita_body(starts_at=_future(5, 10)), headers=headers_a
     )
-    assert r.status_code == 201, r.text
-    assert r.json()["contact_id"] == contact_a["id"]
-    assert r.json()["client_name"] == contact_a["name"]
+    assert r.status_code == 403, r.text
     # contact_id de otro cliente -> 403
     r = client.post(
         f"{BASE}/citas",
@@ -310,10 +315,9 @@ def test_campanas_crud_y_validacion(client, admin_headers, viewer_headers):
     assert r.status_code == 201, r.text
     camp = r.json()
     assert camp["budget"] == 100 and camp["spend"] == 25
-    # lectura para cualquier autenticado
+    # Fase 0 (2026-11-23): prueba recibe 403 también en lectura.
     r = client.get(f"{BASE}/campanas", headers=viewer_headers)
-    assert r.status_code == 200
-    assert any(c["id"] == camp["id"] for c in r.json())
+    assert r.status_code == 403
     # escritura solo admin
     r = client.post(
         f"{BASE}/campanas",

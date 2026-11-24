@@ -10,9 +10,9 @@ Referral row. No money moves through this module, no payments are
 processed, and no payout is promised by the platform.
 
 Permissions follow the platform RBAC (same as CRM):
-- any authenticated user (admin or "prueba") can READ campaigns/referrals;
-- only admins can create, update or change referral status
-  (require_admin -> 403 for prueba).
+- only admins (módulo "referidos") can read, create, update or
+  change referral status (Fase 0, 2026-11-23: prueba recibe 403
+  también en lectura; antes cualquier autenticado leía).
 """
 import re
 import secrets
@@ -25,11 +25,19 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.portal import deny_linked_reader
+from app.core.perfiles import require_modulo
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Contact, Referral, ReferralCampaign, User
 
-router = APIRouter(prefix="/api/referrals", tags=["referrals"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "referidos" — prueba recibe 403 también en lectura.
+# Antes: cualquier autenticado leía campañas y referidos.
+router = APIRouter(
+    prefix="/api/referrals",
+    tags=["referrals"],
+    dependencies=[Depends(require_modulo("referidos"))],
+)
 
 REWARD_TYPES = ("fixed", "percentage")
 CAMPAIGN_STATUSES = ("active", "paused", "ended")

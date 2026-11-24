@@ -28,6 +28,7 @@ from app.api.portal import (
     upsert_brief,
 )
 from app.core.hardening import audit
+from app.core.perfiles import require_modulo
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import (
@@ -41,7 +42,17 @@ from app.models.tables import (
     User,
 )
 
-router = APIRouter(prefix="/api/business/marketing/contenido", tags=["contenido-nest"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "business" (Contenido vive bajo Negocio > Marketing; no
+# hay clave "contenido" en MODULOS_TODOS). Prueba y cliente vinculado
+# reciben 403 en todo el router, incluidas las listas D-01
+# (ideas/calendario con filtro por contacto): el cliente vinculado
+# usa el portal. Cambio de comportamiento deliberado (plan §Q1).
+router = APIRouter(
+    prefix="/api/business/marketing/contenido",
+    tags=["contenido-nest"],
+    dependencies=[Depends(require_modulo("business"))],
+)
 
 PLATFORMS = ("instagram", "threads", "facebook")
 IDEA_SOURCES = ("manual", "tendencia", "cliente")

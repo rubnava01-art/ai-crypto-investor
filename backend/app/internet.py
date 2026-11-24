@@ -27,9 +27,11 @@ import html
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, urljoin, urlparse
 
 import httpx
+
+from app.api.auditor import check_host_allowed, validate_url
 
 # Presupuesto por fuente y global (chat-opt 2026-11-23): 4 s por
 # fuente en paralelo + 1 s de margen para el fetch directo = 5 s
@@ -39,8 +41,24 @@ PRESUPUESTO_TOTAL_S = 5.0
 # Nombres viejos (compatibilidad con tests/imports existentes).
 TIMEOUT_S = TIMEOUT_FUENTE_S
 CACHE_TTL_S = 900
+# Q10 (QA 2026-11-23): tope FIFO de entradas al caché (mismo patrón
+# que el ticker de mercado). Sin tope, cada pregunta distinta era
+# una entrada viva 900 s sin poda.
+CACHE_MAX_ENTRADAS = 500
+# Q2 (QA 2026-11-23): tope de cuerpo en el fetch directo, mismo
+# orden que el auditor (1 MB).
+MAX_CUERPO_DIRECTO_BYTES = 1 * 1024 * 1024
+MAX_REDIRECTS_DIRECTO = 5
 
 _cache: dict[str, tuple[float, dict | None]] = {}
+
+
+def _cache_put(clave: str, resultado: dict | None) -> None:
+    """Guarda en caché con tope FIFO: al superar el máximo se evicta
+    la entrada más antigua (el dict conserva orden de inserción)."""
+    _cache[clave] = (time.monotonic(), resultado)
+    while len(_cache) > CACHE_MAX_ENTRADAS:
+        _cache.pop(next(iter(_cache)))
 
 _PREGUNTA_LIDER = (
     "que es", "qué es", "que son", "qué son", "quien es", "quién es",
@@ -174,17 +192,67 @@ def _texto_visible(html_text: str, limite: int = 600) -> str:
 
 
 def _fetch_directo(client: httpx.Client, url: str, timeout: float) -> dict | None:
+    """Fetch directo de una página pública con defensas SSRF (Q2).
+
+    Reutiliza validate_url/check_host_allowed del auditor: la URL
+    inicial se valida antes del fetch y CADA redirección se
+    revalida (follow_redirects desactivado por petición; se sigue
+    manual, máx. 5 saltos, como el auditor). Cuerpo topado a 1 MB
+    (stream con corte): una página enorme ya no se carga entera en
+    memoria por pregunta. Cualquier bloqueo o fallo devuelve None
+    (el llamador cae al "sin respuesta"); nunca levanta.
+    """
     try:
-        r = client.get(url, headers={"User-Agent": "GrowBusinessPlatform/1.0"},
-                       timeout=timeout)
-    except httpx.HTTPError:
+        url = validate_url(url)
+        check_host_allowed(url)
+    except Exception:
         return None
-    if r.status_code != 200:
+    current = url
+    redirects = 0
+    try:
+        while True:
+            try:
+                with client.stream(
+                    "GET",
+                    current,
+                    headers={"User-Agent": "GrowBusinessPlatform/1.0"},
+                    timeout=timeout,
+                    follow_redirects=False,
+                ) as r:
+                    if r.status_code in (301, 302, 303, 307, 308):
+                        location = r.headers.get("location")
+                        if not location:
+                            return None
+                        if redirects >= MAX_REDIRECTS_DIRECTO:
+                            return None
+                        nxt = urljoin(current, location)
+                        if urlparse(nxt).scheme not in ("http", "https"):
+                            return None
+                        try:
+                            nxt = validate_url(nxt)
+                            check_host_allowed(nxt)
+                        except Exception:
+                            return None
+                        redirects += 1
+                        current = nxt
+                        continue
+                    if r.status_code != 200:
+                        return None
+                    chunks: list[bytes] = []
+                    total = 0
+                    for chunk in r.iter_bytes(65536):
+                        total += len(chunk)
+                        if total > MAX_CUERPO_DIRECTO_BYTES:
+                            return None
+                        chunks.append(chunk)
+                    texto = _texto_visible(b"".join(chunks).decode("utf-8", errors="replace"))
+            except Exception:
+                return None
+            if len(texto) < 80:
+                return None
+            return {"nombre": "Página pública", "url": current, "texto": texto}
+    except Exception:
         return None
-    texto = _texto_visible(r.text)
-    if len(texto) < 80:
-        return None
-    return {"nombre": "Página pública", "url": url, "texto": texto}
 
 
 def _tarea_con_cliente(fn, *args):
@@ -275,5 +343,5 @@ def buscar_en_internet(pregunta: str) -> dict | None:
             ex.shutdown(wait=False, cancel_futures=True)
     except Exception:
         resultado = None
-    _cache[clave] = (ahora, resultado)
+    _cache_put(clave, resultado)
     return resultado

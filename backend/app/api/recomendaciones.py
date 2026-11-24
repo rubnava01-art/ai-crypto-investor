@@ -2,19 +2,28 @@
 
 Recommends Estudiar courses and Crear tools: each entry has a title,
 description, link and category (curso|herramienta). The list starts
-EMPTY — the system never invents recommendations. Any authenticated
-user reads; only admins create/update/delete (require_admin -> 403
-for prueba), mirroring the other modules.
+EMPTY — the system never invents recommendations. Only admins
+(módulo "recomendaciones") read or write (Fase 0, 2026-11-23:
+prueba recibe 403 también en lectura).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.perfiles import require_modulo
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Recommendation, User
 
-router = APIRouter(prefix="/api/recomendaciones", tags=["recomendaciones"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "recomendaciones" — prueba recibe 403 también en
+# lectura. El contenido es compartido y sin PII, pero el plan
+# conjunto ordena cerrar este router como el resto de negocio.
+router = APIRouter(
+    prefix="/api/recomendaciones",
+    tags=["recomendaciones"],
+    dependencies=[Depends(require_modulo("recomendaciones"))],
+)
 
 CATEGORIES = ("curso", "herramienta")
 

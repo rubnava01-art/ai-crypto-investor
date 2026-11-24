@@ -149,9 +149,9 @@ def test_chat_validation_and_auth(client, viewer_headers):
 # ---------------- recomendaciones ----------------
 
 def test_recomendaciones_crud_and_rbac(client, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23): prueba recibe 403 también en lectura.
     r = client.get("/api/recomendaciones", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     # Prueba cannot create
     r = client.post(
@@ -203,7 +203,7 @@ def test_recomendaciones_crud_and_rbac(client, admin_headers, viewer_headers):
     assert r.json()["category"] == "herramienta"
 
     r = client.get("/api/recomendaciones", headers=viewer_headers)
-    assert any(x["id"] == rec_id for x in r.json())
+    assert r.status_code == 403, r.text
 
     r = client.delete(f"/api/recomendaciones/{rec_id}", headers=admin_headers)
     assert r.status_code == 204, r.text
@@ -214,9 +214,9 @@ def test_recomendaciones_crud_and_rbac(client, admin_headers, viewer_headers):
 # ---------------- desarrollo digital ----------------
 
 def test_desarrollo_projects_tasks_and_rbac(client, admin_headers, viewer_headers):
+    # Fase 0 (2026-11-23): prueba recibe 403 también en lectura.
     r = client.get("/api/desarrollo/projects", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     # Prueba cannot create
     r = client.post(
@@ -285,8 +285,7 @@ def test_desarrollo_projects_tasks_and_rbac(client, admin_headers, viewer_header
     assert r.json()["done"] is True
 
     r = client.get(f"/api/desarrollo/projects/{pid}/tasks", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    assert len(r.json()) == 1
+    assert r.status_code == 403, r.text
 
     # Stage advance + contact clear
     r = client.put(

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-23",
+    title: "Seguridad: las lecturas de Negocio y Crear ya respetan el perfil de cada usuario",
+    body: "Publicado el 23 de noviembre: refuerzo de seguridad — las lecturas de Negocio (notas y tareas), Marketing (campañas), Contenido (ideas y calendario), Referidos, Desarrollo y Recomendaciones ahora exigen el módulo que les toca, así que el rol prueba recibe 403 también en lectura y el cliente vinculado solo ve inicio, portal y perfil, como ya pasaba en los módulos que ya estaban cerrados. Además, el Asistente con Internet ahora valida el destino antes de traer una página (mismo control que el Auditor), con tope de tamaño y redirecciones revalidadas. Solo seguridad, sin cambiar funciones. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-23",
     title: "CRM rediseñado: el día paso a paso y los números de la empresa",
     body: "Publicado el 23 de noviembre: el Gestor de Clientes estrena un panel nuevo — arriba, buscador de cliente, doble reloj (Los Ángeles y UTC) y botón para agregar contacto; debajo, 'El día, paso a paso' con cuatro tarjetas numeradas (nuevos contactos, en gestión, seguimiento y citas de hoy) con su mini-gráfica de 7 días y la leyenda con los estados reales del CRM; y 'Los números de la empresa' con contactos nuevos hoy, citas de hoy, ventas de hoy y de la semana desde las facturas pagadas, por cobrar y clientes. Solo datos reales de la plataforma, con vacíos honestos cuando aún no hay nada; lo que no tiene fuente real (llamadas, envíos, pasarela) simplemente no aparece. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

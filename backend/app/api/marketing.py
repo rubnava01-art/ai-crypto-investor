@@ -30,12 +30,27 @@ from sqlalchemy.orm import Session
 
 from app.api.portal import linked_contact_for
 from app.core.hardening import audit
+from app.core.perfiles import require_modulo
 from app.core.rate_limit import RateLimiter, too_many_requests
 from app.core.security import get_current_user, require_admin
 from app.database import get_db
 from app.models.tables import Appointment, Contact, MarketingCampaign, User
 
-router = APIRouter(prefix="/api/business/marketing", tags=["marketing-nest"])
+# Fase 0 (2026-11-23, mejoras óptimas, P0-1): el router entero exige
+# el módulo "business" (Marketing vive bajo Negocio > Marketing; no
+# hay clave "marketing" en MODULOS_TODOS). Prueba y cliente vinculado
+# reciben 403 en todo el router, incluidas las listas D-01 y la
+# creación de citas por POST /citas: el cliente vinculado usa el
+# portal (/api/business/marketing/portal/*, router propio, sin este
+# gate) para ver sus citas y campañas. Cambio de comportamiento
+# deliberado (plan conjunto §Decisión Q1): la auto-reserva de citas
+# por cliente vía este router queda cerrada hasta que exista un
+# endpoint de reserva en el portal.
+router = APIRouter(
+    prefix="/api/business/marketing",
+    tags=["marketing-nest"],
+    dependencies=[Depends(require_modulo("business"))],
+)
 
 APPT_STATUSES = ("pendiente", "confirmada", "completada", "cancelada")
 _APPT_ORDER = {"pendiente": 0, "confirmada": 1, "completada": 2}
