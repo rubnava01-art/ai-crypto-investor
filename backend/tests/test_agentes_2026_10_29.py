@@ -185,7 +185,7 @@ def test_inicio_posts_paginacion(client, admin_headers):
 
 # ---------- B4: caché de ticker ----------
 
-def test_market_ticker_cache(monkeypatch, client, viewer_headers):
+def test_market_ticker_cache(monkeypatch, client, viewer_headers, admin_headers):
     calls = {"n": 0}
 
     def fake_fetch(exchange, symbol):
@@ -194,11 +194,15 @@ def test_market_ticker_cache(monkeypatch, client, viewer_headers):
 
     monkeypatch.setattr(market_mod.exchanges, "fetch_ticker", fake_fetch)
     try:
-        r = client.get("/api/market/ticker?symbol=BTC/USD", headers=viewer_headers)
+        # La caché se prueba con admin desde 2026-11-23 (invertir
+        # fuera de la demo: prueba recibe 403).
+        assert client.get("/api/market/ticker?symbol=BTC/USD",
+                          headers=viewer_headers).status_code == 403
+        r = client.get("/api/market/ticker?symbol=BTC/USD", headers=admin_headers)
         assert r.status_code == 200, r.text
         assert r.json()["last"] == "42424.0"
         assert r.json()["stale"] is False
-        r = client.get("/api/market/ticker?symbol=BTC/USD", headers=viewer_headers)
+        r = client.get("/api/market/ticker?symbol=BTC/USD", headers=admin_headers)
         assert r.status_code == 200
         assert calls["n"] == 1, "la segunda llamada debe servirse de caché"
     finally:

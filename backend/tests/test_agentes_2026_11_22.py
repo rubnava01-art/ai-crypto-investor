@@ -230,7 +230,10 @@ def test_novedades(client, admin_headers):
         client.delete(f"/api/inicio/posts/{post['id']}", headers=admin_headers)
 
 
-def test_ayuda_y_fallback(client, admin_headers):
+def test_ayuda_y_fallback(client, admin_headers, monkeypatch):
+    # Sin Internet (mock): el fallback registra en la bandeja.
+    monkeypatch.setattr(
+        "app.api.asistente.buscar_en_internet", lambda q: None)
     r = _chat(client, admin_headers, "¿Qué puedes hacer?")
     assert r.status_code == 200, r.text
     assert r.json()["accion"]["tipo"] == "ayuda"
@@ -238,6 +241,8 @@ def test_ayuda_y_fallback(client, admin_headers):
     r = _chat(client, admin_headers, "hola, ¿qué tiempo hace hoy en Brea?")
     assert r.status_code == 200, r.text
     assert r.json()["accion"] is None
+    assert r.json()["sin_respuesta"] is True
+    assert "No encontré información sobre eso" in r.json()["respuesta"]
     assert len(r.json()["sugerencias"]) == 3
 
 
@@ -410,7 +415,10 @@ def test_prohibido_trading_real_sin_efectos(client, admin_headers, app):
 # de creación muta. Cada test mide el conteo en BD antes/después y
 # verifica que la respuesta no confirma ninguna creación.
 
-def test_pregunta_borrador_no_crea(client, admin_headers, app):
+def test_pregunta_borrador_no_crea(client, admin_headers, app, monkeypatch):
+    # Sin Internet (mock): las preguntas caen en "sin respuesta".
+    monkeypatch.setattr(
+        "app.api.asistente.buscar_en_internet", lambda q: None)
     db, gen = _db(app)
     try:
         antes = db.query(ContentItem).count()
@@ -451,7 +459,10 @@ def test_pregunta_nota_no_crea(client, admin_headers, app):
         _close(gen)
 
 
-def test_pregunta_tarea_no_crea(client, admin_headers, app):
+def test_pregunta_tarea_no_crea(client, admin_headers, app, monkeypatch):
+    # Sin Internet (mock): las preguntas caen en "sin respuesta".
+    monkeypatch.setattr(
+        "app.api.asistente.buscar_en_internet", lambda q: None)
     db, gen = _db(app)
     try:
         antes = db.query(BusinessTask).count()

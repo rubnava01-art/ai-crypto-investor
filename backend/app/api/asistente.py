@@ -20,6 +20,20 @@ Reutiliza la lógica existente, no la duplica:
 - contactos/clases/novedades: lectura directa de `Contact`,
   `EduClass` y `HomePost`.
 
+Corrida 2026-11-23, Agente 2 (chat con Internet + mejora propia +
+aislamiento por perfil):
+- Orden de resolución: (a) reglas enseñadas por el admin, (b)
+  intenciones internas, (c) catálogo de ayuda, (d) Internet como
+  fallback (solo la pregunta genérica, nunca datos de la
+  plataforma). La respuesta gana `fuente` {nombre, url},
+  `consultado_en` (ISO UTC) y `sin_respuesta` (bool).
+- M1 resuelto: el rol prueba ya NO recibe facturas/citas/contactos
+  reales por chat ("no disponible en la demo"). El cliente vinculado
+  sigue fuera del chat por B1 (403 antes que cualquier intención).
+- Bandeja "Preguntas por enseñar": preguntas sin respuesta se
+  registran en `preguntas_sin_respuesta`; el admin crea reglas en
+  `reglas_asistente` desde la bandeja; nada se auto-escribe.
+
 Seguridad (dura):
 - Mutaciones (nota/tarea/borrador/cita) SOLO admin/super_admin
   (`user.is_admin`; el super admin también es admin). El rol prueba
@@ -51,10 +65,11 @@ from app.api.marketing import _overlaps
 from app.api.portal import deny_linked_reader
 from app.core.hardening import audit
 from app.core.rate_limit import RateLimiter, too_many_requests
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.data import ingest
 from app.database import get_db
 from app.indicators import technical as ind
+from app.internet import buscar_en_internet
 from app.models.tables import (
     Appointment,
     BusinessNote,
@@ -64,6 +79,8 @@ from app.models.tables import (
     EduClass,
     HomePost,
     Invoice,
+    PreguntaSinRespuesta,
+    ReglaAsistente,
     Signal,
     User,
 )
@@ -268,12 +285,21 @@ def _iso(value: dt.datetime | None) -> str | None:
 
 
 def _respuesta(texto: str, tipo: str | None = None, datos: dict | None = None,
-               sugerencias: list[str] | None = None) -> dict:
+               sugerencias: list[str] | None = None,
+               fuente: dict | None = None,
+               consultado_en: str | None = None,
+               sin_respuesta: bool = False) -> dict:
     accion = None if tipo is None else {"tipo": tipo, "datos": datos or {}}
     return {
         "respuesta": texto,
         "accion": accion,
         "sugerencias": sugerencias if sugerencias is not None else _SUGERENCIAS_LECTURA,
+        # Corrida 2026-11-23: fuente de la respuesta (Internet o regla
+        # enseñada) + cuándo se consultó; sin_respuesta=True solo
+        # cuando nada respondió (la pregunta va a la bandeja).
+        "fuente": fuente,
+        "consultado_en": consultado_en,
+        "sin_respuesta": sin_respuesta,
     }
 
 
@@ -285,6 +311,223 @@ def _solo_lectura() -> dict:
         "Pídele a un administrador que haga ese cambio.",
         sugerencias=_SUGERENCIAS_LECTURA,
     )
+
+
+def _no_disponible_demo() -> dict:
+    """M1 (resuelto 2026-11-23): prueba ya NO recibe facturas, citas
+    ni contactos reales por chat. Precios, señales, análisis, clases
+    y novedades siguen disponibles."""
+    return _respuesta(
+        "No disponible en la demo: tu rol (prueba) puede "
+        "consultar precios, señales, análisis, clases y novedades, "
+        "pero no ver facturas, citas ni contactos reales. Pídele a un "
+        "administrador que te dé acceso.",
+        sugerencias=_SUGERENCIAS_LECTURA,
+    )
+
+
+# ------------------------------------------------------------------ ayuda --
+# Catálogo de ayuda estático (corrida 2026-11-23): temas con palabras
+# clave, pasos concretos en español, módulo y ruta interna. Los pasos
+# describen flujos reales de la plataforma (no se inventa ningún
+# botón): crear factura (Facturas), invitar cliente (Control de
+# usuarios + vínculo del portal), citas/notas/tareas (Negocio >
+# Marketing), borrador (Crear / Content Engine), señales/precios
+# (Invertir), cambiar clave (Mi perfil, endpoint real
+# /api/auth/change-password), publicar novedad (Inicio, admin),
+# ver mis facturas (portal del cliente).
+AYUDAS = [
+    {
+        "id": "crear_factura",
+        "claves": ("crear factura", "crear una factura", "como hago una factura",
+                   "como creo una factura", "nueva factura", "hacer una factura"),
+        "titulo": "Crear una factura",
+        "pasos": ("Ve a Facturas (/facturas) y crea una factura nueva con "
+                  "el cliente y el importe. Queda como borrador hasta que "
+                  "la envíes; solo las facturas pagadas cuentan como ventas."),
+        "modulo": "facturas",
+        "ruta": "/facturas",
+    },
+    {
+        "id": "invitar_cliente",
+        "claves": ("invitar cliente", "invitar un cliente", "invitar a un cliente",
+                   "como invito a un cliente", "como invitar a un cliente",
+                   "dar acceso a un cliente", "acceso de cliente"),
+        "titulo": "Invitar a un cliente",
+        "pasos": ("Lo hace el administrador: primero crea la cuenta del "
+                  "cliente en Control de usuarios (/usuarios, rol prueba) "
+                  "y después la vincula a su contacto en Negocio > "
+                  "Marketing > Portal (Vínculos). El cliente entra con "
+                  "esa cuenta y solo ve su portal."),
+        "modulo": "crm",
+        "ruta": "/crm",
+    },
+    {
+        "id": "crear_cita",
+        "claves": ("como creo una cita", "como hago una cita",
+                   "como agendo una cita", "como se crea una cita",
+                   "como pedir una cita", "como agendar una cita"),
+        "titulo": "Crear una cita",
+        "pasos": ("En Negocio > Marketing > Citas (/business) crea la "
+                  "cita con el cliente, la fecha y la hora (60 min). "
+                  "También puedes pedírmela a mí: «Crea una cita para "
+                  "María mañana a las 10:00» (solo el administrador)."),
+        "modulo": "business",
+        "ruta": "/business",
+    },
+    {
+        "id": "crear_nota_tarea",
+        "claves": ("como creo una nota", "como hago una nota",
+                   "como creo una tarea", "como hago una tarea",
+                   "como se crea una nota", "como se crea una tarea"),
+        "titulo": "Crear una nota o una tarea",
+        "pasos": ("En Negocio > Marketing (/business) crea notas y "
+                  "tareas. También puedes pedírmelas a mí: «Crea una "
+                  "nota: revisar precios» o «Crea una tarea: llamar a "
+                  "un cliente» (solo el administrador)."),
+        "modulo": "business",
+        "ruta": "/business",
+    },
+    {
+        "id": "crear_borrador",
+        "claves": ("como creo un borrador", "como hago un borrador",
+                   "como se crea un borrador", "como creo contenido",
+                   "como hago contenido", "como creo un post",
+                   "como creo una publicacion"),
+        "titulo": "Crear un borrador de contenido",
+        "pasos": ("En Crear (/crear), Content Engine, crea un borrador "
+                  "con el tema y la plataforma. También puedes "
+                  "pedírmelo a mí: «Crea un borrador sobre el nuevo "
+                  "curso» (solo el administrador; es una plantilla por "
+                  "reglas, no IA: revísalo antes de programarlo)."),
+        "modulo": "crear",
+        "ruta": "/crear",
+    },
+    {
+        "id": "ver_senales_precios",
+        "claves": ("como veo las senales", "como ver las senales",
+                   "como veo los precios", "como ver los precios",
+                   "donde veo las senales", "donde veo los precios",
+                   "donde estan las senales", "donde estan los precios"),
+        "titulo": "Ver señales y precios",
+        "pasos": ("En Invertir (/) ves los precios de BTC/ETH y las "
+                  "últimas señales en modo simulación. También puedes "
+                  "preguntarme: «¿Cuánto vale el bitcoin?» o "
+                  "«Muéstrame las últimas señales»."),
+        "modulo": "invertir",
+        "ruta": "/",
+    },
+    {
+        "id": "cambiar_clave",
+        "claves": ("como cambio mi clave", "como cambiar mi clave",
+                   "como cambio la clave", "como cambiar la clave",
+                   "cambiar mi clave", "donde cambio mi clave",
+                   "como cambio mi contrasena"),
+        "titulo": "Cambiar mi clave",
+        "pasos": ("En Mi perfil (/perfil), «Cambiar mi clave»: escribe "
+                  "tu clave actual y la nueva (mínimo 12 caracteres). "
+                  "Después tendrás que volver a entrar con la clave nueva."),
+        "modulo": "perfil",
+        "ruta": "/perfil",
+    },
+    {
+        "id": "publicar_novedad",
+        "claves": ("como publico una novedad", "como publicar una novedad",
+                   "como creo una novedad", "publicar novedad",
+                   "publicar una novedad", "nueva novedad"),
+        "titulo": "Publicar una novedad",
+        "pasos": ("En Inicio (/inicio) el administrador crea una "
+                  "novedad con título y texto y se publica en Inicio. "
+                  "Las novedades del sistema («Actualización de la "
+                  "plataforma») solo cambian cuando el administrador "
+                  "aprueba una publicación."),
+        "modulo": "inicio",
+        "ruta": "/inicio",
+    },
+    {
+        "id": "ver_mis_facturas",
+        "claves": ("como veo mis facturas", "ver mis facturas",
+                   "donde veo mis facturas", "donde estan mis facturas",
+                   "mis facturas"),
+        "titulo": "Ver mis facturas (cliente)",
+        "pasos": ("Como cliente vinculado, tus facturas están en tu "
+                  "portal (Negocio > Marketing > Portal): ahí ves solo "
+                  "tus facturas, tus citas y tus campañas, nunca las de "
+                  "otro cliente."),
+        "modulo": "portal",
+        "ruta": "/business",
+    },
+]
+
+
+def _buscar_ayuda(norm: str) -> dict | None:
+    """Entrada del catálogo de ayuda cuyo tema aparece en el mensaje,
+    o None. Se consulta DESPUÉS de las intenciones de creación y
+    ANTES de las de lectura: «¿cómo creo una factura?» es una
+    pregunta de ayuda, no un resumen de facturación."""
+    for ayuda in AYUDAS:
+        if any(clave in norm for clave in ayuda["claves"]):
+            return ayuda
+    return None
+
+
+def _h_ayuda_tema(ayuda: dict) -> dict:
+    return _respuesta(
+        f"{ayuda['titulo']} — {ayuda['pasos']} (Módulo: {ayuda['modulo']}, {ayuda['ruta']}).",
+        tipo="ayuda",
+        datos={"tema": ayuda["id"], "modulo": ayuda["modulo"], "ruta": ayuda["ruta"]},
+        sugerencias=["¿Qué puedes hacer?", "¿Cuánto vale el bitcoin?", "¿Qué hay nuevo?"],
+    )
+
+
+# ------------------------------------------------- reglas y bandeja (mejora propia) --
+
+def _regla_activa(db: Session, norm: str):
+    """Regla enseñada activa cuyo patrón (normalizado) aparece en el
+    mensaje; ante varias, gana el patrón más largo (el más específico).
+    Las reglas las crea solo el admin y se consultan ANTES que las
+    intenciones internas."""
+    reglas = (
+        db.query(ReglaAsistente)
+        .filter(ReglaAsistente.activo == True)  # noqa: E712
+        .all()
+    )
+    mejor = None
+    mejor_len = 0
+    for regla in reglas:
+        patron = _norm(regla.patron)
+        if patron and patron in norm and len(patron) > mejor_len:
+            mejor, mejor_len = regla, len(patron)
+    return mejor
+
+
+def _registrar_pregunta(db: Session, pregunta: str):
+    """Registra/incrementa una pregunta sin respuesta en la bandeja.
+    Si ya existía resuelta o descartada y vuelve a quedarse sin
+    respuesta, vuelve a pendiente (la regla que la cubría ya no está
+    activa)."""
+    texto = (pregunta or "").strip()[:1000]
+    if not texto:
+        return None
+    ahora = dt.datetime.now(dt.timezone.utc)
+    row = (
+        db.query(PreguntaSinRespuesta)
+        .filter(PreguntaSinRespuesta.pregunta == texto)
+        .first()
+    )
+    if row is None:
+        row = PreguntaSinRespuesta(
+            pregunta=texto, veces=1, primera_vez=ahora, ultima_vez=ahora,
+            estado="pendiente",
+        )
+        db.add(row)
+    else:
+        row.veces = (row.veces or 0) + 1
+        row.ultima_vez = ahora
+        if row.estado != "pendiente":
+            row.estado = "pendiente"
+    db.commit()
+    return row
 
 
 def _extraer_despues(mensaje: str, patrones: tuple[str, ...]) -> str:
@@ -578,7 +821,10 @@ def _h_crear_borrador(db: Session, user: User, mensaje: str) -> dict:
     )
 
 
-def _h_listar_citas(db: Session) -> dict:
+def _h_listar_citas(db: Session, user: User) -> dict:
+    # M1 (resuelto 2026-11-23): prueba no ve citas reales por chat.
+    if not user.is_admin:
+        return _no_disponible_demo()
     ahora = dt.datetime.now(dt.timezone.utc)
     rows = (
         db.query(Appointment)
@@ -705,7 +951,10 @@ def _h_crear_cita(db: Session, user: User, mensaje: str, norm: str) -> dict:
     )
 
 
-def _h_facturas(db: Session) -> dict:
+def _h_facturas(db: Session, user: User) -> dict:
+    # M1 (resuelto 2026-11-23): prueba no ve facturas reales por chat.
+    if not user.is_admin:
+        return _no_disponible_demo()
     facturas = db.query(Invoice).all()
     total_pagado = Decimal("0")
     total_enviado = Decimal("0")
@@ -730,7 +979,10 @@ def _h_facturas(db: Session) -> dict:
     )
 
 
-def _h_contactos(db: Session) -> dict:
+def _h_contactos(db: Session, user: User) -> dict:
+    # M1 (resuelto 2026-11-23): prueba no ve contactos reales por chat.
+    if not user.is_admin:
+        return _no_disponible_demo()
     rows = db.query(Contact).order_by(Contact.id.desc()).limit(10).all()
     if not rows:
         return _respuesta("No hay contactos registrados en el CRM.",
@@ -777,19 +1029,14 @@ def _h_ayuda() -> dict:
         marca = " (solo admin)" if c["requiere_admin"] else ""
         lineas.append(f"- {c['descripcion']} Por ejemplo: «{c['ejemplo']}»{marca}")
     lineas.append("Todo con datos reales de la plataforma; nunca invento cifras.")
+    lineas.append(
+        "También puedo explicarte cómo hacer cosas («¿cómo creo una "
+        "factura?») y buscar información general en Internet, siempre "
+        "con su fuente."
+    )
     return _respuesta("\n".join(lineas), tipo="ayuda",
                        datos={"comandos": [c["id"] for c in COMANDOS]},
                        sugerencias=_SUGERENCIAS_LECTURA)
-
-
-def _h_fallback() -> dict:
-    return _respuesta(
-        "No entendí qué me pides. Puedo consultar precios, señales y "
-        "análisis del mercado, listar citas, facturas, contactos, clases "
-        "y novedades, y (si eres admin) crear notas, tareas, borradores "
-        "y citas. Prueba con una de estas:",
-        sugerencias=_SUGERENCIAS_LECTURA,
-    )
 
 
 # ------------------------------------------------------------------ endpoints --
@@ -829,29 +1076,55 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
             asistente_limiter.window,
         )
     norm = _norm(mensaje)
-    # 1) Prohibido, antes que cualquier intención: subcadenas fijas y
-    # compra/venta de cripto con cantidad intermedia ("compra 0.01 BTC").
-    if any(p in norm for p in _PROHIBIDO) or re.search(
-        r"\b(compra|comprar|vende|vender|invierte|invertir)\b.{0,30}\b(btc|bitcoin|eth|ethereum|cripto)",
-        norm,
-    ):
-        return _respuesta(_RESPUESTA_PROHIBIDO, sugerencias=_SUGERENCIAS_LECTURA)
-    # 2) Intenciones, en orden: las creaciones antes que los listados
-    # (p. ej. "crea una cita" contiene "cita"). Cada creación exige
-    # _es_orden_creacion: una pregunta o consulta nunca muta (A1) y
-    # cae en el listado o en el fallback.
+    # Orden de resolución (corrida 2026-11-23):
+    # (a) reglas enseñadas por el admin, (b) intenciones internas,
+    # (c) catálogo de ayuda, (d) Internet como fallback. El catálogo
+    # se consulta antes que el bloqueo de prohibidos para que una
+    # PREGUNTA de ayuda («¿cómo cambio mi clave?») reciba los pasos;
+    # la ORDEN imperativa («cambia mi clave a X») no casa con el
+    # catálogo y cae en el bloqueo como antes.
+    # (a) Reglas enseñadas (coincidencia de subcadena normalizada).
+    regla = _regla_activa(db, norm)
+    if regla is not None:
+        return _respuesta(
+            regla.respuesta,
+            tipo="regla",
+            datos={"regla_id": regla.id, "modulo": regla.modulo,
+                   "ruta": regla.ruta},
+            fuente={"nombre": "Regla enseñada por el administrador",
+                    "url": regla.ruta or ""},
+            sugerencias=_SUGERENCIAS_LECTURA,
+        )
+    # (b) Intenciones internas, en orden: las creaciones antes que
+    # los listados (p. ej. "crea una cita" contiene "cita"). Cada
+    # creación exige _es_orden_creacion: una pregunta o consulta
+    # nunca muta (A1) y cae en el listado, la ayuda o el fallback.
     if any(k in norm for k in ("ayuda", "que puedes hacer", "comandos", "que sabes hacer")):
         return _h_ayuda()
     if _es_orden_creacion(norm) and any(k in norm for k in ("crea una cita", "agenda una cita", "crear una cita", "agendar una cita", "nueva cita")):
         return _h_crear_cita(db, user, mensaje, norm)
     if any(k in norm for k in ("cita", "citas", "agenda")):
-        return _h_listar_citas(db)
+        return _h_listar_citas(db, user)
     if _es_orden_creacion(norm) and any(k in norm for k in ("crea una nota", "crear una nota", "nueva nota", "anota")):
         return _h_crear_nota(db, user, mensaje)
     if _es_orden_creacion(norm) and any(k in norm for k in ("crea una tarea", "crear una tarea", "nueva tarea", "pendiente")):
         return _h_crear_tarea(db, user, mensaje)
     if _es_orden_creacion(norm) and any(k in norm for k in ("borrador", "contenido", "publicacion", "post")):
         return _h_crear_borrador(db, user, mensaje)
+    # (c) Catálogo de ayuda: «¿cómo…?» y temas explícitos de ayuda.
+    # Va antes que los listados de lectura: «¿cómo creo una
+    # factura?» es ayuda, no un resumen de facturación.
+    ayuda = _buscar_ayuda(norm)
+    if ayuda is not None:
+        return _h_ayuda_tema(ayuda)
+    # Prohibido, antes que cualquier intención de lectura: subcadenas
+    # fijas y compra/venta de cripto con cantidad intermedia
+    # ("compra 0.01 BTC").
+    if any(p in norm for p in _PROHIBIDO) or re.search(
+        r"\b(compra|comprar|vende|vender|invierte|invertir)\b.{0,30}\b(btc|bitcoin|eth|ethereum|cripto)",
+        norm,
+    ):
+        return _respuesta(_RESPUESTA_PROHIBIDO, sugerencias=_SUGERENCIAS_LECTURA)
     if any(k in norm for k in ("precio", "cuanto vale", "cotizacion")):
         return _h_precio(db, norm)
     if "senal" in norm:
@@ -859,11 +1132,170 @@ def chat(payload: ChatIn, user: User = Depends(get_current_user),
     if any(k in norm for k in ("analisis", "analiza", "mercado", "tendencia")):
         return _h_analisis(db)
     if any(k in norm for k in ("factura", "venta", "vendid", "ingresos")):
-        return _h_facturas(db)
+        return _h_facturas(db, user)
     if any(k in norm for k in ("contacto", "clientes")):
-        return _h_contactos(db)
+        return _h_contactos(db, user)
     if any(k in norm for k in ("clase", "clases", "curso")):
         return _h_clases(db)
     if any(k in norm for k in ("novedad", "novedades", "que hay nuevo")):
         return _h_novedades(db)
-    return _h_fallback()
+    # (d) Internet como fallback: solo la pregunta genérica, nunca
+    # datos de la plataforma (ver app/internet.py).
+    hallazgo = buscar_en_internet(mensaje.strip())
+    if hallazgo is not None:
+        consultado = dt.datetime.now(dt.timezone.utc).isoformat()
+        fuente = {"nombre": hallazgo["nombre"], "url": hallazgo["url"]}
+        return _respuesta(
+            hallazgo["texto"],
+            tipo="internet",
+            datos={"fuente": fuente, "consultado_en": consultado},
+            fuente=fuente,
+            consultado_en=consultado,
+            sugerencias=_SUGERENCIAS_LECTURA,
+        )
+    # Sin fuente: respuesta clara + registro en la bandeja para que
+    # el admin la enseñe. No se inventa nada.
+    _registrar_pregunta(db, mensaje.strip())
+    return _respuesta(
+        "No encontré información sobre eso. Puedo consultar precios, "
+        "señales y análisis del mercado, listar clases y novedades, y "
+        "(si eres admin) crear notas, tareas, borradores y citas. Tu "
+        "pregunta quedó registrada para que el administrador le enseñe "
+        "una respuesta al asistente.",
+        sin_respuesta=True,
+        sugerencias=_SUGERENCIAS_LECTURA,
+    )
+
+
+# ------------------------------------------------- bandeja y reglas (solo admin) --
+
+def _pregunta_out(p: PreguntaSinRespuesta) -> dict:
+    return {
+        "id": p.id,
+        "pregunta": p.pregunta,
+        "veces": p.veces,
+        "primera_vez": _iso(p.primera_vez),
+        "ultima_vez": _iso(p.ultima_vez),
+        "estado": p.estado,
+    }
+
+
+def _regla_out(r: ReglaAsistente) -> dict:
+    return {
+        "id": r.id,
+        "patron": r.patron,
+        "respuesta": r.respuesta,
+        "modulo": r.modulo,
+        "ruta": r.ruta,
+        "activo": r.activo,
+        "creado_por": r.creado_por,
+        "creado_en": _iso(r.creado_en),
+    }
+
+
+class ReglaIn(BaseModel):
+    respuesta: str = ""
+    modulo: str | None = None
+    ruta: str | None = None
+
+
+@router.get("/preguntas")
+def listar_preguntas(
+    estado: str | None = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Bandeja "Preguntas por enseñar" (solo admin)."""
+    q = db.query(PreguntaSinRespuesta)
+    if estado:
+        q = q.filter(PreguntaSinRespuesta.estado == estado)
+    rows = (
+        q.order_by(PreguntaSinRespuesta.veces.desc(),
+                   PreguntaSinRespuesta.ultima_vez.desc())
+        .all()
+    )
+    return [_pregunta_out(p) for p in rows]
+
+
+@router.post("/preguntas/{pregunta_id}/regla", status_code=status.HTTP_201_CREATED)
+def crear_regla_desde_pregunta(
+    pregunta_id: int,
+    payload: ReglaIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """El admin enseña la respuesta a una pregunta de la bandeja: se
+    crea la regla (patrón = la pregunta) y la pregunta queda resuelta.
+    Nada se auto-escribe: solo este endpoint crea reglas."""
+    pregunta = db.get(PreguntaSinRespuesta, pregunta_id)
+    if pregunta is None:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    if not (payload.respuesta or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La respuesta no puede estar vacía.",
+        )
+    regla = ReglaAsistente(
+        patron=pregunta.pregunta,
+        respuesta=payload.respuesta.strip(),
+        modulo=(payload.modulo or "").strip() or None,
+        ruta=(payload.ruta or "").strip() or None,
+        activo=True,
+        creado_por=admin.username,
+    )
+    db.add(regla)
+    pregunta.estado = "resuelta"
+    db.commit()
+    db.refresh(regla)
+    audit(db, admin, "asistente.crear_regla", "regla_asistente",
+          str(regla.id), details={"pregunta_id": pregunta.id})
+    return _regla_out(regla)
+
+
+@router.delete("/preguntas/{pregunta_id}")
+def descartar_pregunta(
+    pregunta_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Descarta una pregunta de la bandeja (marca descartada, no se
+    borra el registro)."""
+    pregunta = db.get(PreguntaSinRespuesta, pregunta_id)
+    if pregunta is None:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    pregunta.estado = "descartada"
+    db.commit()
+    audit(db, admin, "asistente.descartar_pregunta",
+          "pregunta_sin_respuesta", str(pregunta.id), details={})
+    return _pregunta_out(pregunta)
+
+
+@router.get("/reglas")
+def listar_reglas(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Reglas enseñadas (solo admin), las activas primero."""
+    rows = (
+        db.query(ReglaAsistente)
+        .order_by(ReglaAsistente.activo.desc(), ReglaAsistente.id.desc())
+        .all()
+    )
+    return [_regla_out(r) for r in rows]
+
+
+@router.delete("/reglas/{regla_id}")
+def desactivar_regla(
+    regla_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Desactiva una regla (no se borra: queda el historial)."""
+    regla = db.get(ReglaAsistente, regla_id)
+    if regla is None:
+        raise HTTPException(status_code=404, detail="Regla no encontrada")
+    regla.activo = False
+    db.commit()
+    audit(db, admin, "asistente.desactivar_regla", "regla_asistente",
+          str(regla.id), details={})
+    return _regla_out(regla)

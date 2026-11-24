@@ -68,9 +68,10 @@ def test_viewer_blocked_from_controls(client):
 def test_viewer_can_view_and_test(client):
     h = _make_viewer(client)
     assert client.get("/api/system/status", headers=h).status_code == 200
-    assert client.get("/api/market/prices", headers=h).status_code in (200, 503)
+    # Invertir fuera de la demo desde 2026-11-23: precios y backtest
+    # son 403 para prueba (antes 200/503 y "test" permitido).
+    assert client.get("/api/market/prices", headers=h).status_code == 403
     me = client.get("/api/auth/me", headers=h)
     assert me.json()["role"] == "prueba"
-    # backtest run = a "test" -> allowed for viewers (may 422 on payload, must not be 403)
     r = client.post("/api/backtest/run", json={}, headers=h)
-    assert r.status_code != 403
+    assert r.status_code == 403

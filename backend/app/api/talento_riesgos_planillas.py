@@ -26,12 +26,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Empleado, Planilla, Riesgo, User
 
-talento_router = APIRouter(prefix="/api/talento", tags=["talento"])
-riesgos_router = APIRouter(prefix="/api/riesgos", tags=["riesgos"])
-planillas_router = APIRouter(prefix="/api/planillas", tags=["planillas"])
+talento_router = APIRouter(prefix="/api/talento", tags=["talento"], dependencies=[Depends(require_modulo("talento"))])
+riesgos_router = APIRouter(prefix="/api/riesgos", tags=["riesgos"], dependencies=[Depends(require_modulo("riesgos"))])
+planillas_router = APIRouter(prefix="/api/planillas", tags=["planillas"], dependencies=[Depends(require_modulo("planillas"))])
 
 EMPLEADO_ESTADOS = ("activo", "inactivo")
 RIESGO_PROBABILIDADES = ("baja", "media", "alta")

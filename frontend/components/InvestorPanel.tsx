@@ -329,15 +329,16 @@ export function InvestorPanel({
           </div>
           {/* Caja de precio: el precio en vivo grande y separado del resto,
               con su hora y el capital en tabular-nums; antes era una sola
-              línea densa que mezclaba precio, hora y capital. */}
-          <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
+              línea densa que mezclaba precio, hora y capital. Estilo
+              Semrush (2026-11-23): tarjeta con número grande + contexto. */}
+          <div className="fintech-card mt-3 px-4 py-3.5">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs text-zinc-400">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                 {t.invertir.price} {symbol}
               </span>
               {price ? (
                 <span
-                  className={`font-mono text-lg font-bold tabular-nums ${priceStale ? "text-zinc-400 opacity-70" : "text-zinc-100"}`}
+                  className={`font-mono text-2xl font-extrabold tabular-nums ${priceStale ? "text-zinc-400 opacity-70" : "text-zinc-100"}`}
                   title={priceStale ? t.reliability.stalePrice : undefined}
                 >
                   ${price.toLocaleString("en-US", { maximumFractionDigits: 2 })}

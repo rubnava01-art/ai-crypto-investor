@@ -25,10 +25,9 @@ def test_talento_requires_auth(client):
 
 
 def test_talento_crud_rbac_validation(client, viewer_headers, admin_headers):
-    # Prueba sees an empty list even if rows exist (personal data).
+    # Prueba ya no lee talento desde 2026-11-23 (403 por módulo).
     r = client.get("/api/talento", headers=viewer_headers)
-    assert r.status_code == 200
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     # Prueba cannot write.
     for method, url, payload in (
@@ -84,9 +83,9 @@ def test_talento_crud_rbac_validation(client, viewer_headers, admin_headers):
     r = client.get("/api/talento", headers=admin_headers)
     assert r.status_code == 200
     assert any(e["id"] == emp_id for e in r.json())
-    # Prueba still sees nothing after the row exists.
+    # Prueba sigue sin ver nada tras crear la fila (403 por módulo).
     r = client.get("/api/talento", headers=viewer_headers)
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     r = client.put(
         f"/api/talento/{emp_id}",
@@ -109,10 +108,9 @@ def test_talento_crud_rbac_validation(client, viewer_headers, admin_headers):
 
 
 def test_riesgos_crud_prueba_reads_rbac_validation(client, viewer_headers, admin_headers):
-    # Prueba CAN read riesgos (read-only, no writes).
+    # Prueba ya no lee riesgos desde 2026-11-23 (403 por módulo).
     r = client.get("/api/riesgos", headers=viewer_headers)
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)
+    assert r.status_code == 403, r.text
 
     for method, url, payload in (
         ("post", "/api/riesgos", {"riesgo": "Intento"}),
@@ -150,9 +148,9 @@ def test_riesgos_crud_prueba_reads_rbac_validation(client, viewer_headers, admin
     assert riesgo["probabilidad"] == "media"
     assert riesgo["impacto"] == "alto"
 
-    # Prueba now sees the row (readable, not redacted to []).
+    # Prueba ya no ve la fila desde 2026-11-23 (403 por módulo).
     r = client.get("/api/riesgos", headers=viewer_headers)
-    assert any(x["id"] == riesgo_id for x in r.json())
+    assert r.status_code == 403, r.text
 
     r = client.put(
         f"/api/riesgos/{riesgo_id}",
@@ -175,9 +173,9 @@ def test_riesgos_crud_prueba_reads_rbac_validation(client, viewer_headers, admin
 
 
 def test_planillas_crud_rbac_validation(client, viewer_headers, admin_headers):
+    # Prueba ya no lee planillas desde 2026-11-23 (403 por módulo).
     r = client.get("/api/planillas", headers=viewer_headers)
-    assert r.status_code == 200
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     for method, url, payload in (
         ("post", "/api/planillas", {"periodo": "2026-11"}),
@@ -225,9 +223,9 @@ def test_planillas_crud_rbac_validation(client, viewer_headers, admin_headers):
     )
     assert r.status_code == 404
 
-    # Prueba still sees nothing.
+    # Prueba ya no ve nada desde 2026-11-23 (403 por módulo).
     r = client.get("/api/planillas", headers=viewer_headers)
-    assert r.json() == []
+    assert r.status_code == 403, r.text
 
     r = client.put(
         f"/api/planillas/{planilla_id}",

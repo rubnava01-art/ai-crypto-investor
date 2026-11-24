@@ -60,8 +60,9 @@ def test_facturas_requires_auth(client):
 
 
 def test_facturas_viewer_readonly(client, viewer_headers):
+    # Lectura también 403 desde 2026-11-23 (facturas fuera de la demo).
     r = client.get("/api/facturas/invoices", headers=viewer_headers)
-    assert r.status_code == 200
+    assert r.status_code == 403, r.text
     assert client.post(
         "/api/facturas/invoices",
         json={"client_name": "X", "items": ITEMS},

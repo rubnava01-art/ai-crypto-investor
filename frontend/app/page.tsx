@@ -12,6 +12,7 @@ import {
 import { Panel } from "../components/Panel";
 import { ApiErrorBanner, LoadMore, PanelLoading, SkipLink, newId } from "../components/ui";
 import { ModuleNav } from "../components/ModuleNav";
+import { accesoApi } from "../lib/api/acceso";
 import { MarketPanel } from "../components/MarketPanel";
 import { ProfileMenu } from "../components/ProfileMenu";
 import type { MeResponse } from "../lib/api";
@@ -129,9 +130,29 @@ export default function DashboardPage() {
           .catch(() => { if (!loadCancelledRef.current) setDbStatus(null); });
         // Tolerancia parcial del backend: una sección nula significa que esa
         // sección falló, no que todo el dashboard esté caído. Avisar sin
-        // esconder el resto de los datos.
-        if ([d.system, d.balances, d.performance, d.signals, d.strategies,
-             d.modes, d.operations, d.risk, d.logs].some((s) => s == null)) {
+        // esconder el resto de los datos. PERO una sección nula también es
+        // el gating por perfil (corrida 2026-11-23): el backend devuelve
+        // null en lo que no le toca a este perfil (Invertir y logs para
+        // prueba/cliente), y eso NO es un fallo. Solo se avisa si falta
+        // una sección que este perfil sí debería ver (system/signals para
+        // todos; Invertir con el módulo; logs solo admin). Si el perfil no
+        // resuelve, se mantiene el aviso anterior (fail-closed).
+        let perfil: { modulos: string[]; is_admin: boolean } | null = null;
+        try {
+          perfil = await accesoApi.getPerfil();
+        } catch {
+          perfil = null;
+        }
+        if (loadCancelledRef.current) return;
+        const puedeInvertir = perfil == null || perfil.modulos.includes("invertir");
+        const puedeLogs = perfil == null || perfil.is_admin;
+        const faltaInesperada =
+          d.system == null ||
+          d.signals == null ||
+          (puedeInvertir &&
+            [d.balances, d.performance, d.strategies, d.modes, d.operations, d.risk].some((s) => s == null)) ||
+          (puedeLogs && d.logs == null);
+        if (faltaInesperada) {
           setActionError(t.dashboard.partialError);
         }
         // M10: un fallo de /me distinto de 401 se muestra (antes se
@@ -356,11 +377,8 @@ export default function DashboardPage() {
       </div>
       </section>
 
-      {me && !isAdmin && (
-        <div className="mb-5 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3.5 text-sm leading-relaxed text-sky-300">
-          <strong className="font-semibold">{t.dashboard.testModeTitle}</strong> {t.dashboard.testModeBody}
-        </div>
-      )}
+      {/* Aviso por perfil (prueba / cliente) lo lleva ModuleNav desde
+          2026-11-23, en todas las páginas; aquí ya no se duplica. */}
 
       <section aria-label={t.dashboard.secondaryHeading} className="mb-6 sm:mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">

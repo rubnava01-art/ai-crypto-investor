@@ -33,7 +33,8 @@ export type NavKey =
   | "ajustador"
   | "terminal"
   | "flujos"
-  | "planes";
+  | "planes"
+  | "portal";
 
 export type Dictionary = {
   header: {
@@ -117,6 +118,9 @@ export type Dictionary = {
   contacto: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
   estudiarGestos: Record<string, string>;
+  // Bandeja "Preguntas por enseñar" del Asistente (solo admin, 2026-11-23)
+  // y textos de los gráficos de datos propios estilo Semrush.
+  preguntas: Record<string, string>;
   reliability: Record<string, string>;
   // Terminal (consola simulada, solo admin): mismo patrón.
   terminal: Record<string, string>;

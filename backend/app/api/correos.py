@@ -22,10 +22,11 @@ from sqlalchemy.orm import Session
 from app.api.portal import deny_linked_reader
 from app.core.rate_limit import correos_limiter, too_many_requests
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Contact, EmailLog, EmailTemplate, User
 
-router = APIRouter(prefix="/api/correos", tags=["correos"])
+router = APIRouter(prefix="/api/correos", tags=["correos"], dependencies=[Depends(require_modulo("correos"))])
 
 LOG_STATUSES = ("preparado", "enviado")
 

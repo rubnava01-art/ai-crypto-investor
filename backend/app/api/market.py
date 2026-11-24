@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rate_limit import market_limiter
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.core.symbols import validate_symbol as _validate_symbol
 from app.core.timeframes import validate_timeframe as _validate_timeframe
 from app.data import exchanges, ingest
@@ -27,7 +28,7 @@ from app.api.strategy import _STALE_CANDLES, _as_utc, _timeframe_seconds
 # sigue importando de strategy por compatibilidad (alias reexportado).
 from app.models.tables import User
 
-router = APIRouter(prefix="/api/market", tags=["market"])
+router = APIRouter(prefix="/api/market", tags=["market"], dependencies=[Depends(require_modulo("invertir"))])
 
 DEFAULT_EXCHANGE = "kraken"  # spec: Coinbase or Kraken; Kraken default, both supported
 

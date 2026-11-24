@@ -51,8 +51,9 @@ def test_correos_requires_auth(client):
 
 
 def test_correos_viewer_readonly(client, viewer_headers):
+    # Lectura también 403 desde 2026-11-23 (correos fuera de la demo).
     r = client.get("/api/correos/templates", headers=viewer_headers)
-    assert r.status_code == 200
+    assert r.status_code == 403, r.text
     assert client.post(
         "/api/correos/templates", json={"name": "X"}, headers=viewer_headers
     ).status_code == 403

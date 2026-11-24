@@ -16,13 +16,14 @@ from app.backtest.engine import (
 )
 from app.core.rate_limit import backtest_limiter, too_many_requests
 from app.core.security import get_current_user
+from app.core.perfiles import require_modulo
 from app.core.symbols import validate_symbol as _validate_symbol
 from app.core.timeframes import validate_timeframe as _validate_timeframe
 from app.data import ingest
 from app.database import get_db
 from app.models.tables import User
 
-router = APIRouter(prefix="/api/backtest", tags=["backtest"])
+router = APIRouter(prefix="/api/backtest", tags=["backtest"], dependencies=[Depends(require_modulo("invertir"))])
 
 RUNS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "backtests")
 

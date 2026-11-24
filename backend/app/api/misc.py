@@ -17,6 +17,7 @@ from app.core.runtime import (
     persist_runtime_setting,
 )
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.core.state import state
 from app.database import get_db
 from app.models.tables import Order, StrategyVersion, SystemEvent, User
@@ -33,11 +34,11 @@ from app.schemas.api import (
     utc_now_iso,
 )
 
-strategies_router = APIRouter(prefix="/api/strategies", tags=["strategies"])
-scanner_router = APIRouter(prefix="/api/scanner", tags=["scanner"])
-simulation_router = APIRouter(prefix="/api/simulation", tags=["simulation"])
-operations_router = APIRouter(prefix="/api", tags=["operations"])
-risk_router = APIRouter(prefix="/api/risk", tags=["risk"])
+strategies_router = APIRouter(prefix="/api/strategies", tags=["strategies"], dependencies=[Depends(require_modulo("invertir"))])
+scanner_router = APIRouter(prefix="/api/scanner", tags=["scanner"], dependencies=[Depends(require_modulo("invertir"))])
+simulation_router = APIRouter(prefix="/api/simulation", tags=["simulation"], dependencies=[Depends(require_modulo("invertir"))])
+operations_router = APIRouter(prefix="/api", tags=["operations"], dependencies=[Depends(require_modulo("invertir"))])
+risk_router = APIRouter(prefix="/api/risk", tags=["risk"], dependencies=[Depends(require_modulo("invertir"))])
 logs_router = APIRouter(prefix="/api/logs", tags=["logs"])
 
 

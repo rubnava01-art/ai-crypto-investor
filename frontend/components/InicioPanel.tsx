@@ -5,6 +5,7 @@ import { api, ApiError, type HomeComment, type HomePost, type MeResponse } from 
 import { useLanguage } from "../lib/i18n";
 import { novedadesOrdenadas } from "../lib/novedades";
 import { Panel } from "./Panel";
+import { MetricCard } from "./MetricCard";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, LoadMore, useConfirm, Field } from "./ui";
 
@@ -162,6 +163,11 @@ export function InicioPanel() {
     const fb = b.created_at ?? "";
     return fa < fb ? 1 : fa > fb ? -1 : 0;
   });
+  // Cifras reales de la plataforma (nada inventado): publicaciones del
+  // admin, avances del sistema y comentarios totales.
+  const avances = novedadesOrdenadas();
+  const totalComments = items.reduce((acc, p) => acc + (p.comment_count ?? 0), 0);
+  const metricsLoading = posts === null && !postsError;
 
   return (
     <>
@@ -178,12 +184,20 @@ export function InicioPanel() {
         {t.inicio.intro}
       </p>
 
+      {/* Fila de métricas estilo Semrush: número grande + contexto, con
+          datos reales de la plataforma (publicaciones, avances,
+          comentarios). Sin datos, el esqueleto; nunca cifras inventadas. */}
+      <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
+        <MetricCard label={t.inicio.metricPosts} value={String(items.length)} loading={metricsLoading} loadingAriaLabel={t.misc.loadingAria} />
+        <MetricCard label={t.inicio.metricProgress} value={String(avances.length)} />
+        <MetricCard label={t.inicio.metricComments} value={String(totalComments)} loading={metricsLoading} loadingAriaLabel={t.misc.loadingAria} />
+      </div>
+
       {/* Avance de la plataforma: línea de tiempo con las novedades
           reales del sistema (lib/novedades.ts), de lo más reciente a
           lo más antiguo. Si no hay ninguna, no se muestra nada: sin
           texto de relleno ni avance inventado, y sin porcentajes. */}
       {(() => {
-        const avances = novedadesOrdenadas();
         if (avances.length === 0) return null;
         return (
           <section aria-label={t.inicio.progressTitle} className="mb-5 rounded-lg border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">

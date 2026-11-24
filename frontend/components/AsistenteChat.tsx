@@ -6,8 +6,16 @@ import { usePathname } from "next/navigation";
 import { ApiError, getToken } from "../lib/api/client";
 import { api } from "../lib/api";
 import { loginUrl } from "../lib/session";
-import { getCapacidades, postChat, type AsistenteAccion, type AsistenteComando } from "../lib/asistente";
+import { safeHttpHref } from "../lib/urls";
+import {
+  getCapacidades,
+  postChat,
+  type AsistenteAccion,
+  type AsistenteComando,
+  type AsistenteFuente,
+} from "../lib/asistente";
 import { useLanguage } from "../lib/i18n";
+import { PreguntasEnsenar } from "./PreguntasEnsenar";
 
 /**
  * Asistente — chat personalizado dentro de la web.
@@ -29,6 +37,12 @@ type ChatMsg = {
   accion?: AsistenteAccion | null;
   /** Mensaje original que falló, para el botón de reintento. */
   failedInput?: string;
+  /** Fuente externa consultada + fecha (contrato 2026-11-23). */
+  fuente?: AsistenteFuente | null;
+  consultado_en?: string | null;
+  sin_respuesta?: boolean;
+  pasos?: string[];
+  ruta?: string | null;
 };
 
 let nextMsgId = 1;
@@ -68,7 +82,16 @@ function ChatIcon({ size = 24 }: { size?: number }) {
 
 /** Cuerpo del chat compartido por el panel flotante y la página /asistente. */
 function AsistenteChatBody() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  // Fecha de consulta ("23 nov 2026, 17:58"): el backend manda ISO UTC;
+  // si no parsea, no se muestra fecha en vez de inventar una.
+  const fmtConsultado = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return `${d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
+  };
   const [messages, setMessages] = useState<ChatMsg[]>([
     { id: 0, role: "assistant", text: t.asistente.greeting },
   ]);
@@ -129,7 +152,17 @@ function AsistenteChatBody() {
         const res = await postChat(text);
         setMessages((prev) => [
           ...prev,
-          { id: nextMsgId++, role: "assistant", text: res.respuesta, accion: res.accion ?? null },
+          {
+            id: nextMsgId++,
+            role: "assistant",
+            text: res.respuesta,
+            accion: res.accion ?? null,
+            fuente: res.fuente ?? null,
+            consultado_en: res.consultado_en ?? null,
+            sin_respuesta: res.sin_respuesta ?? false,
+            pasos: res.pasos ?? [],
+            ruta: res.ruta ?? null,
+          },
         ]);
         setSugerencias(res.sugerencias ?? []);
       } catch (err) {
@@ -193,6 +226,59 @@ function AsistenteChatBody() {
               }`}
             >
               <p className="whitespace-pre-wrap">{m.text}</p>
+              {m.role === "assistant" && m.sin_respuesta && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+                  {t.asistente.noAnswer}
+                </p>
+              )}
+              {m.role === "assistant" && m.pasos && m.pasos.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                    {t.asistente.stepsTitle}
+                  </p>
+                  <ol className="mt-1 list-decimal space-y-1 pl-5">
+                    {m.pasos.map((paso, i) => (
+                      <li key={i} className="text-sm leading-relaxed text-zinc-200">
+                        {paso}
+                      </li>
+                    ))}
+                  </ol>
+                  {m.ruta && m.ruta.startsWith("/") && (
+                    <Link
+                      href={m.ruta}
+                      className="mt-2 inline-flex min-h-[36px] items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    >
+                      {t.asistente.goToModule} →
+                    </Link>
+                  )}
+                </div>
+              )}
+              {m.role === "assistant" && m.fuente && (
+                <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                  {(() => {
+                    const fecha = fmtConsultado(m.consultado_en);
+                    const href = safeHttpHref(m.fuente?.url);
+                    const label = t.asistente.sourceOnly.replace("{nombre}", m.fuente?.nombre ?? "");
+                    return (
+                      <>
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-emerald-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                          >
+                            {label} ↗
+                          </a>
+                        ) : (
+                          label
+                        )}
+                        {fecha ? ` · ${t.asistente.consultedAt.replace("{fecha}", fecha)}` : ""}
+                      </>
+                    );
+                  })()}
+                </p>
+              )}
               {m.accion && (
                 <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
                   <span aria-hidden="true">✓</span>
@@ -297,12 +383,43 @@ function AsistenteChatBody() {
 
 /** Botón flotante + panel de chat. Se monta en el layout raíz; se oculta
  * en /login (pantalla pública) y en /asistente (la vista dedicada ya tiene
- * el chat). En móvil queda por encima de la barra inferior (bottom-20);
+ * el chat), y al cliente vinculado (2026-11-23: sin "asistente" en sus
+ * módulos, el chat le daría 403). En móvil queda por encima de la barra inferior (bottom-20);
  * en escritorio, bottom-6. z-50 por encima de la nav inferior (z-40). */
 export function AsistenteChat() {
   const pathname = usePathname();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
+  // Corrección 2026-11-23 (QA, opción B): el cliente vinculado ya no
+  // tiene "asistente" en sus módulos (Agente 2 lo quita de
+  // MODULOS_CLIENTE) y el backend le deniega el chat (403, B1); el FAB
+  // no debe abrirle un chat que no puede usar. Mismo GET
+  // /api/acceso/perfil que consume ModuleNav. Fail-closed: mientras el
+  // perfil no resuelve, el FAB no se muestra; si la petición falla, se
+  // asume prueba (mismo fallback que ModuleNav), así admin/prueba
+  // quedan como hoy. Sin sesión no hay cliente vinculado posible: se
+  // muestra como hoy.
+  const [perfil, setPerfil] = useState<"loading" | "admin" | "prueba" | "cliente">(() =>
+    getToken() ? "loading" : "prueba",
+  );
+
+  useEffect(() => {
+    if (!getToken()) return;
+    let cancelled = false;
+    api
+      .getPerfil()
+      .then((p) => {
+        if (cancelled) return;
+        setPerfil(p.role === "super_admin" || p.role === "admin" ? "admin" : p.role);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPerfil("prueba");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -314,6 +431,8 @@ export function AsistenteChat() {
   }, [open ]);
 
   if (pathname === "/login" || pathname === "/asistente") return null;
+  // Cliente vinculado (o perfil aún sin resolver): sin FAB ni panel.
+  if (perfil === "loading" || perfil === "cliente") return null;
 
   return (
     <>
@@ -367,11 +486,16 @@ export function AsistenteChat() {
   );
 }
 
-/** Variante de página completa para /asistente (dentro de ModuleShell). */
+/** Variante de página completa para /asistente (dentro de ModuleShell).
+ * Debajo del chat va la bandeja "Preguntas por enseñar", solo-admin
+ * (el componente se oculta solo si no eres admin). */
 export function AsistentePanel() {
   return (
-    <div className="flex h-[70dvh] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900">
-      <AsistenteChatBody />
+    <div className="space-y-4">
+      <div className="flex h-[70dvh] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900">
+        <AsistenteChatBody />
+      </div>
+      <PreguntasEnsenar />
     </div>
   );
 }

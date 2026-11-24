@@ -40,8 +40,9 @@ def test_espacio_requires_auth(client):
 
 
 def test_espacio_viewer_readonly(client, viewer_headers):
+    # Lectura también 403 desde 2026-11-23 (espacio fuera de la demo).
     r = client.get("/api/espacio/revelations", headers=viewer_headers)
-    assert r.status_code == 200
+    assert r.status_code == 403, r.text
     assert client.post(
         "/api/espacio/revelations", json={"title": "X"}, headers=viewer_headers
     ).status_code == 403
@@ -105,7 +106,7 @@ def test_emotion_requires_auth_and_viewer_readonly(client, admin_headers, viewer
         "/api/espacio/emotions", json={"emotion": "tranquilo", "intensity": 3}
     ).status_code == 401
     r = client.get("/api/espacio/emotions", headers=viewer_headers)
-    assert r.status_code == 200
+    assert r.status_code == 403, r.text
     assert client.post(
         "/api/espacio/emotions",
         json={"emotion": "tranquilo", "intensity": 3},

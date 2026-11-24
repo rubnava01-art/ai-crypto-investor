@@ -14,7 +14,10 @@ def test_inventario_requires_auth(client):
 
 
 def test_inventario_crud_and_validation(client, viewer_headers, admin_headers):
+    # Lectura también 403 desde 2026-11-23 (inventario fuera de la demo).
     r = client.get("/api/inventario/items", headers=viewer_headers)
+    assert r.status_code == 403, r.text
+    r = client.get("/api/inventario/items", headers=admin_headers)
     assert r.status_code == 200
     assert r.json() == []
 
@@ -80,5 +83,5 @@ def test_inventario_crud_and_validation(client, viewer_headers, admin_headers):
     # Admin deletes; list is empty again.
     r = client.delete(f"/api/inventario/items/{item_id}", headers=admin_headers)
     assert r.status_code == 204
-    r = client.get("/api/inventario/items", headers=viewer_headers)
+    r = client.get("/api/inventario/items", headers=admin_headers)
     assert r.json() == []

@@ -97,8 +97,11 @@ def test_crm_viewer_read_only(client, admin_headers, viewer_headers):
     cid = r.json()["id"]
 
     h = viewer_headers
-    # can read
+    # cannot read either since 2026-11-23 (aislamiento por perfil:
+    # crm no está en la demo de prueba).
     r = client.get("/api/crm/contacts", headers=h)
+    assert r.status_code == 403, r.text
+    r = client.get("/api/crm/contacts", headers=h_admin)
     assert r.status_code == 200
     assert any(x["id"] == cid for x in r.json())
     # cannot write

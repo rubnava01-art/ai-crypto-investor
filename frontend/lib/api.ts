@@ -31,6 +31,7 @@ import { marketingApi } from "./api/marketing";
 import { portalApi } from "./api/portal";
 import { contenidoApi } from "./api/contenido";
 import { biApi } from "./api/bi";
+import { accesoApi } from "./api/acceso";
 
 export const api = {
   ...systemApi,
@@ -59,4 +60,5 @@ export const api = {
   ...portalApi,
   ...contenidoApi,
   ...biApi,
+  ...accesoApi,
 };

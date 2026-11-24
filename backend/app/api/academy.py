@@ -6,8 +6,10 @@ Creador Completo at $59.99 and the $400 Academy (PayPal/Square). No URL or
 price is invented here.
 
 Permissions follow the platform RBAC:
-- any authenticated user (admin or "prueba") can READ the catalog and the
-  per-course student lists;
+- any authenticated user (admin or "prueba") can READ the catalog;
+- the per-course student lists are ADMIN-ONLY since 2026-11-23
+  (resuelve la pregunta abierta 6 del informe de seguridad: el
+  listado de alumnos expone datos de clientes);
 - only admins can edit courses and register/update/delete deliveries
   (require_admin -> 403 for prueba).
 
@@ -429,7 +431,10 @@ def update_course(
 @router.get("/courses/{course_id}/students", response_model=list[EnrollmentOut])
 def list_students(
     course_id: int,
-    user: User = Depends(get_current_user),
+    # Corrida 2026-11-23, Agente 2: listado de alumnos solo-admin
+    # (pregunta 6 del informe de seguridad). Antes cualquier usuario
+    # autenticado lo leía y el test B6 exigía 200 para prueba.
+    admin: User = Depends(require_admin),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

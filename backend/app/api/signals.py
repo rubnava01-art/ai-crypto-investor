@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Signal, User
 from app.schemas.api import SignalOut, SignalsResponse
 
-router = APIRouter(prefix="/api/signals", tags=["signals"])
+router = APIRouter(prefix="/api/signals", tags=["signals"], dependencies=[Depends(require_modulo("invertir"))])
 
 
 def _to_out(s: Signal) -> SignalOut:

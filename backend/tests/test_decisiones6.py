@@ -222,10 +222,13 @@ def test_pii_redaction_for_prueba(client, admin_headers):
         ids["demo"] = r.json()["id"]
         prueba = _login(client, "demo6pii", "pass1234abcd")
 
+        # Espacio fuera de la demo desde 2026-11-23: prueba ya no
+        # lee emociones ni revelaciones (403); la redacción de PII
+        # queda sustituida por el cierre del módulo.
         r = client.get("/api/espacio/emotions", headers=prueba)
-        assert r.status_code == 200 and r.json() == [], r.text
+        assert r.status_code == 403, r.text
         r = client.get("/api/espacio/revelations", headers=prueba)
-        assert r.status_code == 200 and r.json() == [], r.text
+        assert r.status_code == 403, r.text
 
         r = client.get("/api/chat/messages", headers=prueba)
         assert r.status_code == 200, r.text

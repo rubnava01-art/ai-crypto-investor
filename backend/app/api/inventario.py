@@ -13,10 +13,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import InventoryItem, User
 
-router = APIRouter(prefix="/api/inventario", tags=["inventario"])
+router = APIRouter(prefix="/api/inventario", tags=["inventario"], dependencies=[Depends(require_modulo("inventario"))])
 
 UNITS = ("pieza", "kg", "litro", "metro", "caja", "otro")
 

@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-23",
+    title: "Chat con Internet, interfaz por perfil y visuales estilo Semrush",
+    body: "Publicado el 23 de noviembre: el Asistente ahora consulta Internet (sin clave) y responde con fuente y fecha, además de guiar paso a paso por cada módulo — crear facturas, invitar clientes, crear citas y más — y de guardar las preguntas sin respuesta en una bandeja para que el admin les enseñe la respuesta, así el chat mejora solo. Además, cada perfil tiene ahora su propia interfaz: el rol prueba queda en demo sin Invertir ni datos reales, el cliente vinculado ve solo su portal, y nada se cruza entre clientes e inversión. Y la interfaz estrena visuales estilo Semrush: tarjetas de métricas y gráficas limpias en Inicio, Invertir, Análisis de datos y Auditor, con datos reales de la plataforma. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-23",
     title: "Seguridad: el chat ya no mezcla datos entre clientes y el cierre de sesión borra todo",
     body: "Publicado el 23 de noviembre: refuerzo de seguridad en toda la plataforma — el Asistente ya no permite que un cliente vinculado consulte contactos, facturas ni citas de otros clientes; el inicio de sesión y el registro ya no revelan si una cuenta existe; hay límites de velocidad en el chat, los comentarios y el cambio de clave; y al cerrar sesión se borra el token, los borradores con datos personales y las cachés, para que ningún dato del usuario anterior sobreviva al siguiente. Solo seguridad, sin cambiar funciones. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

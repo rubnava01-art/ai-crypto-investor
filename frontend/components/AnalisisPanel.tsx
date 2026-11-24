@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Panel } from "./Panel";
+import { MetricCard } from "./MetricCard";
 import { useLanguage } from "../lib/i18n";
 import { Field } from "./ui";
 import { BarChart, LineChart, PieChart } from "./bi/BiCharts";
+import { ChartCard } from "./bi/DashboardCard";
 
 const inputCls =
   "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -112,10 +114,10 @@ export function AnalisisPanel() {
             <div className="mt-6">
               <h3 className="mb-3 text-sm font-semibold text-zinc-200">{t.analisis.kpiTitle}</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><p className="text-xs text-zinc-400">{t.analisis.total}</p><p className="mt-1 text-lg font-semibold text-zinc-100">{fmt(stats.total)}</p></div>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><p className="text-xs text-zinc-400">{t.analisis.average}</p><p className="mt-1 text-lg font-semibold text-zinc-100">{fmt(stats.avg)}</p></div>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><p className="text-xs text-zinc-400">{t.analisis.largest}</p><p className="mt-1 text-lg font-semibold text-zinc-100">{fmt(stats.max.value)}</p><p className="text-xs text-zinc-400">{stats.max.label}</p></div>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3"><p className="text-xs text-zinc-400">{t.analisis.smallest}</p><p className="mt-1 text-lg font-semibold text-zinc-100">{fmt(stats.min.value)}</p><p className="text-xs text-zinc-400">{stats.min.label}</p></div>
+                <MetricCard label={t.analisis.total} value={fmt(stats.total)} />
+                <MetricCard label={t.analisis.average} value={fmt(stats.avg)} />
+                <MetricCard label={t.analisis.largest} value={fmt(stats.max.value)} changeLabel={stats.max.label} />
+                <MetricCard label={t.analisis.smallest} value={fmt(stats.min.value)} changeLabel={stats.min.label} />
               </div>
               <p className="mt-3 text-sm leading-relaxed text-zinc-300">
                 {t.analisis.summaryPrefix} {stats.count} {t.analisis.countSuffix} {fmt(stats.total)}. {t.analisis.largest}: {stats.max.label} ({fmt(stats.max.value)}). {t.analisis.smallest}: {stats.min.label} ({fmt(stats.min.value)}).
@@ -165,25 +167,20 @@ export function AnalisisPanel() {
           </div>
 
           <div className="mt-6 space-y-6">
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t.analisis.barTitle}</h3>
+            <ChartCard title={t.analisis.barTitle} context={`${t.analisis.sourceNote}: ${sourceLine}`}>
               <BarChart data={result.parsed} fmt={fmt} ariaLabel={t.analisis.barTitle} />
-              <p className="mt-1 text-xs text-zinc-400">{t.analisis.sourceNote}: {sourceLine}</p>
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t.analisis.lineTitle}</h3>
+            </ChartCard>
+            <ChartCard title={t.analisis.lineTitle} context={`${t.analisis.sourceNote}: ${sourceLine}`}>
               <LineChart data={result.parsed} fmt={fmt} ariaLabel={t.analisis.lineTitle} />
-              <p className="mt-1 text-xs text-zinc-400">{t.analisis.sourceNote}: {sourceLine}</p>
-            </div>
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-zinc-200">{t.analisis.pieTitle}</h3>
-              {result.parsed.some((d) => d.value > 0) ? (
-                <PieChart data={result.parsed} fmt={fmt} ariaLabel={t.analisis.pieTitle} />
-              ) : (
-                <p className="text-sm text-zinc-400">{t.analisis.pieNeedsPositive}</p>
-              )}
-              <p className="mt-1 text-xs text-zinc-400">{t.analisis.sourceNote}: {sourceLine}</p>
-            </div>
+            </ChartCard>
+            <ChartCard
+              title={t.analisis.pieTitle}
+              context={`${t.analisis.sourceNote}: ${sourceLine}`}
+              empty={!result.parsed.some((d) => d.value > 0)}
+              emptyText={t.analisis.pieNeedsPositive}
+            >
+              <PieChart data={result.parsed} fmt={fmt} ariaLabel={t.analisis.pieTitle} />
+            </ChartCard>
           </div>
         </>
       )}

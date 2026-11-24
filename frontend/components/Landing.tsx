@@ -65,10 +65,10 @@ const PlanesPanel = dynamic(() => import("./PlanesPanel").then((m) => m.PlanesPa
  * Orden de secciones: héroe (con calculadora) → franja de confianza →
  * franja de precios → 4 pilares → sección IA → etapas → planes + tabla
  * comparativa → cómo empezar → cierre final con CTA → footer.
- * Convención "24 módulos": landingModuleKeys().length (24) = rutas de
- * ModuleNav (28) menos las 4 con presentación propia: / (Invertir),
+ * Convención "25 módulos": landingModuleKeys().length (25) = rutas de
+ * ModuleNav (29) menos las 4 con presentación propia: / (Invertir),
  * /estudiar, /crear e /inicio (la propia portada). Gestionar es familia,
- * no ruta: sus módulos (crm, facturas, correos…) están dentro de los 24.
+ * no ruta: sus módulos (crm, facturas, correos…) están dentro de los 25.
  * La cifra se deriva de MODULES, nunca a mano; los 3 módulos solo-admin
  * van marcados con "(solo admin)". */
 

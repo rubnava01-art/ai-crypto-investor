@@ -16,10 +16,11 @@ from sqlalchemy.orm import Session
 
 from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Contact, Invoice, User
 
-router = APIRouter(prefix="/api/facturas", tags=["facturas"])
+router = APIRouter(prefix="/api/facturas", tags=["facturas"], dependencies=[Depends(require_modulo("facturas"))])
 
 STATUSES = ("borrador", "enviada", "pagada")
 # Forward-only state machine (Fase 3, M18), mirroring referrals'

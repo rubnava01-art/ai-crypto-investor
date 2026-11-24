@@ -232,17 +232,16 @@ def test_b6_metrics_and_logs_require_admin(
 
 
 def test_b6_students_still_readable_by_viewer(client, admin_headers, viewer_headers):
-    """Documenta lo que QUEDÓ FUERA de B6: el panel de Academia carga
-    el listado de alumnos para prueba (toggle sin gate de admin en
-    AcademyPanel.tsx) y test_academy.py exige 200 para viewer.
-    Cerrarlo es la decisión 6 de Rubén, no de esta corrida."""
+    """Decisión 6 RESUELTA el 2026-11-23 (Agente 2, por orden de Rubén):
+    el listado de alumnos de Academia es solo-admin; prueba recibe
+    403. El docstring anterior documentaba que quedaba fuera de B6."""
     courses = client.get("/api/academy/courses", headers=admin_headers).json()
     assert courses, "el catálogo de Academia debe estar sembrado"
     course_id = courses[0]["id"]
     r = client.get(
         f"/api/academy/courses/{course_id}/students", headers=viewer_headers
     )
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
 
 
 def test_b6_trends_denies_linked_client_but_not_viewer(

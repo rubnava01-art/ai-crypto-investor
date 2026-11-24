@@ -9,7 +9,7 @@ desalojo FIFO.
 import app.api.market as market_mod
 
 
-def test_ticker_cache_evicts_oldest(monkeypatch, client, viewer_headers):
+def test_ticker_cache_evicts_oldest(monkeypatch, client, viewer_headers, admin_headers):
     calls = {"n": 0}
 
     def fake_fetch(exchange, symbol):
@@ -18,9 +18,12 @@ def test_ticker_cache_evicts_oldest(monkeypatch, client, viewer_headers):
 
     monkeypatch.setattr(market_mod.exchanges, "fetch_ticker", fake_fetch)
     monkeypatch.setattr(market_mod, "_TICKER_CACHE_MAX_ENTRIES", 3)
+    # Invertir fuera de la demo desde 2026-11-23: prueba recibe 403.
+    assert client.get("/api/market/ticker?symbol=AAA/USD",
+                      headers=viewer_headers).status_code == 403
     try:
         for symbol in ("AAA/USD", "BBB/USD", "CCC/USD", "DDD/USD"):
-            r = client.get(f"/api/market/ticker?symbol={symbol}", headers=viewer_headers)
+            r = client.get(f"/api/market/ticker?symbol={symbol}", headers=admin_headers)
             assert r.status_code == 200, r.text
             assert r.json()["last"] == "100.0"
         assert calls["n"] == 4
@@ -29,11 +32,11 @@ def test_ticker_cache_evicts_oldest(monkeypatch, client, viewer_headers):
         assert ("kraken", "DDD/USD") in market_mod._TICKER_CACHE
 
         # El símbolo desalojado vuelve a pegar al exchange...
-        r = client.get("/api/market/ticker?symbol=AAA/USD", headers=viewer_headers)
+        r = client.get("/api/market/ticker?symbol=AAA/USD", headers=admin_headers)
         assert r.status_code == 200
         assert calls["n"] == 5
         # ...mientras el que sigue en caché no pega de nuevo.
-        r = client.get("/api/market/ticker?symbol=CCC/USD", headers=viewer_headers)
+        r = client.get("/api/market/ticker?symbol=CCC/USD", headers=admin_headers)
         assert r.status_code == 200
         assert calls["n"] == 5
     finally:

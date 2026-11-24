@@ -288,11 +288,10 @@ def test_s1_crm_403_para_cliente_vinculado(client, app, admin_headers, viewer_he
     assert r.status_code == 200, r.text
     ids = [c["id"] for c in r.json()]
     assert s["contact_a"]["id"] in ids and s["contact_b"]["id"] in ids
-    # Prueba sin vínculo: sin cambios (D3).
+    # Prueba sin vínculo: D3 RESUELTO el 2026-11-23 (Agente 2) —
+    # prueba ya no lee el CRM (403 por módulo).
     r = client.get("/api/crm/contacts", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    ids = [c["id"] for c in r.json()]
-    assert s["contact_a"]["id"] in ids and s["contact_b"]["id"] in ids
+    assert r.status_code == 403, r.text
 
 
 def test_s1_facturas_403_para_cliente_vinculado(client, app, admin_headers, viewer_headers):
@@ -302,9 +301,9 @@ def test_s1_facturas_403_para_cliente_vinculado(client, app, admin_headers, view
     r = client.get("/api/facturas/invoices", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert any(f["id"] == s["inv_b"]["id"] for f in r.json())
+    # D3 RESUELTO el 2026-11-23 (Agente 2): prueba ya no lee facturas.
     r = client.get("/api/facturas/invoices", headers=viewer_headers)
-    assert r.status_code == 200, r.text
-    assert any(f["id"] == s["inv_b"]["id"] for f in r.json())
+    assert r.status_code == 403, r.text
 
 
 def test_s1_correos_403_para_cliente_vinculado(client, app, admin_headers, viewer_headers):
@@ -318,10 +317,11 @@ def test_s1_correos_403_para_cliente_vinculado(client, app, admin_headers, viewe
     r = client.get("/api/correos/logs", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert any(t["id"] == s["log_id"] for t in r.json())
+    # D3 RESUELTO el 2026-11-23 (Agente 2): prueba ya no lee correos.
     r = client.get("/api/correos/templates", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
     r = client.get("/api/correos/logs", headers=viewer_headers)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 403, r.text
 
 
 def test_s1_referidos_403_para_cliente_vinculado(client, app, admin_headers, viewer_headers):

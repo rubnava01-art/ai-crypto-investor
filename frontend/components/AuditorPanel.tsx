@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type WebAudit } from "../lib/api";
 import { Panel } from "./Panel";
+import { MetricCard } from "./MetricCard";
+import { ChartCard } from "./bi/DashboardCard";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 
@@ -203,15 +205,6 @@ export function AuditorPanel() {
     }
   };
 
-  const scoreColor =
-    !result || result.score === null
-      ? "text-zinc-300"
-      : result.score >= 80
-        ? "text-emerald-400"
-        : result.score >= 50
-          ? "text-amber-400"
-          : "text-red-400";
-
   // Informe estilo Semrush: salud del sitio + conteos por severidad y
   // lista agrupada por categoría. Las auditorías viejas guardadas no
   // traen category/severity: defaults seguros (seo / aviso).
@@ -331,39 +324,29 @@ export function AuditorPanel() {
 
       {result && (
         <Panel title={t.auditor.resultTitle}>
-          <div className="mb-4 flex flex-wrap items-center gap-4">
-            <div className="shrink-0 text-center">
-              <p className={`text-5xl font-bold ${scoreColor}`}>
-                {result.score === null ? "—" : result.score}
-              </p>
-              <p className="text-xs text-zinc-400">{t.auditor.scoreLabel}</p>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-zinc-100">{t.auditor.healthTitle}</p>
-              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                <span className="flex items-center gap-1.5 text-zinc-300">
-                  <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-red-400" />
-                  {errCount} {t.auditor.errorsWord}
-                </span>
-                <span className="flex items-center gap-1.5 text-zinc-300">
-                  <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                  {warnCount} {t.auditor.warningsWord}
-                </span>
-                <span className="flex items-center gap-1.5 text-zinc-300">
-                  <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-zinc-400" />
-                  {noteCount} {t.auditor.noticesWord}
-                </span>
-              </p>
-              <p className="mt-1 truncate text-sm font-semibold text-zinc-100">{result.url}</p>
-              <p className="truncate text-xs text-zinc-400">{t.auditor.finalLabel}{result.final_url}</p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {t.auditor.notScore}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                {t.auditor.sourceNote}
-              </p>
-              {result.note && <p className="mt-1 text-xs text-amber-300">{result.note}</p>}
-            </div>
+          {/* Fila de métricas estilo Semrush: puntaje grande + conteos por
+              severidad, todo calculado del resultado actual. */}
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard
+              label={t.auditor.scoreLabel}
+              value={result.score === null ? "—" : String(result.score)}
+              tone={result.score === null ? "neutral" : result.score >= 80 ? "up" : result.score >= 50 ? "neutral" : "down"}
+            />
+            <MetricCard label={t.auditor.errorsWord} value={String(errCount)} tone={errCount > 0 ? "down" : "up"} />
+            <MetricCard label={t.auditor.warningsWord} value={String(warnCount)} tone={warnCount > 0 ? "down" : "neutral"} />
+            <MetricCard label={t.auditor.noticesWord} value={String(noteCount)} />
+          </div>
+          <div className="mb-4 min-w-0">
+            <p className="text-sm font-semibold text-zinc-100">{t.auditor.healthTitle}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-zinc-100">{result.url}</p>
+            <p className="truncate text-xs text-zinc-400">{t.auditor.finalLabel}{result.final_url}</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              {t.auditor.notScore}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              {t.auditor.sourceNote}
+            </p>
+            {result.note && <p className="mt-1 text-xs text-amber-300">{result.note}</p>}
           </div>
 
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -420,29 +403,31 @@ export function AuditorPanel() {
           )}
 
           {/* Informe gráfico: barras por categoría y por severidad,
-              calculadas del resultado actual. */}
-          <section aria-label={t.auditor.reportTitle} className="mt-6 border-t border-zinc-800 pt-4">
-            <h3 className="mb-3 text-sm font-bold text-zinc-100">{t.auditor.reportTitle}</h3>
-            <h4 className="mb-1 text-xs font-semibold text-zinc-300">{t.auditor.reportCatTitle}</h4>
-            <HBarChart
-              ariaLabel={`${t.auditor.reportCatTitle}: ${catScores.map((s) => `${catName[s.cat] ?? s.cat} ${s.pct}%`).join(", ")}`}
-              rows={catScores.map((s) => ({
-                label: catName[s.cat] ?? s.cat,
-                value: s.pct,
-                max: 100,
-                display: `${s.passed}/${s.total} · ${s.pct}%`,
-                color: CAT_COLORS[s.cat] ?? "#34d399",
-              }))}
-            />
-            <h4 className="mb-1 mt-4 text-xs font-semibold text-zinc-300">{t.auditor.reportSevTitle}</h4>
-            <HBarChart
-              ariaLabel={`${t.auditor.reportSevTitle}: ${errCount} ${t.auditor.errorsWord}, ${warnCount} ${t.auditor.warningsWord}, ${noteCount} ${t.auditor.noticesWord}`}
-              rows={[
-                { label: t.auditor.errorsWord, value: errCount, max: sevMax, display: String(errCount), color: "#f87171" },
-                { label: t.auditor.warningsWord, value: warnCount, max: sevMax, display: String(warnCount), color: "#fbbf24" },
-                { label: t.auditor.noticesWord, value: noteCount, max: sevMax, display: String(noteCount), color: "#a1a1aa" },
-              ]}
-            />
+              calculadas del resultado actual, en tarjetas de gráfica. */}
+          <section aria-label={t.auditor.reportTitle} className="mt-6 space-y-4 border-t border-zinc-800 pt-4">
+            <h3 className="text-sm font-bold text-zinc-100">{t.auditor.reportTitle}</h3>
+            <ChartCard title={t.auditor.reportCatTitle}>
+              <HBarChart
+                ariaLabel={`${t.auditor.reportCatTitle}: ${catScores.map((s) => `${catName[s.cat] ?? s.cat} ${s.pct}%`).join(", ")}`}
+                rows={catScores.map((s) => ({
+                  label: catName[s.cat] ?? s.cat,
+                  value: s.pct,
+                  max: 100,
+                  display: `${s.passed}/${s.total} · ${s.pct}%`,
+                  color: CAT_COLORS[s.cat] ?? "#34d399",
+                }))}
+              />
+            </ChartCard>
+            <ChartCard title={t.auditor.reportSevTitle}>
+              <HBarChart
+                ariaLabel={`${t.auditor.reportSevTitle}: ${errCount} ${t.auditor.errorsWord}, ${warnCount} ${t.auditor.warningsWord}, ${noteCount} ${t.auditor.noticesWord}`}
+                rows={[
+                  { label: t.auditor.errorsWord, value: errCount, max: sevMax, display: String(errCount), color: "#f87171" },
+                  { label: t.auditor.warningsWord, value: warnCount, max: sevMax, display: String(warnCount), color: "#fbbf24" },
+                  { label: t.auditor.noticesWord, value: noteCount, max: sevMax, display: String(noteCount), color: "#a1a1aa" },
+                ]}
+              />
+            </ChartCard>
           </section>
         </Panel>
       )}

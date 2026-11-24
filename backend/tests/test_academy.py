@@ -144,8 +144,11 @@ def test_academy_enrollment_viewer_read_only(client, admin_headers, viewer_heade
     eid = r.json()["id"]
 
     hv = viewer_headers
-    # can read students
+    # students: solo-admin desde 2026-11-23 (pregunta 6 del informe de
+    # seguridad, resuelta por orden de Rubén); prueba recibe 403.
     r = client.get(f"/api/academy/courses/{course_id}/students", headers=hv)
+    assert r.status_code == 403, r.text
+    r = client.get(f"/api/academy/courses/{course_id}/students", headers=h_admin)
     assert r.status_code == 200
     assert any(s["id"] == eid for s in r.json())
     # cannot write

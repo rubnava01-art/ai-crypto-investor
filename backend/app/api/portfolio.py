@@ -25,11 +25,12 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.security import get_current_user
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Fill, MarketCandle, Order, Trade, User
 from app.schemas.api import BalancesResponse, PerformanceResponse, utc_now_iso
 
-router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+router = APIRouter(prefix="/api/portfolio", tags=["portfolio"], dependencies=[Depends(require_modulo("invertir"))])
 
 
 def _paper_stats(db: Session) -> dict:

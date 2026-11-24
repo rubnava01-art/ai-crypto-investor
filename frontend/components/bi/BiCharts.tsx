@@ -19,8 +19,14 @@ export function BarChart({ data, fmt, ariaLabel }: { data: ChartDatum[]; fmt: (n
   const range = max - min || 1;
   const slot = W / data.length;
   const bw = Math.max(8, Math.min(48, slot * 0.6));
+  // Rejilla horizontal tenue (estilo dashboard: el valor se lee sin
+  // adivinar la altura de la barra). 0/25/50/75/100 % del rango.
+  const gridYs = [0, 0.25, 0.5, 0.75, 1].map((f) => H - 30 - f * 200);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={ariaLabel}>
+      {gridYs.map((y) => (
+        <line key={y} x1={0} x2={W} y1={y} y2={y} stroke="#27272a" strokeWidth={1} />
+      ))}
       {data.map((d, i) => {
         const h = ((d.value - min) / range) * 200;
         const x = i * slot + (slot - bw) / 2;
@@ -46,8 +52,13 @@ export function LineChart({ data, fmt, ariaLabel }: { data: ChartDatum[]; fmt: (
   const px = (i: number) => (data.length === 1 ? W / 2 : 30 + (i * (W - 60)) / (data.length - 1));
   const py = (v: number) => H - 30 - ((v - min) / range) * 200;
   const points = data.map((d, i) => `${px(i)},${py(d.value)}`).join(" ");
+  // Rejilla horizontal tenue, como en BarChart.
+  const gridYs = [0, 0.25, 0.5, 0.75, 1].map((f) => H - 30 - f * 200);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={ariaLabel}>
+      {gridYs.map((y) => (
+        <line key={y} x1={30} x2={W - 30} y1={y} y2={y} stroke="#27272a" strokeWidth={1} />
+      ))}
       <polyline points={points} fill="none" stroke="#34d399" strokeWidth={2} />
       {data.map((d, i) => (
         <g key={i}>

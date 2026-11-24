@@ -10,11 +10,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_admin
+from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.exchange import adapter
 from app.models.tables import ExchangeConnection, User
 
-router = APIRouter(prefix="/api/exchange", tags=["exchange"])
+router = APIRouter(prefix="/api/exchange", tags=["exchange"], dependencies=[Depends(require_modulo("invertir"))])
 
 
 class ExchangeStatus(BaseModel):

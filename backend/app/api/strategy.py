@@ -14,6 +14,7 @@ from app.core.timeframes import (
 )
 from app.core.rate_limit import strategy_limiter, too_many_requests
 from app.core.security import get_current_user
+from app.core.perfiles import require_modulo
 from app.data import ingest
 from app.database import get_db
 from app.indicators import technical as ind
@@ -39,7 +40,7 @@ def _as_utc(moment: dt.datetime) -> dt.datetime:
         return moment.replace(tzinfo=dt.timezone.utc)
     return moment
 
-router = APIRouter(prefix="/api/strategy", tags=["strategy"])
+router = APIRouter(prefix="/api/strategy", tags=["strategy"], dependencies=[Depends(require_modulo("invertir"))])
 
 
 class EvaluationResponse(BaseModel):

@@ -1517,3 +1517,57 @@ class BrandBrief(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class PreguntaSinRespuesta(Base):
+    """Bandeja "Preguntas por enseñar" (corrida 2026-11-23, Agente 2).
+
+    Cada pregunta del Asistente sin match interno, sin ayuda y sin
+    fuente en Internet se registra/incrementa aquí para que el admin
+    la enseñe con una regla. `estado`: pendiente|resuelta|descartada.
+    Tablas NUEVAS: create_all las crea solas al arrancar; no se toca
+    ninguna columna existente.
+    """
+
+    __tablename__ = "preguntas_sin_respuesta"
+    __table_args__ = (
+        Index("ix_preguntas_estado_ultima", "estado", "ultima_vez"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pregunta: Mapped[str] = mapped_column(String(1000), nullable=False)
+    veces: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    primera_vez: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    ultima_vez: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+    estado: Mapped[str] = mapped_column(
+        String(16), default="pendiente", nullable=False
+    )  # pendiente|resuelta|descartada
+
+
+class ReglaAsistente(Base):
+    """Regla enseñada por el admin al Asistente (corrida 2026-11-23,
+    Agente 2). El chat consulta las reglas ACTIVAS por coincidencia de
+    subcadena normalizada (sin tildes, minúsculas) ANTES que las
+    intenciones internas. Solo el admin las crea/aprueba (desde la
+    bandeja o borrándolas); nada se auto-escribe.
+    """
+
+    __tablename__ = "reglas_asistente"
+    __table_args__ = (
+        Index("ix_reglas_asistente_activo", "activo"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    patron: Mapped[str] = mapped_column(String(1000), nullable=False)
+    respuesta: Mapped[str] = mapped_column(Text, nullable=False)
+    modulo: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ruta: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    creado_por: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    creado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

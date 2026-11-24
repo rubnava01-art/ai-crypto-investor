@@ -262,6 +262,21 @@ export const MODULES = [
       </Icon>
     ),
   },
+  {
+    // Ruta propia 2026-11-23: antes el portal solo vivía dentro de
+    // /business y el cliente vinculado no tenía "business" en sus
+    // módulos, así que no podía llegar a su portal desde el menú.
+    href: "/portal",
+    label: "Portal cliente",
+    hint: "Tus facturas · citas · contenido",
+    icon: (
+      <Icon>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="11" r="2" />
+        <path d="M14 9.5h4M14 13.5h4M5.5 16.5h5" />
+      </Icon>
+    ),
+  },
 ];
 
 // Clave del diccionario ES/EN por ruta (lib/i18n): la etiqueta y la
@@ -296,7 +311,22 @@ export const KEY_BY_HREF: Record<string, NavKey> = {
   "/terminal": "terminal",
   "/flujos": "flujos",
   "/planes": "planes",
+  "/portal": "portal",
 };
+
+/** Conjunto mínimo de prueba (fail-closed, 2026-11-23): si el perfil
+ * falla, estos son los únicos módulos visibles — aprendizaje y perfil,
+ * sin Invertir operativo ni módulos de negocio/admin. Es el mismo
+ * conjunto que MODULOS_PRUEBA del backend (perfiles.py) menos
+ * "asistente" y "portal", que no son entradas de este menú. Claves
+ * NavKey, las mismas que devuelve GET /api/acceso/perfil. */
+export const PRUEBA_MIN_KEYS: readonly string[] = [
+  "inicio",
+  "estudiar",
+  "crear",
+  "perfil",
+  "planes",
+];
 
 /** Rutas con presentación propia en la landing (no se listan entre los
  * "módulos extra"): la propia portada (/inicio), Invertir (raíz),
@@ -335,7 +365,7 @@ const GROUPS: { key: string; hrefs: string[] }[] = [
   { key: "invertir", hrefs: ["/"] },
   { key: "estudiar", hrefs: ["/estudiar", "/estudiar/manual-plataforma", "/estudiar/manual-invertir", "/estudiar/manual-negocio", "/estudiar/juego", "/recomendaciones"] },
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
-  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis", "/planes"] },
+  { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis", "/planes", "/portal"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
   { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal", "/flujos"] },
 ];
@@ -400,13 +430,16 @@ export function familyForHref(href: string): string {
 export function ModuleNav() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  // Rol tri-estado (corrección QA 2026-11-10 nº 1, fail-closed): mientras
-  // /me resuelve, el rol es "loading" y las entradas adminOnly NO se
-  // muestran — solo aparecen cuando /me confirma "admin". Un usuario
-  // "prueba" no ve las entradas admin ni un instante durante la carga. Si
-  // /me falla, se asume "prueba" (tampoco se muestra lo admin).
-  const [role, setRole] = useState<"loading" | "admin" | "prueba">("loading");
+  // Rol por perfil (corrida 2026-11-23, chat potente + perfiles):
+  // GET /api/acceso/perfil devuelve el rol y los módulos que le tocan
+  // a esta cuenta (claves = NavKey). Fail-closed: mientras resuelve no
+  // se muestra ningún módulo; si /me o el perfil falla, solo el
+  // conjunto mínimo de prueba. El backend refuerza cada endpoint: el
+  // menú solo deja de prometer lo que no le toca.
+  const [role, setRole] = useState<"loading" | "admin" | "prueba" | "cliente">("loading");
+  const [modulos, setModulos] = useState<Set<string> | null>(null);
   const isAdmin = role === "admin";
+  const isCliente = role === "cliente";
   // Móvil: todo el menú vive detrás de un único botón "Menú" (2026-11-17):
   // antes las 6 familias + Inicio ocupaban ~400 px antes del contenido.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -435,16 +468,37 @@ export function ModuleNav() {
     });
   }, [pathname]);
   useEffect(() => {
+    let cancelled = false;
     api
-      .me()
-      .then((m) => setRole(m.is_admin ? "admin" : "prueba"))
-      .catch(() => setRole("prueba"));
+      .getPerfil()
+      .then((p) => {
+        if (cancelled) return;
+        setRole(p.role === "super_admin" || p.role === "admin" ? "admin" : p.role);
+        setModulos(new Set(p.modulos));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Perfil sin implementar o sin respuesta: conjunto mínimo de
+        // prueba, nunca todo el menú (fail-closed).
+        setRole("prueba");
+        setModulos(new Set(PRUEBA_MIN_KEYS));
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const visible = useMemo(
-    () => MODULES.filter((m) => !("adminOnly" in m && m.adminOnly) || isAdmin),
-    [isAdmin],
-  );
+  // Solo los módulos de `modulos`: lo que no le toca a un perfil no
+  // aparece ni como enlace. El filtro adminOnly queda como segunda
+  // capa (el perfil ya no debería traerlos para no-admin).
+  const visible = useMemo(() => {
+    if (!modulos) return [];
+    return MODULES.filter((m) => {
+      if (!modulos.has(KEY_BY_HREF[m.href])) return false;
+      if ("adminOnly" in m && m.adminOnly && !isAdmin) return false;
+      return true;
+    });
+  }, [modulos, isAdmin]);
   const byHref = useMemo(() => new Map(visible.map((m) => [m.href, m])), [visible]);
   // Inicio es un botón independiente, no parte de ninguna familia.
   const inicio = byHref.get("/inicio");
@@ -492,6 +546,28 @@ export function ModuleNav() {
 
   return (
     <nav aria-label={t.header.navAria}>
+      {/* Aviso por perfil (2026-11-23): prueba ve el aviso de demo y
+          cliente vinculado, el de su portal. Admin/super no ven aviso.
+          El aviso de prueba vivía solo en el dashboard (/); ahora lo
+          lleva el menú y se ve en todos los módulos. */}
+      {role === "prueba" && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-sky-700/60 bg-sky-500/10 px-4 py-3 text-sm leading-relaxed text-sky-300"
+        >
+          <strong className="font-semibold">{t.dashboard.testModeTitle}</strong>{" "}
+          {t.dashboard.testModeBody}
+        </div>
+      )}
+      {isCliente && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-700/60 bg-emerald-500/10 px-4 py-3 text-sm leading-relaxed text-emerald-300"
+        >
+          <strong className="font-semibold">{t.dashboard.clientModeTitle}</strong>{" "}
+          {t.dashboard.clientModeBody}
+        </div>
+      )}
       {/* Móvil: un solo botón "Menú" con el módulo actual; el resto del
           menú (Inicio + familias) solo se despliega al tocarlo. */}
       <div className="sm:hidden">
