@@ -13,8 +13,14 @@
 // Excepción desde 2026-11-22: la lista de facturas guardadas — lista
 // compartida gestionada solo por el admin, la misma para todos los
 // lectores, y sus tres mutaciones (crear/cambiar estado/borrar)
-// invalidan el prefijo en lib/api/facturas.ts. Los errores NO se
-// guardan: un fallo deja la entrada libre para reintentar. Cada
+// invalidan el prefijo en lib/api/facturas.ts. Excepción desde
+// 2026-11-24: las listas de Gestión (talento, riesgos, planillas) en
+// lib/api/empresa.ts — mismo patrón: listas compartidas gestionadas
+// solo por el admin, cada mutación invalida su prefijo. Talento y
+// Planillas devuelven [] para prueba y la lista completa para admin,
+// pero el memo vive en el navegador de una sola sesión y se vacía al
+// cambiar el token, así que una lista no sobrevive a un cambio de rol.
+// Los errores NO se guardan: un fallo deja la entrada libre para reintentar. Cada
 // mutación (crear/editar/borrar curso o clase) invalida su prefijo, así que la lista tras guardar nunca
 // muestra datos viejos más de lo que tarda el refetch. Además, desde
 // 2026-11-23 el memo se vacía entero al cambiar el token (login,

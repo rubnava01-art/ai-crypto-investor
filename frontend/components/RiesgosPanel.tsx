@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { empresaApi, type Riesgo, type RiesgoEstado, type RiesgoImpacto, type RiesgoProbabilidad } from "../lib/api/empresa";
 import { Panel } from "./Panel";
@@ -61,13 +61,20 @@ export function RiesgosPanel() {
   const estadoLabel = (v: string) =>
     v === "en_curso" ? t.riesgos.estadoEnCurso : v === "mitigado" ? t.riesgos.estadoMitigado : v === "cerrado" ? t.riesgos.estadoCerrado : t.riesgos.estadoAbierto;
 
-  const visible = (rows ?? []).filter((r) => {
+  // Filtro memorizado (2026-11-24): antes se recalculaba en cada
+  // render; con la lista en memo ya no se re-pide, y el filtrado no
+  // se rehace si no cambian filas o filtros.
+  const visible = useMemo(() => (rows ?? []).filter((r) => {
     const q = query.trim().toLowerCase();
     if (estadoFilter && r.estado !== estadoFilter) return false;
     if (probFilter && r.probabilidad !== probFilter) return false;
     if (!q) return true;
     return [r.riesgo, r.descripcion, r.responsable].join(" ").toLowerCase().includes(q);
-  });
+  }), [rows, query, estadoFilter, probFilter]);
+  // Conteo filtrado (2026-11-24): con búsqueda o filtros activos el
+  // badge muestra "visibles / total", mismo patrón que Talento,
+  // Planillas y Facturas; sin filtro, solo el total como antes.
+  const filtering = query.trim() !== "" || estadoFilter !== "" || probFilter !== "";
 
   const resetForm = () => {
     setEditingId(null);
@@ -137,7 +144,7 @@ export function RiesgosPanel() {
         title={t.riesgos.panelTitle}
         badge={
           <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-            {rows === null ? t.riesgos.loading : `${rows.length}`}
+            {rows === null ? t.riesgos.loading : filtering ? `${visible.length} / ${rows.length}` : `${rows.length}`}
           </span>
         }
       >
@@ -171,7 +178,7 @@ export function RiesgosPanel() {
         {rows === null ? (
           loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.riesgos.loading}</p>
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{t.riesgos.empty}</p>
+          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.riesgos.emptyFiltered : t.riesgos.empty}</p>
         ) : (
           <ul className="space-y-3">
             {visible.map((r) => (

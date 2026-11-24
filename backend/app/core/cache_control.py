@@ -34,6 +34,13 @@ invoices list carries client names/contact details, so `private`
   list after saving never shows stale rows; another admin's change
   in another tab can take up to 60 s to appear, the same trade-off
   already accepted for templates/trends).
+- /api/talento, /api/riesgos, /api/planillas — Gestión lists
+  (2026-11-24; same trade-off as invoices: shared admin-managed
+  lists, every in-app mutation invalidates the client memo in
+  lib/api/empresa.ts. Talento/Planillas return [] for prueba and the
+  full list for admin — `private` keeps that per-browser, so one
+  role's cached rows can never leak to another user; the client memo
+  is also cleared on every token change.)
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
@@ -56,6 +63,9 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/business/marketing/contenido/plantillas",
         "/api/crear/trends",
         "/api/facturas/invoices",
+        "/api/talento",
+        "/api/riesgos",
+        "/api/planillas",
     }
 )
 

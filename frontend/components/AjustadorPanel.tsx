@@ -80,29 +80,31 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * antepuesta: todos los índices +1 y la entrada nueva (business, crear,
  * estudiar, invertir, usuarios, inicio, perfil, analisis, auditor) en [0] — y con
  * la entrada de optimización del chat del 2026-11-23 antepuesta: todos los
- * índices +1 y la entrada nueva (business, crear, estudiar, invertir) en [0]. */
+ * índices +1 y la entrada nueva (business, crear, estudiar, invertir) en [0] — y con
+ * la entrada de mejoras diarias del 2026-11-24 antepuesta: todos los
+ * índices +1 y la entrada nueva (talento, riesgos, planillas, usuarios) en [0]. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [1, 3, 4, 5, 7, 8, 11, 13, 14, 15, 16],
-  planes: [26],
-  terminal: [27],
-  flujos: [20, 27],
-  analizador: [27],
-  auditor: [4, 27, 30],
-  ajustador: [37],
-  correos: [6],
-  crear: [0, 1, 3, 4, 5, 7, 10, 14, 29],
-  estudiar: [0, 3, 4, 5, 7, 8, 14, 18, 25, 27, 35, 37, 40, 41],
-  inicio: [0, 4, 5, 14, 27, 38, 46],
-  perfil: [4, 9, 17, 39],
-  talento: [10, 18, 42],
-  riesgos: [11, 42],
-  planillas: [8, 14, 42],
-  crm: [2, 6, 11, 42],
-  analisis: [4, 42],
-  invertir: [3, 4, 5, 7, 14, 19, 23, 24, 28, 43, 45],
-  usuarios: [4, 5, 6, 9, 10, 12, 21, 45, 46],
-  espacio: [46],
-  facturas: [2, 8, 14],
+  business: [2, 4, 5, 6, 8, 9, 12, 14, 15, 16, 17],
+  planes: [27],
+  terminal: [28],
+  flujos: [21, 28],
+  analizador: [28],
+  auditor: [5, 28, 31],
+  ajustador: [38],
+  correos: [7],
+  crear: [1, 2, 4, 5, 6, 8, 11, 15, 30],
+  estudiar: [1, 4, 5, 6, 8, 9, 15, 19, 26, 28, 36, 38, 41, 42],
+  inicio: [1, 5, 6, 15, 28, 39, 47],
+  perfil: [5, 10, 18, 40],
+  talento: [0, 11, 19, 43],
+  riesgos: [0, 12, 43],
+  planillas: [0, 9, 15, 43],
+  crm: [3, 7, 12, 43],
+  analisis: [5, 43],
+  invertir: [4, 5, 6, 8, 15, 20, 24, 25, 29, 44, 46],
+  usuarios: [0, 5, 6, 7, 10, 11, 13, 22, 46, 47],
+  espacio: [47],
+  facturas: [3, 9, 15],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

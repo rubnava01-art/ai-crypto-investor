@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-24",
+    title: "Mejoras diarias: caché en Gestión, contador filtrado en Riesgos y acceso directo en el login",
+    body: "Publicado el 24 de noviembre: tres mejoras del día — en velocidad, las listas de Talento humano, Gestión de Riesgos y Planillas ahora se guardan en caché 60 segundos y cargan más rápido al navegar, con invalidación inmediata al crear o borrar; en Gestión de Riesgos, el contador muestra cuántos riesgos coinciden con el filtro (visibles / total) y el mensaje de vacío distingue entre no tener riesgos y no haber coincidencias; y en accesos, al abrir el login el cursor ya cae directo en el campo de usuario. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-23",
     title: "Prueba sin registro, calculadora mejorada y módulos por categoría",
     body: "Publicado el 23 de noviembre: ya puedes probar la plataforma sin crear cuenta — botón 'Probar sin registro' en Inicio: entra como invitado con una sesión corta y prueba el Asistente con Internet, la calculadora de interés compuesto, el conversor de bitcoin, la gráfica y las guías de Estudiar, con invitaciones a registrarte para guardar tu progreso. Además, la página principal estrena título directo de beneficio con el aviso de simulación educativa visible y una sección de Seguridad y Transparencia con datos reales; la calculadora ahora tiene deslizadores, gráfica anual con tooltip y comparación con y sin aportes; los módulos van agrupados en cuatro categorías (Simulación de Inversión, Academia, Contenido y Gestión) con buscador; y la web carga con un aviso amable mientras despierta el servidor. Trading real sigue apagado y las etiquetas de simulación intactas.",

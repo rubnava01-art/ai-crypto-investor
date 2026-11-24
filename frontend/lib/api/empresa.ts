@@ -8,6 +8,7 @@
 // NO hay campos de SSN, banco ni impuestos, y no se mueve dinero: las
 // planillas son solo REGISTROS (periodo, empleado, monto, estado).
 import { request } from "./client";
+import { catalogMemo } from "./memo";
 
 export type EmpleadoEstado = "activo" | "inactivo";
 export interface Empleado {
@@ -81,32 +82,47 @@ function asList<T>(data: unknown): T[] {
 }
 
 async function list<T>(path: string): Promise<T[]> {
-  const data = await request<unknown>(path, { auth: true, retry: true });
-  return asList<T>(data);
+  return catalogMemo.get<T[]>(path, async () => {
+    const data = await request<unknown>(path, { auth: true, retry: true });
+    return asList<T>(data);
+  });
+}
+
+// Mutación: invalida el prefijo de su lista para que el panel, que
+// recarga tras guardar, nunca muestre la lista vieja del memo.
+function mutate<T>(path: string, p: Promise<T>): Promise<T> {
+  return p.then((res) => {
+    catalogMemo.invalidate(path);
+    return res;
+  });
 }
 
 export const empresaApi = {
+  // Listas casi estáticas (2026-11-24): memo 60 s en cliente como
+  // Facturas/Clases/Academia — cada visita a Talento, Riesgos o
+  // Planillas volvía a pedir la misma lista; el backend además las
+  // marca Cache-Control private max-age=60.
   listEmpleados: () => list<Empleado>("/api/talento"),
   createEmpleado: (body: EmpleadoInput) =>
-    request<Empleado>("/api/talento", { method: "POST", auth: true, body }),
+    mutate("/api/talento", request<Empleado>("/api/talento", { method: "POST", auth: true, body })),
   updateEmpleado: (id: number, body: EmpleadoInput) =>
-    request<Empleado>(`/api/talento/${id}`, { method: "PUT", auth: true, body }),
+    mutate("/api/talento", request<Empleado>(`/api/talento/${id}`, { method: "PUT", auth: true, body })),
   deleteEmpleado: (id: number) =>
-    request<void>(`/api/talento/${id}`, { method: "DELETE", auth: true }),
+    mutate("/api/talento", request<void>(`/api/talento/${id}`, { method: "DELETE", auth: true })),
 
   listRiesgos: () => list<Riesgo>("/api/riesgos"),
   createRiesgo: (body: RiesgoInput) =>
-    request<Riesgo>("/api/riesgos", { method: "POST", auth: true, body }),
+    mutate("/api/riesgos", request<Riesgo>("/api/riesgos", { method: "POST", auth: true, body })),
   updateRiesgo: (id: number, body: RiesgoInput) =>
-    request<Riesgo>(`/api/riesgos/${id}`, { method: "PUT", auth: true, body }),
+    mutate("/api/riesgos", request<Riesgo>(`/api/riesgos/${id}`, { method: "PUT", auth: true, body })),
   deleteRiesgo: (id: number) =>
-    request<void>(`/api/riesgos/${id}`, { method: "DELETE", auth: true }),
+    mutate("/api/riesgos", request<void>(`/api/riesgos/${id}`, { method: "DELETE", auth: true })),
 
   listPlanillas: () => list<Planilla>("/api/planillas"),
   createPlanilla: (body: PlanillaInput) =>
-    request<Planilla>("/api/planillas", { method: "POST", auth: true, body }),
+    mutate("/api/planillas", request<Planilla>("/api/planillas", { method: "POST", auth: true, body })),
   updatePlanilla: (id: number, body: PlanillaInput) =>
-    request<Planilla>(`/api/planillas/${id}`, { method: "PUT", auth: true, body }),
+    mutate("/api/planillas", request<Planilla>(`/api/planillas/${id}`, { method: "PUT", auth: true, body })),
   deletePlanilla: (id: number) =>
-    request<void>(`/api/planillas/${id}`, { method: "DELETE", auth: true }),
+    mutate("/api/planillas", request<void>(`/api/planillas/${id}`, { method: "DELETE", auth: true })),
 };

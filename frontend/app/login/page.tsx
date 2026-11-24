@@ -308,6 +308,11 @@ function LoginPageInner() {
               placeholder={t.login.userPlaceholder}
               maxLength={64}
               required
+              // Acceso (2026-11-24): el cursor ya está en el usuario al
+              // abrir el login — un toque menos en móvil, donde Rubén
+              // trabaja. Solo al montar: cambiar de pestaña no remonta
+              // el campo y no roba el foco.
+              autoFocus
             />
           </span>
         </label>
