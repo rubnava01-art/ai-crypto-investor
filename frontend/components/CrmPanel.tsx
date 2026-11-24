@@ -73,7 +73,15 @@ const emptyForm: FormState = {
   notes: "",
 };
 
-export function CrmPanel() {
+export function CrmPanel({
+  query: controlledQuery,
+  onQueryChange,
+}: {
+  /** Búsqueda controlada por el dashboard superior (CrmDashboard). Sin
+   * estas props el panel usa su propio campo de búsqueda como antes. */
+  query?: string;
+  onQueryChange?: (q: string) => void;
+} = {}) {
   const { t } = useLanguage();
   // Listas traducidas (los CRM_SOURCES/CRM_STATUSES exportados se conservan
   // en español solo por compatibilidad; el panel usa estas).
@@ -97,7 +105,9 @@ export function CrmPanel() {
   const isAdmin = !!me?.is_admin;
 
   const [contacts, setContacts] = useState<CrmContact[] | null>(null);
-  const [query, setQuery] = useState("");
+  const [queryInternal, setQueryInternal] = useState("");
+  const query = controlledQuery ?? queryInternal;
+  const setQuery = onQueryChange ?? setQueryInternal;
   const [statusFilter, setStatusFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
 
@@ -201,6 +211,8 @@ export function CrmPanel() {
       }
       cancelEdit();
       await load();
+      // El dashboard superior (pasos/métricas) se actualiza con el cambio.
+      window.dispatchEvent(new CustomEvent("crm:changed"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.crm.errSave);
     } finally {
@@ -217,6 +229,7 @@ export function CrmPanel() {
       if (editingId === c.id) cancelEdit();
       setMsg(t.crm.msgDeleted.replace("{nombre}", c.name));
       await load();
+      window.dispatchEvent(new CustomEvent("crm:changed"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.crm.errDelete);
     }
@@ -242,7 +255,8 @@ export function CrmPanel() {
         vinculado (cada tecla re-dispararía el 403); se ocultan con el
         estado amable. */}
       {!forbidden && (
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px_200px]">
+      <div className={`mb-4 grid grid-cols-1 gap-3 ${controlledQuery === undefined ? "sm:grid-cols-[1fr_200px_200px]" : "sm:grid-cols-[200px_200px]"}`}>
+        {controlledQuery === undefined && (
         <Field label={t.crm.searchAria}><input
           className={inputCls}
           placeholder={t.crm.searchPlaceholder}
@@ -250,6 +264,7 @@ export function CrmPanel() {
           onChange={(e) => setQuery(e.target.value)}
           aria-label={t.crm.searchAria}
         /></Field>
+        )}
         <Field label={t.crm.filterAria}><select
           className={inputCls}
           value={statusFilter}
@@ -400,12 +415,12 @@ export function CrmPanel() {
 
       {/* Create / edit form (admin only) */}
       {isAdmin && (
-        <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+        <form id="crm-nuevo-contacto" onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
           <p className="text-sm font-semibold text-zinc-200">
             {editingId !== null ? t.crm.editTitle : t.crm.newTitle}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label={t.crm.nameAria}><input aria-label={t.crm.nameAria} className={inputCls} placeholder={t.crm.namePlaceholder} value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" /></Field>
+            <Field label={t.crm.nameAria}><input id="crm-nuevo-nombre" aria-label={t.crm.nameAria} className={inputCls} placeholder={t.crm.namePlaceholder} value={form.name} onChange={set("name")} required maxLength={128} autoComplete="off" /></Field>
             <Field label={t.crm.emailAria}><input aria-label={t.crm.emailAria} className={inputCls} placeholder={t.crm.emailPlaceholder} type="email" value={form.email} onChange={set("email")} autoComplete="off" /></Field>
             <Field label={t.crm.phoneAria}><input aria-label={t.crm.phoneAria} className={inputCls} placeholder={t.crm.phonePlaceholder} value={form.phone} onChange={set("phone")} autoComplete="off" /></Field>
             <Field label={t.crm.tagsAria}><input aria-label={t.crm.tagsAria} className={inputCls} placeholder={t.crm.tagsPlaceholder} value={form.tags} onChange={set("tags")} autoComplete="off" /></Field>

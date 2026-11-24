@@ -558,6 +558,40 @@ export interface CrmContactInput {
   notes?: string;
 }
 
+// Resumen del CRM (Fase 3, rediseño estilo Vivero): solo datos reales
+// (contactos, citas, facturas). Ver GET /api/crm/contacts/resumen.
+export interface CrmResumenPaso {
+  clave: string;
+  numero: number;
+  total: number;
+  hoy: number;
+  serie_7d: number[];
+  sub: string;
+  vacio: string;
+}
+
+export interface CrmResumenDinero {
+  cantidad: number;
+  total: number;
+}
+
+export interface CrmResumen {
+  fecha: string;
+  zona_horaria: string;
+  pasos: CrmResumenPaso[];
+  leyenda: { estado: string; total: number }[];
+  metricas: {
+    contactos_nuevos_hoy: number;
+    citas_hoy: number;
+    ventas_hoy: CrmResumenDinero;
+    ventas_semana: CrmResumenDinero;
+    por_cobrar: CrmResumenDinero;
+    clientes: number;
+  };
+  ventas_semana_dias: { fecha: string; etiqueta: string; total: number; cantidad: number }[];
+  nota_ventas: string;
+}
+
 // ---------- Academia (Grow Business Platform — Fase 2, módulo Estudiar) ----------
 
 export type CourseKind = "ebook" | "pack" | "academia";

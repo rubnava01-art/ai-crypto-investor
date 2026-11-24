@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-23",
+    title: "CRM rediseñado: el día paso a paso y los números de la empresa",
+    body: "Publicado el 23 de noviembre: el Gestor de Clientes estrena un panel nuevo — arriba, buscador de cliente, doble reloj (Los Ángeles y UTC) y botón para agregar contacto; debajo, 'El día, paso a paso' con cuatro tarjetas numeradas (nuevos contactos, en gestión, seguimiento y citas de hoy) con su mini-gráfica de 7 días y la leyenda con los estados reales del CRM; y 'Los números de la empresa' con contactos nuevos hoy, citas de hoy, ventas de hoy y de la semana desde las facturas pagadas, por cobrar y clientes. Solo datos reales de la plataforma, con vacíos honestos cuando aún no hay nada; lo que no tiene fuente real (llamadas, envíos, pasarela) simplemente no aparece. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-23",
     title: "Chat más rápido: respuestas de Internet en paralelo y sin esperas",
     body: "Publicado el 23 de noviembre: el Asistente ahora responde mucho más rápido — las consultas de Internet se hacen en paralelo en vez de una por una, con un presupuesto máximo de 5 segundos en vez de 10; las preguntas con respuesta en la plataforma (como el precio del bitcoin) ya no salen a Internet y se contestan al instante; y los saludos y mensajes sin respuesta caen de inmediato a la bandeja de enseñanza. Además, el perfil y los permisos se cargan una sola vez por sesión en vez de pedirlos en cada página, y el historial del chat ya no se vuelve a dibujar entero al escribir. Mismo Asistente, mismas respuestas, solo más rápido y más claro. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

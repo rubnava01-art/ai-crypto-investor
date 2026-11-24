@@ -1,8 +1,10 @@
 // Dominio crm del API (extraído de lib/api.ts en Fase 4, sin cambios de comportamiento).
 import { request } from "./client";
-import type { CrmContact, CrmContactInput } from "./types";
+import type { CrmContact, CrmContactInput, CrmResumen } from "./types";
 
 export const crmApi = {
+  getCrmResumen: () =>
+    request<CrmResumen>("/api/crm/contacts/resumen", { auth: true, retry: true }),
   listContacts: (q?: string, status?: string, opts?: { signal?: AbortSignal }) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
