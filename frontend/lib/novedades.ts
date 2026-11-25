@@ -26,6 +26,16 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-25",
+    title: "Mejoras diarias: caché en Inventario y contadores visibles/total en Clases y Control de usuarios",
+    body: "Publicado el 25 de noviembre: tres mejoras del día — en velocidad, la lista de Inventario ahora se guarda en caché 60 segundos y carga más rápido al navegar, con invalidación inmediata al crear, editar o borrar; en Estudiar, con búsqueda activa cada sección de Clases muestra cuántas clases coinciden (visibles / total); y en Control de usuarios, con búsqueda o filtro de rol aparece el contador de visibles / total junto al badge 'Solo admin'. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-25",
+    title: "Entrada de prueba rápida más veloz: warm-up, caché y una sola llamada al mercado",
+    body: "Publicado el 25 de noviembre: la entrada de invitado 'Probar sin registro' en Inicio quedó más rápida — al abrirla, el servidor ya calienta los indicadores y el mercado público responde en una sola llamada, así el primer invitado ve los precios y las herramientas de Estudiar sin la espera larga de antes; la sesión de invitado sigue siendo de 15 minutos, con pregunta de seguridad y sin guardar nada hasta registrarse. Solo velocidad en la entrada, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-24",
     title: "Nueva sección pública Herramientas: 25 herramientas reales con sus precios",
     body: "Publicado el 24 de noviembre: nueva sección pública Herramientas — 25 herramientas reales de la plataforma en cuatro grupos (Invierte, Aprende, Crea y Gestiona), con buscador y filtro; cada tarjeta dice en qué plan va incluida (Esencial $19, Crecimiento $49 o Negocio Total $99 al mes, 14 días gratis) y qué hace, con sus límites honestos. La sección también aparece en Inicio y está enlazada desde Planes, y el gancho libre (calculadora y educación Bitcoin) ahora lleva bien al invitado hasta Estudiar sin perderlo en el login. Solo presentación y enlaces, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",

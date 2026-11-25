@@ -41,6 +41,10 @@ invoices list carries client names/contact details, so `private`
   full list for admin — `private` keeps that per-browser, so one
   role's cached rows can never leak to another user; the client memo
   is also cleared on every token change.)
+- /api/inventario/items — stock list (2026-11-25; same trade-off:
+  same rows for every authenticated reader, only the admin writes,
+  every in-app mutation invalidates the client memo in
+  lib/api/inventario.ts).
 
 Deliberately NOT cached: /api/dashboard (per-user aggregate),
 /api/market/prices and /api/market/ticker (live data with their own
@@ -66,6 +70,7 @@ _CACHEABLE_GET_PATHS = frozenset(
         "/api/talento",
         "/api/riesgos",
         "/api/planillas",
+        "/api/inventario/items",
     }
 )
 

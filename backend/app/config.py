@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     # allow_sandbox: el modo sandbox solo funciona cuando es True
     # (setup de staging explícito). En producción es 403 siempre.
     seed_demo_accounts: bool = False
+    # Precalentamiento de mercado público (entrada de prueba rápida,
+    # 2026-11-24): al arrancar, un fetch real de ticker+prices llena
+    # la caché para que el primer invitado no pague el fetch frío a
+    # Kraken (~2,5-5 s). Best-effort y en segundo plano. En tests se
+    # desactiva (WARMUP_PUBLIC_MARKET=false en tests/conftest.py):
+    # varios tests asumen la caché fría (p. ej. 503 con el exchange
+    # caído) y un warm-up real los contaminaría.
+    warmup_public_market: bool = True
     allow_sandbox: bool = False
 
     # Exchange API keys (Phase 5+). Read-only keys only: no withdrawal

@@ -304,6 +304,11 @@ export function UsersPanel() {
     if (!q) return filtered;
     return filtered.filter((u) => u.username.toLowerCase().includes(q));
   }, [users, roleFilter, query]);
+  // Conteo filtrado (2026-11-25): con búsqueda o filtro de rol activo
+  // el badge muestra "visibles / total", mismo patrón que Talento,
+  // Riesgos, Planillas, Facturas y Clases; sin filtro, solo el badge
+  // de admin como antes.
+  const filtering = query.trim() !== "" || roleFilter !== "all";
 
   return (
     <>
@@ -311,8 +316,15 @@ export function UsersPanel() {
     <Panel
       title={t.usuarios.panelTitle}
       badge={
-        <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
-          {t.usuarios.adminBadge}
+        <span className="flex shrink-0 items-center gap-2">
+          {users !== null && filtering && (
+            <span aria-live="polite" className="whitespace-nowrap rounded-full bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300">
+              {`${visibleUsers.length} / ${users.length}`}
+            </span>
+          )}
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+            {t.usuarios.adminBadge}
+          </span>
         </span>
       }
     >

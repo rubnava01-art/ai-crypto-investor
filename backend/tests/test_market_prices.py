@@ -1,4 +1,6 @@
 """Tests for GET /api/market/prices (live top-coin prices, mocked exchange)."""
+import time
+
 import app.api.market as market_mod
 from app.api.market import _PRICES_CACHE
 
@@ -56,8 +58,13 @@ def test_market_prices_exchange_down_serves_stale(client, monkeypatch):
     def _boom(*a, **k):
         raise ConnectionError("down")
 
-    # expire the cache so it refetches, then fails -> stale served
-    _PRICES_CACHE["at"] = 0.0
+    # expire the cache so it refetches, then fails -> stale served.
+    # OJO: `at = 0.0` NO vale como "caducado": time.monotonic() es
+    # tiempo desde el arranque de la máquina, así que en una VM recién
+    # reiniciada 0.0 equivale a solo unos minutos (ventana SWR o HIT
+    # fresco) y el test pasa o falla según el uptime. Se fuerza una
+    # edad mayor que MAX_STALE (3600 s), como el test hermano de 11_13.
+    _PRICES_CACHE["at"] = time.monotonic() - 4000.0
     monkeypatch.setattr(market_mod.exchanges, "fetch_ticker", _boom)
     r = client.get("/api/market/prices", headers=headers)
     assert r.status_code == 200, r.text

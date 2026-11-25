@@ -47,8 +47,17 @@ export function isMarketNoData(err: unknown): boolean {
  * resuelve como en ModuleNav: `getPerfil()` (memoizado 60 s) y, si
  * falla, el flag local de invitado. Nunca cambia la base por un
  * perfil que no sea invitado: un `prueba` sigue en /api/market/*
- * (y su 403 preexistente en `invertir` no se toca aquí). */
+ * (y su 403 preexistente en `invertir` no se toca aquí).
+ * Entrada rápida (2026-11-24): con sesión de invitado el flag local
+ * (`aci_guest=1`, puesto solo por `setGuestToken` tras un token de
+ * invitado válido y borrado por `setToken` al cambiar de sesión)
+ * decide sin esperar a /api/acceso/perfil: ese viaje extra — que se
+ * vacía al cambiar el token, así que la primera lectura de mercado
+ * tras entrar siempre lo pagaba — ya no retrasa el primer precio del
+ * invitado. El backend sigue siendo el que autoriza cada endpoint. */
 export async function marketBasePath(): Promise<string> {
+  // Vía rápida de invitado: sin viaje a /api/acceso/perfil.
+  if (isGuest()) return "/api/public/market";
   try {
     const perfil = await accesoApi.getPerfil();
     if (perfil.role === "invitado") return "/api/public/market";

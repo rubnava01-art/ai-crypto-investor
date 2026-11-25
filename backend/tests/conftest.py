@@ -9,6 +9,10 @@ from sqlalchemy.orm import sessionmaker
 
 DB_FD, DB_PATH = tempfile.mkstemp(suffix=".db")
 os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
+# Warm-up de mercado público desactivado en tests (ver
+# Settings.warmup_public_market): llena la caché con datos reales y
+# contaminaría los tests que asumen caché fría (503, conteo de fetch).
+os.environ["WARMUP_PUBLIC_MARKET"] = "false"
 
 from app.core.security import hash_password  # noqa: E402
 from app.database import get_db  # noqa: E402

@@ -26,6 +26,12 @@ export const GUEST_MODULES: readonly string[] = ["inicio", "estudiar", "planes",
 export const guestApi = {
   /** Reto matemático para la prueba sin registro (mismo que registro). */
   challenge: () => request<RegisterChallenge>("/api/auth/register-challenge"),
+  /** Calienta el backend (GET /api/health, sin auth) mientras el
+   * visitante resuelve el reto: en el free tier la primera petición
+   * despierta el servidor y las siguientes ya llegan calientes. Se
+   * dispara al abrir el modal (y al pasar el cursor por el botón) y
+   * nunca bloquea el flujo: un fallo se traga en silencio. */
+  warmup: () => request<{ status: string }>("/api/health").catch(() => undefined),
   /** Emite el token invitado y lo guarda como sesión de invitado. */
   start: async (challenge_id: string, challenge_answer: number) => {
     const res = await request<GuestTokenResponse>("/api/auth/guest", {

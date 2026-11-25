@@ -176,6 +176,11 @@ def get_current_principal(
 
     Un token de invitado con role distinto de "invitado" es inválido
     (401): el role vive en el JWT firmado, no lo elige el cliente.
+
+    El Bearer se decodifica UNA vez aquí y el payload ya decodificado
+    baja a _resolve_user(): antes get_current_user() lo volvía a
+    decodificar (doble verificación de firma por petición de usuario;
+    el invitado ya solo pagaba una).
     """
     payload = _decode_bearer(credentials)
     sub = payload.get("sub") or ""
@@ -185,7 +190,7 @@ def get_current_principal(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
         return Guest(guest_id=sub[len(GUEST_TOKEN_PREFIX):])
-    return get_current_user(credentials=credentials, db=db)
+    return _resolve_user(payload, db)
 
 
 def guest_read_guard(
@@ -209,22 +214,14 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing bearer token",
-        )
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.jwt_secret_key,
-            algorithms=[JWT_ALGORITHM],
-        )
-        username = payload.get("sub")
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+    payload = _decode_bearer(credentials)
+    return _resolve_user(payload, db)
+
+
+def _resolve_user(payload: dict, db: Session) -> User:
+    """Resuelve un User desde un payload JWT ya decodificado (ver
+    get_current_principal: el Bearer se decodifica una sola vez)."""
+    username = payload.get("sub")
     if not username:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"

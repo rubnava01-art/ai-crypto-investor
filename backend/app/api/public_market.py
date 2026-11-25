@@ -23,11 +23,38 @@ from sqlalchemy.orm import Session
 from app.api import market as market_api
 from app.core.rate_limit import public_market_limiter, too_many_requests
 from app.core.security import Principal, get_current_principal
-from app.data import exchanges, ingest
+from app.data import ingest
 from app.database import get_db
 from app.indicators import technical as ind
+from app.models.tables import MarketCandle
 
 router = APIRouter(prefix="/api/public/market", tags=["public-market"])
+
+# Caché de indicadores (corrida 2026-11-24, entrada de prueba rápida):
+# /indicators leía 200 velas de la BD y recalculaba el resumen en
+# CADA llamada (~7 ms), aunque las velas no hubieran cambiado. La
+# caché guarda el resumen ya calculado y se consulta ANTES de cargar
+# las 200 velas: la clave es un fingerprint ligero (nº de velas +
+# open_time/cierre/volumen de la vela más reciente, dos consultas
+# indexadas de una fila). El ingest solo reescribe la vela en curso,
+# así que cualquier cambio en los datos cambia la clave; el TTL de
+# 60 s es solo un tope. No se inventa nada: un MISS calcula
+# exactamente lo mismo que antes. El `updated_utc` de la respuesta
+# se regenera en cada llamada (fresco); solo se reutiliza el resumen
+# de indicadores. Tope 128 entradas con desalojo FIFO, como la caché
+# de ticker.
+_INDICATORS_CACHE: dict[tuple, dict] = {}
+_INDICATORS_TTL_S = 60.0
+_INDICATORS_CACHE_MAX_ENTRIES = 128
+
+
+def _indicators_cache_put(key: tuple, entry: dict) -> None:
+    if key in _INDICATORS_CACHE:
+        _INDICATORS_CACHE[key] = entry
+        return
+    while len(_INDICATORS_CACHE) >= _INDICATORS_CACHE_MAX_ENTRIES:
+        _INDICATORS_CACHE.pop(next(iter(_INDICATORS_CACHE)))
+    _INDICATORS_CACHE[key] = entry
 
 
 def _public_market_guard(
@@ -59,7 +86,7 @@ def get_public_ticker(
     if cached is not None and now - cached["at"] < market_api._TICKER_TTL_S:
         return market_api.TickerResponse(**{**cached["payload"], "stale": False})
     try:
-        t = exchanges.fetch_ticker(exchange, symbol)
+        t = market_api._fetch_ticker_singleflight(exchange, symbol)
     except Exception as e:  # noqa: BLE001 - surface as 503, never fake
         if cached is not None:
             return market_api.TickerResponse(**{**cached["payload"], "stale": True})
@@ -132,6 +159,55 @@ def get_public_indicators(
     market_api._validate_exchange(exchange)
     symbol = market_api._validate_symbol(symbol)
     timeframe = market_api._validate_timeframe(timeframe)
+    now = time.monotonic()
+    # Fingerprint ligero ANTES de cargar las 200 velas: nº de velas +
+    # vela más reciente (el ingest solo reescribe la vela en curso).
+    # Un HIT evita la carga de 200 filas y el recálculo del resumen.
+    newest = (
+        db.query(MarketCandle)
+        .filter(
+            MarketCandle.symbol == symbol, MarketCandle.timeframe == timeframe
+        )
+        .order_by(MarketCandle.open_time_utc.desc())
+        .first()
+    )
+    if newest is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Not enough candles for indicators (0/35). Ingest more data.",
+        )
+    n_candles = (
+        db.query(MarketCandle)
+        .filter(
+            MarketCandle.symbol == symbol, MarketCandle.timeframe == timeframe
+        )
+        .count()
+    )
+    if n_candles < 35:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Not enough candles for indicators ({n_candles}/35). Ingest more data.",
+        )
+    cache_key = (
+        exchange,
+        symbol,
+        timeframe,
+        n_candles,
+        newest.open_time_utc,
+        str(newest.close),
+        str(newest.volume),
+    )
+    cached = _INDICATORS_CACHE.get(cache_key)
+    if cached is not None and now - cached["at"] < _INDICATORS_TTL_S:
+        return market_api.IndicatorsResponse(
+            symbol=symbol,
+            timeframe=timeframe,
+            source=cached["source"],
+            updated_utc=market_api._utcnow(),
+            stale=cached["stale"],
+            newest_candle_utc=cached["newest_candle_utc"],
+            indicators=cached["indicators"],
+        )
     candles = ingest.latest_candles(db, symbol, timeframe, 200)
     if len(candles) < 35:
         raise HTTPException(
@@ -141,6 +217,17 @@ def get_public_indicators(
     closes = [float(c.close) for c in candles]
     volumes = [float(c.volume) for c in candles]
     stale, newest_candle_utc = market_api._candles_freshness(candles, timeframe)
+    indicators = ind.summarize(closes, volumes)
+    _indicators_cache_put(
+        cache_key,
+        {
+            "at": now,
+            "source": candles[-1].source,
+            "stale": stale,
+            "newest_candle_utc": newest_candle_utc,
+            "indicators": indicators,
+        },
+    )
     return market_api.IndicatorsResponse(
         symbol=symbol,
         timeframe=timeframe,
@@ -148,7 +235,7 @@ def get_public_indicators(
         updated_utc=market_api._utcnow(),
         stale=stale,
         newest_candle_utc=newest_candle_utc,
-        indicators=ind.summarize(closes, volumes),
+        indicators=indicators,
     )
 
 

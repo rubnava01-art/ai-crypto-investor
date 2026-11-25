@@ -139,6 +139,16 @@ def seed_demo_data() -> None:
 async def lifespan(app: FastAPI):
     # Fail closed en producción antes de sembrar nada (corrida 3 agentes).
     assert_production_secrets()
+    # Entrada de prueba rápida (2026-11-24): el warm-up se lanza LO
+    # PRIMERO del lifespan, antes del seed (no toca la BD): cada
+    # milisegundo que el fetch a Kraken corre durante el arranque es
+    # un milisegundo menos que espera el primer invitado que se une
+    # al vuelo con single-flight. Best-effort y en segundo plano, no
+    # bloquea el arranque. Desactivable con WARMUP_PUBLIC_MARKET=false
+    # (los tests lo desactivan).
+    warmup_task = None
+    if settings.warmup_public_market:
+        warmup_task = asyncio.create_task(_warm_public_market_cache())
     seed_demo_data()
     # Fase 2/3: restore persisted runtime state + reconcile crash
     # leftovers BEFORE the scanner loop starts, so the loop never runs
@@ -162,8 +172,64 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     task = asyncio.create_task(_scanner_loop())
+    # Precalentar la caché de mercado público en segundo plano, sin
+    # bloquear el arranque (la tarea se creó al inicio del lifespan).
+    # El primer invitado pagaba el fetch frío a Kraken (ticker ~2,5-3,6 s,
+    # prices ~4,7-5 s); el warm-up hace exactamente ese mismo fetch
+    # real una vez al arrancar, así que si el invitado llega después
+    # encuentra la caché caliente (~2 ms). Si llega durante el warm-up,
+    # el single-flight de app.api.market lo une al fetch en vuelo en
+    # vez de lanzar otro. Best-effort: si el exchange falla, la caché
+    # queda vacía y el primer invitado sigue el camino normal (fetch
+    # síncrono o 503/stale, como hoy). No se inventa ningún dato y no
+    # toca el escáner.
     yield
     task.cancel()
+    if warmup_task is not None:
+        warmup_task.cancel()
+
+
+async def _warm_public_market_cache() -> None:
+    """Precalienta ticker + prices públicos tras el arranque.
+
+    En hilos aparte (los fetch son síncronos) y en paralelo entre sí:
+    ticker ~2,5 s y prices ~4,7 s en serie tardaban ~7 s; en paralelo
+    el warm-up completo queda en ~5 s. Llama a los propios endpoints
+    públicos con un principal invitado interno: la caché se llena
+    exactamente como con una petición real (mismo TTL, mismos datos).
+    """
+    try:
+        await asyncio.gather(
+            asyncio.to_thread(_warm_ticker_sync),
+            asyncio.to_thread(_warm_prices_sync),
+            return_exceptions=True,
+        )
+    except Exception:  # noqa: BLE001 - best-effort, nunca rompe el arranque
+        logger.exception("public market warm-up failed; first guest warms the cache")
+
+
+def _warm_ticker_sync() -> None:
+    from app.api import public_market
+    from app.core.security import Guest
+
+    try:
+        public_market.get_public_ticker(
+            symbol="BTC/USD",
+            exchange="kraken",
+            principal=Guest(guest_id="warmup"),
+        )
+    except Exception:  # noqa: BLE001 - best-effort
+        logger.warning("public market warm-up: ticker BTC/USD failed")
+
+
+def _warm_prices_sync() -> None:
+    from app.api import public_market
+    from app.core.security import Guest
+
+    try:
+        public_market.get_public_prices(exchange="kraken", principal=Guest(guest_id="warmup"))
+    except Exception:  # noqa: BLE001 - best-effort
+        logger.warning("public market warm-up: prices failed")
 
 
 async def _scanner_loop() -> None:

@@ -66,6 +66,15 @@ export function setToken(token: string | null) {
   if (typeof window === "undefined") return;
   if (token) window.localStorage.setItem(TOKEN_KEY, token);
   else window.localStorage.removeItem(TOKEN_KEY);
+  // Entrada de prueba rápida (2026-11-24): la marca de invitado describe
+  // LA SESIÓN ACTUAL, no el navegador. Antes sobrevivía a un login con
+  // cuenta real (setToken no la borraba) y `isGuest()` seguía diciendo
+  // "invitado" con un token de cuenta — el menú, el banner y la base de
+  // mercado tomaban el camino de invitado por error. Al cambiar de
+  // sesión la marca se borra; `setGuestToken` la vuelve a poner justo
+  // después (llama a setToken primero y luego marca), así que el flujo
+  // de invitado no cambia. `logout()` ya la borraba por su lado.
+  clearGuestFlag();
   clearMeCache();
   // Defensa en profundidad (2026-11-23, recomendación QA 2026-11-22):
   // al cambiar de sesión ningún catálogo memoizado (facturas,

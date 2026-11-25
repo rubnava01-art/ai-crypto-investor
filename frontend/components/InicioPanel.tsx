@@ -5,6 +5,7 @@ import { api, ApiError, isGuest, type HomeComment, type HomePost, type MeRespons
 import { useLanguage } from "../lib/i18n";
 import { novedadesOrdenadas } from "../lib/novedades";
 import { Panel } from "./Panel";
+import { Skeleton } from "./Skeleton";
 import { MetricCard } from "./MetricCard";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, LoadMore, useConfirm, Field } from "./ui";
@@ -254,7 +255,10 @@ export function InicioPanel() {
       {postsError ? <ApiErrorBanner error={postsError} t={t} onRetry={postsLoad.reload} /> : null}
       <div className="mt-4 border-t border-zinc-800 pt-3">
         {posts === null && !postsError ? (
-          <p className="py-2 text-sm text-zinc-400">{t.inicio.loadingPosts}</p>
+          <div className="space-y-4 py-2" aria-label={t.inicio.loadingPosts}>
+            <Skeleton className="h-24 w-full" ariaLabel={t.inicio.loadingPosts} />
+            <Skeleton className="h-24 w-full" ariaLabel={t.inicio.loadingPosts} />
+          </div>
         ) : items.length === 0 ? (
           <p className="py-2 text-sm text-zinc-400">
             {t.inicio.emptyPosts}

@@ -16,7 +16,10 @@
 // invalidan el prefijo en lib/api/facturas.ts. Excepción desde
 // 2026-11-24: las listas de Gestión (talento, riesgos, planillas) en
 // lib/api/empresa.ts — mismo patrón: listas compartidas gestionadas
-// solo por el admin, cada mutación invalida su prefijo. Talento y
+// solo por el admin, cada mutación invalida su prefijo. Excepción
+// desde 2026-11-25: la lista de inventario en lib/api/inventario.ts —
+// misma para todos los lectores autenticados, solo el admin escribe,
+// cada mutación (crear/editar/ajustar/borrar) invalida su prefijo. Talento y
 // Planillas devuelven [] para prueba y la lista completa para admin,
 // pero el memo vive en el navegador de una sola sesión y se vacía al
 // cambiar el token, así que una lista no sobrevive a un cambio de rol.

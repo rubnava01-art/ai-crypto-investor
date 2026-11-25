@@ -190,3 +190,22 @@ test("P0-1: perfil falla + sin flag invitado → usa /api/market/*", async () =>
   assert.ok(urls.some((u) => u.includes("/api/market/ticker")));
   assert.ok(!urls.some((u) => u.includes("/api/public/market/ticker")));
 });
+
+test("Entrada rápida 2026-11-24: flag invitado → base pública SIN pedir /api/acceso/perfil", async () => {
+  catalogMemo.clear();
+  const urls: string[] = [];
+  const restoreFetch = stubFetch(urls, "prueba");
+  const restoreWindow = stubGuestWindow();
+  try {
+    await marketApi.marketTicker("BTC/USD");
+  } finally {
+    restoreFetch();
+    restoreWindow();
+  }
+  assert.ok(urls.some((u) => u.includes("/api/public/market/ticker")));
+  assert.ok(!urls.some((u) => u.includes("/api/market/ticker")));
+  assert.ok(
+    !urls.some((u) => u.includes("/api/acceso/perfil")),
+    `la vía rápida no debe pedir el perfil: ${urls.join(", ")}`,
+  );
+});

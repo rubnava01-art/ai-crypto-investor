@@ -483,6 +483,17 @@ export function ModuleNav() {
   // menú solo deja de prometer lo que no le toca.
   const [role, setRole] = useState<"loading" | "admin" | "prueba" | "cliente" | "invitado">("loading");
   const [modulos, setModulos] = useState<Set<string> | null>(null);
+  // Entrada rápida (2026-11-24): el banner "Estás probando sin cuenta"
+  // no espera a /api/acceso/perfil. La marca local de invitado
+  // (`aci_guest=1`, puesta solo por setGuestToken y borrada al cambiar
+  // de sesión) se lee al montar — sin riesgo de hidratación, porque se
+  // aplica en un efecto tras el primer pintado — y el banner aparece
+  // en el primer segundo, antes de que el perfil resuelva. El menú
+  // sigue filtrándose por el perfil del servidor, como antes.
+  const [guestLocal, setGuestLocal] = useState(false);
+  useEffect(() => {
+    setGuestLocal(isGuest());
+  }, []);
   const isAdmin = role === "admin";
   const isCliente = role === "cliente";
   // Móvil: todo el menú vive detrás de un único botón "Menú" (2026-11-17):
@@ -619,7 +630,7 @@ export function ModuleNav() {
           cliente vinculado, el de su portal. Admin/super no ven aviso.
           El aviso de prueba vivía solo en el dashboard (/); ahora lo
           lleva el menú y se ve en todos los módulos. */}
-      {role === "invitado" && (
+      {(role === "invitado" || (role === "loading" && guestLocal)) && (
         <div
           role="status"
           className="mb-4 rounded-xl border border-emerald-700/60 bg-emerald-500/10 px-4 py-3 text-sm leading-relaxed text-emerald-300"

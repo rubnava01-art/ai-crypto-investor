@@ -57,6 +57,9 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
         c.description.toLowerCase().includes(q)
     );
   }, [rows, search]);
+  // Conteo filtrado (2026-11-25): con búsqueda activa el badge muestra
+  // "visibles / total", mismo patrón que Talento, Riesgos, Planillas y
+  // Facturas; sin búsqueda, solo el total como antes.
 
   const isLive = kind === "envivo";
   // E8: aviso de fecha pasada (no bloquea el guardado, solo avisa).
@@ -157,7 +160,11 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
       title={isLive ? t.clases.liveTitle : t.clases.recordedTitle}
       badge={
         <span aria-live="polite" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isLive ? "bg-red-500/15 text-red-300" : "bg-indigo-500/15 text-indigo-300"}`}>
-          {rows === null ? t.clases.badgeLoading : `${rows.length} ${rows.length === 1 ? t.clases.classOne : t.clases.classMany}`}
+          {rows === null
+            ? t.clases.badgeLoading
+            : search.trim() !== ""
+              ? `${visible.length} / ${rows.length} ${t.clases.classMany}`
+              : `${rows.length} ${rows.length === 1 ? t.clases.classOne : t.clases.classMany}`}
         </span>
       }
     >

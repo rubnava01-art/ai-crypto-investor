@@ -52,3 +52,49 @@ test("parseRetryAfter: ausente o inválido → null; pasado → 0", () => {
   const now = Date.parse("2026-11-24T10:00:00Z");
   assert.equal(parseRetryAfter("Tue, 24 Nov 2026 09:59:00 GMT", now), 0);
 });
+
+// Entrada rápida (2026-11-24): la marca de invitado describe la sesión
+// actual — setToken la borra al cambiar de sesión, setGuestToken la pone.
+import { isGuest, setGuestToken, setToken } from "./client";
+
+function stubWindow() {
+  const prev = (globalThis as Record<string, unknown>).window;
+  const store = new Map<string, string>();
+  (globalThis as Record<string, unknown>).window = {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    },
+    sessionStorage: {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    },
+  };
+  return () => {
+    if (prev === undefined) delete (globalThis as Record<string, unknown>).window;
+    else (globalThis as Record<string, unknown>).window = prev;
+  };
+}
+
+test("marca invitado: setGuestToken la pone; setToken (login real) la borra", () => {
+  const restore = stubWindow();
+  try {
+    assert.equal(isGuest(), false);
+    setGuestToken("tok-invitado");
+    assert.equal(isGuest(), true);
+    setToken("tok-cuenta-real");
+    assert.equal(isGuest(), false);
+    setGuestToken("tok-invitado-2");
+    assert.equal(isGuest(), true);
+    setToken(null);
+    assert.equal(isGuest(), false);
+  } finally {
+    restore();
+  }
+});

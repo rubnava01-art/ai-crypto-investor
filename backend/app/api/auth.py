@@ -20,6 +20,7 @@ unified in Spanish in this module (login + register); the pending
 message is byte-identical to before.
 """
 import secrets
+import threading
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -54,9 +55,29 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # B8 (corrida seguridad 2026-11-23): hash ficticio para igualar el
 # tiempo de login cuando el usuario no existe (oráculo de timing).
-# Se genera una vez al importar: bcrypt es lento a propósito y el
-# valor nunca coincide con ninguna contraseña real.
-_DUMMY_PASSWORD_HASH = hash_password("dummy-password-nunca-valida-" + secrets.token_hex(16))
+# PEREZOSO (corrida 2026-11-24, entrada de prueba rápida): antes se
+# generaba al importar el módulo (~470 ms de bcrypt en cada arranque
+# en frío, que paga también el primer invitado aunque nunca haga
+# login). Ahora se genera solo en el primer login de usuario
+# inexistente y se reutiliza después: el mismo valor para todos los
+# intentos posteriores, así que el oráculo de timing sigue igualado
+# a partir de ese primer intento. El doble chequeo con lock evita
+# generarlo dos veces si dos logins llegan a la vez.
+_DUMMY_PASSWORD_HASH: str | None = None
+_DUMMY_PASSWORD_HASH_LOCK = threading.Lock()
+
+
+def _dummy_password_hash() -> str:
+    global _DUMMY_PASSWORD_HASH
+    hashed = _DUMMY_PASSWORD_HASH
+    if hashed is None:
+        with _DUMMY_PASSWORD_HASH_LOCK:
+            if _DUMMY_PASSWORD_HASH is None:
+                _DUMMY_PASSWORD_HASH = hash_password(
+                    "dummy-password-nunca-valida-" + secrets.token_hex(16)
+                )
+            hashed = _DUMMY_PASSWORD_HASH
+    return hashed
 
 # One-time human challenges: challenge_id -> (answer, expires_at).
 # In-memory by design (single worker, same assumption as the login rate
@@ -167,7 +188,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     password_ok = (
         verify_password(payload.password, user.password_hash)
         if user is not None
-        else verify_password(payload.password, _DUMMY_PASSWORD_HASH)
+        else verify_password(payload.password, _dummy_password_hash())
     )
     if user is None or not password_ok:
         login_lockout.record_failure(payload.username)

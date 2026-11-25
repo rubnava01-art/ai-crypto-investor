@@ -56,6 +56,78 @@ _PRICES_MAX_STALE_S = 3600.0
 # Guarda del refresco en fondo: un solo refresco en vuelo por proceso.
 _PRICES_REFRESH_LOCK = threading.Lock()
 _PRICES_REFRESHING = False
+# Single-flight (corrida 2026-11-24, entrada de prueba rápida):
+# sin esto, N peticiones concurrentes del mismo fetch a Kraken
+# lanzaban N fetches en paralelo (el warm-up de arranque + el primer
+# invitado + cada invitado que entrara a la vez). Con single-flight,
+# el primer hilo es el líder y hace el ÚNICO fetch; los demás esperan
+# a su resultado (o a su error) en vez de lanzar otro. La caché TTL
+# (ticker 60 s, prices 300 s) no cambia: el single-flight solo
+# coalesce el MISS, y el resultado se guarda en la caché como antes.
+# Los endpoints son `def` síncronos (hilos de uvicorn), así que el
+# primitivo es threading.Event, no asyncio. El líder siempre despierta
+# a los seguidores (finally), incluso si el fetch explota.
+class _SingleFlight:
+    """Coalesce concurrentes de un mismo fetch: un líder, N seguidores
+    que comparten su resultado o su error."""
+
+    # Peor caso del líder: fetch_ticker reintenta 3 veces con timeout
+    # 15 s + backoff (~48 s); _fetch_market_prices espera hasta 60 s
+    # a sus 4 monedas. 90 s cubre ambos con margen y sigue por debajo
+    # del timeout global de petición (120 s): si el líder no termina,
+    # el seguidor recibe TimeoutError y el endpoint lo trata como un
+    # fetch fallido (stale/503), nunca se queda colgado.
+    WAIT_TIMEOUT_S = 90.0
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._inflight: dict = {}
+
+    def run(self, key, fn):
+        with self._lock:
+            slot = self._inflight.get(key)
+            if slot is None:
+                slot = {
+                    "event": threading.Event(),
+                    "result": None,
+                    "error": None,
+                }
+                self._inflight[key] = slot
+                leader = True
+            else:
+                leader = False
+        if leader:
+            try:
+                slot["result"] = fn()
+            except Exception as e:  # noqa: BLE001 - el error lo heredan los seguidores
+                slot["error"] = e
+            finally:
+                with self._lock:
+                    self._inflight.pop(key, None)
+                slot["event"].set()
+            if slot["error"] is not None:
+                raise slot["error"]
+            return slot["result"]
+        if not slot["event"].wait(timeout=self.WAIT_TIMEOUT_S):
+            raise TimeoutError(f"single-flight fetch timed out for {key!r}")
+        if slot["error"] is not None:
+            raise slot["error"]
+        return slot["result"]
+
+
+_TICKER_SINGLEFLIGHT = _SingleFlight()
+_PRICES_SINGLEFLIGHT = _SingleFlight()
+
+
+def _fetch_ticker_singleflight(exchange: str, symbol: str) -> dict:
+    """fetch_ticker con single-flight por (exchange, símbolo): si el
+    warm-up u otro hilo ya está pidiendo ese ticker a Kraken, se espera
+    su resultado en vez de lanzar otro fetch."""
+    return _TICKER_SINGLEFLIGHT.run(
+        (exchange, symbol), lambda: exchanges.fetch_ticker(exchange, symbol)
+    )
+
+
 # Caché de ticker por (exchange, símbolo), mismo patrón stale que /prices
 # (corrida 3 agentes): antes cada llamada pegaba al exchange sin caché.
 _TICKER_CACHE: dict[tuple, dict] = {}
@@ -247,7 +319,7 @@ def get_ticker(
     if cached is not None and now - cached["at"] < _TICKER_TTL_S:
         return TickerResponse(**{**cached["payload"], "stale": False})
     try:
-        t = exchanges.fetch_ticker(exchange, symbol)
+        t = _fetch_ticker_singleflight(exchange, symbol)
     except Exception as e:  # noqa: BLE001 - surface as 503, never fake
         if cached is not None:
             return TickerResponse(**{**cached["payload"], "stale": True})
@@ -327,7 +399,7 @@ def _fetch_one_coin(exchange: str, symbol: str, name: str, pair: str) -> CoinPri
     """One coin's ticker + sparkline. Per-coin resilience: a failure
     reports this coin with price None instead of failing the endpoint."""
     try:
-        t = exchanges.fetch_ticker(exchange, pair)
+        t = _fetch_ticker_singleflight(exchange, pair)
     except Exception:  # noqa: BLE001 - one bad coin, not a failed endpoint
         return CoinPriceOut(
             symbol=symbol, name=name, pair=pair,
@@ -351,7 +423,7 @@ def _fetch_one_coin(exchange: str, symbol: str, name: str, pair: str) -> CoinPri
     )
 
 
-def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
+def _fetch_market_prices_uncached(exchange: str) -> list[CoinPriceOut]:
     """Real public prices for the top coins (no API keys needed).
 
     PARALLEL (Fase 3, M16): the old code fetched 4 tickers + 4 OHLCV
@@ -388,6 +460,16 @@ def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
             )
         )
     return out
+
+
+def _fetch_market_prices(exchange: str) -> list[CoinPriceOut]:
+    """Precios con single-flight por exchange: si el warm-up, un
+    refresco en fondo u otra petición ya está trayendo los precios de
+    ese exchange, se espera a ese resultado en vez de lanzar otro
+    fetch de 4 monedas. El TTL/stale de la caché no cambia."""
+    return _PRICES_SINGLEFLIGHT.run(
+        exchange, lambda: _fetch_market_prices_uncached(exchange)
+    )
 
 
 def _refresh_prices_background(exchange: str) -> None:
