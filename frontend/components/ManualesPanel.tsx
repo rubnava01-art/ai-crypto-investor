@@ -19,13 +19,13 @@ export function ManualesPanel() {
     <section aria-label={m.sectionTitle} className="rounded-2xl border-2 border-sky-500/60 bg-sky-500/10 px-4 py-4 sm:px-5">
       <h2 className="text-base font-bold text-zinc-100">{m.sectionTitle}</h2>
       <p className="mt-1 text-sm leading-relaxed text-zinc-300">{m.sectionIntro}</p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link
             key={c.href}
             href={c.href}
             aria-label={c.aria}
-            className="flex min-h-[44px] flex-col justify-center gap-0.5 rounded-xl border border-zinc-700 bg-zinc-900/70 px-4 py-3 transition-colors hover:border-sky-500 hover:bg-zinc-800 active:bg-zinc-700 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+            className="flex min-h-[44px] flex-col justify-center gap-0.5 rounded-xl border border-zinc-700 bg-zinc-900/70 px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-sky-500 hover:bg-zinc-800 hover:shadow-lg active:bg-zinc-700 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
           >
             <span className="text-sm font-semibold text-zinc-100">{c.title}</span>
             <span className="text-xs leading-relaxed text-zinc-400">{c.desc}</span>

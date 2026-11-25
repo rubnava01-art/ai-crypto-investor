@@ -38,6 +38,19 @@ export function EstudiarTabs({ sections, activeId, onSelect, onPrev, onNext }: E
   const g = t.estudiarGestos;
   const activeIndex = Math.max(0, sections.findIndex((s) => s.id === activeId));
 
+  // La pestaña activa entra en vista sola (2026-11-25, Agente UX/UI):
+  // al navegar con las flechas o desde otra sección, la pestaña
+  // seleccionada podía quedar fuera del área visible en móvil y el
+  // usuario no veía cuál estaba activa. Solo desplaza en horizontal
+  // (inline: nearest) y respeta el movimiento reducido.
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  useEffect(() => {
+    const el = tabRefs.current.get(activeId);
+    if (!el) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", inline: "nearest", block: "nearest" });
+  }, [activeId]);
+
   // Anuncio vivo: se llena solo a partir del primer cambio de sección
   // (nunca en el montaje, para no anunciar al cargar la página).
   const [announce, setAnnounce] = useState("");
@@ -62,6 +75,10 @@ export function EstudiarTabs({ sections, activeId, onSelect, onPrev, onNext }: E
             <button
               key={s.id}
               type="button"
+              ref={(el) => {
+                if (el) tabRefs.current.set(s.id, el);
+                else tabRefs.current.delete(s.id);
+              }}
               aria-current={s.id === activeId ? "true" : undefined}
               onClick={() => onSelect(s.id)}
               className={tabBtn(s.id === activeId)}

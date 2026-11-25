@@ -6,7 +6,9 @@ import { useLanguage } from "../lib/i18n";
 import { formatMoney } from "../lib/format";
 import { useCancelled } from "../lib/useLoad";
 import { Panel } from "./Panel";
-import { useConfirm, Field } from "./ui";
+import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
+import { useConfirm, Field, ApiErrorBanner } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
@@ -36,6 +38,10 @@ export function InventarioPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Tri-estado (2026-11-25): un fallo de carga ya no se ve como lista
+  // vacía — se conserva el estado y se muestra el banner con reintento,
+  // mismo patrón que Riesgos/Planillas/Talento.
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const isAdmin = !!me?.is_admin;
 
@@ -54,8 +60,10 @@ export function InventarioPanel() {
       const _load1 = await api.listInventoryItems();
       if (isCancelled()) return;
       setItems(_load1);
-    } catch {
-      setItems([]);
+      setLoadError(null);
+    } catch (e) {
+      if (isCancelled()) return;
+      setLoadError(e);
     }
   }, []);
 
@@ -243,14 +251,19 @@ export function InventarioPanel() {
           />
           {t.inventario.onlyLowStock}
         </label>
+        {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {items === null ? (
-          <p className="py-2 text-sm text-zinc-400">{t.inventario.loadingItems}</p>
+          loadError ? null : (
+            <ListSkeleton ariaLabel={t.misc.loadingAria} />
+          )
         ) : visible.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">
-            {items.length === 0
-              ? t.inventario.emptyItems
-              : t.inventario.noMatch}
-          </p>
+          <EmptyState
+            text={
+              items.length === 0
+                ? t.inventario.emptyItems
+                : t.inventario.noMatch
+            }
+          />
         ) : (
           <ul className="mt-3 space-y-3">
             {visible.map((it) => (

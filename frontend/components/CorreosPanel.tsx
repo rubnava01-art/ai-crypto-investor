@@ -9,6 +9,7 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage, type Dictionary } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, copyTextWithFallback, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
@@ -31,22 +32,6 @@ function applyTokens(text: string, c: CrmContact | null, fallbackName: string) {
 /** Tamaño de página real contra el backend (ítem 17): cada "Cargar más"
  * pide limit/offset al servidor, no revela filas ya descargadas. */
 const PAGE_SIZE = 25;
-
-/** Skeleton de lista (M-2): sustituye al texto plano "Cargando…" en
- * plantillas y registro. */
-function ListSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div role="status" aria-label="Cargando" className="space-y-3 py-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} aria-hidden="true" className="space-y-2">
-          <div className="h-4 w-2/5 motion-safe:animate-pulse rounded bg-slate-800" />
-          <div className="h-3 w-full motion-safe:animate-pulse rounded bg-slate-800" />
-          <div className="h-3 w-3/4 motion-safe:animate-pulse rounded bg-slate-800" />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /** Cuerpo con line-clamp-2 + "Ver más" por fila (M-3): las plantillas y
  * los registros largos ya no inflan el DOM ni el scroll. */
@@ -230,12 +215,10 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
           <ApiErrorBanner error={templatesError} t={tt} onRetry={templatesLoad.reload} />
         ) : null}
         {loadingFirst && !templatesError ? (
-          <ListSkeleton />
+          <ListSkeleton ariaLabel={tt.misc.loadingAria} />
         ) : rows.length === 0 ? (
           templatesForbidden ? null : (
-          <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
-            <p className="text-sm text-zinc-400">{tt.correos.emptyTemplates}</p>
-          </div>
+          <EmptyState text={tt.correos.emptyTemplates} />
           )
         ) : (
           <>
@@ -546,21 +529,21 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
           <form onSubmit={save} className="space-y-3">
             <Field label={t.correos.subjectAria2}><input aria-label={t.correos.subjectAria2} className={inputCls} placeholder={t.correos.subjectPlaceholder2} value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={300} autoComplete="off" /></Field>
             <Field label={t.correos.bodyAria2}><textarea aria-label={t.correos.bodyAria2} className={inputCls} placeholder={t.correos.bodyPlaceholder2} value={body} onChange={(e) => setBody(e.target.value)} required rows={5} /></Field>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button type="button" onClick={copy} disabled={!toName.trim() && !subject && !body} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                 {t.correos.copyMail}
               </button>
               {gmailUrl ? (
-                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-cyan-700 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+                <a href={gmailUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] items-center justify-center rounded-lg bg-cyan-700 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                   {t.correos.openGmail}
                 </a>
               ) : (
-                <button type="button" disabled className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-400 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
+                <button type="button" disabled className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-400 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60">
                   {t.correos.missingEmail}
                 </button>
               )}
               {isAdmin && (
-                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                <button type="submit" disabled={busy || !toName.trim() || !subject.trim() || !body.trim()} className="min-h-[44px] rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                   {busy ? t.correos.saving : t.correos.saveToLog}
                 </button>
               )}
@@ -675,12 +658,10 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
         <ApiErrorBanner error={logsError} t={t} onRetry={logsLoad.reload} />
       ) : null}
       {loadingFirst && !logsError ? (
-        <ListSkeleton />
+        <ListSkeleton ariaLabel={t.misc.loadingAria} />
       ) : rows.length === 0 ? (
         logsForbidden ? null : (
-        <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
-          <p className="text-sm text-zinc-400">{t.correos.emptyLogs}</p>
-        </div>
+        <EmptyState text={t.correos.emptyLogs} />
         )
       ) : (
         <>

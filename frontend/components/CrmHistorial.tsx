@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type CrmContact, type Invoice, type EmailLog } from "../lib/api";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { Field } from "./ui";
@@ -119,7 +120,7 @@ export function CrmHistorial() {
       {!selected ? (
         <p className="py-2 text-sm text-zinc-400">{t.crm.historiaSelectHint}</p>
       ) : entries.length === 0 ? (
-        <p className="py-2 text-sm text-zinc-400">{t.crm.historiaEmpty}</p>
+        <EmptyState text={t.crm.historiaEmpty} />
       ) : (
         <ul className="space-y-3">
           {entries.map((e) => (

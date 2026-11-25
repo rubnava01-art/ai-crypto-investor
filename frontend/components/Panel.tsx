@@ -12,7 +12,7 @@ export function Panel({ title, badge, children, accent }: {
         accent ? "border-red-800/60" : ""
       }`}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="min-w-0 flex-1 text-sm font-semibold uppercase leading-6 tracking-wider text-slate-200">{title}</h2>
         {badge}
       </div>

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { empresaApi, type Riesgo, type RiesgoEstado, type RiesgoImpacto, type RiesgoProbabilidad } from "../lib/api/empresa";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
@@ -60,6 +62,17 @@ export function RiesgosPanel() {
     v === "bajo" ? t.riesgos.impBajo : v === "alto" ? t.riesgos.impAlto : t.riesgos.impMedio;
   const estadoLabel = (v: string) =>
     v === "en_curso" ? t.riesgos.estadoEnCurso : v === "mitigado" ? t.riesgos.estadoMitigado : v === "cerrado" ? t.riesgos.estadoCerrado : t.riesgos.estadoAbierto;
+  // Color semántico del estado y del nivel (2026-11-25): antes el estado
+  // era un chip gris y probabilidad/impacto texto plano; ahora abierto/
+  // alto se distingue de mitigado/bajo de un vistazo.
+  const estadoBadge: Record<string, string> = {
+    abierto: "bg-amber-500/15 text-amber-300",
+    en_curso: "bg-sky-500/15 text-sky-300",
+    mitigado: "bg-emerald-500/15 text-emerald-300",
+    cerrado: "bg-zinc-500/15 text-zinc-400",
+  };
+  const nivelColor = (v: string) =>
+    v === "alta" || v === "alto" ? "font-semibold text-red-400" : v === "media" || v === "medio" ? "font-semibold text-amber-300" : "text-zinc-300";
 
   // Filtro memorizado (2026-11-24): antes se recalculaba en cada
   // render; con la lista en memo ya no se re-pide, y el filtrado no
@@ -176,19 +189,30 @@ export function RiesgosPanel() {
         </div>
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (
-          loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.riesgos.loading}</p>
+          loadError ? null : <ListSkeleton ariaLabel={t.misc.loadingAria} />
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.riesgos.emptyFiltered : t.riesgos.empty}</p>
+          <EmptyState
+            text={(rows ?? []).length > 0 ? t.riesgos.emptyFiltered : t.riesgos.empty}
+            actionLabel={isAdmin && rows.length === 0 ? t.riesgos.create : undefined}
+            onAction={
+              isAdmin && rows.length === 0
+                ? () => {
+                    document.getElementById("riesgos-form")?.scrollIntoView({ behavior: "smooth" });
+                    document.getElementById("riesgos-nuevo-riesgo")?.focus({ preventScroll: true });
+                  }
+                : undefined
+            }
+          />
         ) : (
           <ul className="space-y-3">
             {visible.map((r) => (
               <li key={r.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold text-zinc-100">{r.riesgo}</p>
-                  <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">{estadoLabel(r.estado)}</span>
+                  <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${estadoBadge[r.estado] ?? estadoBadge.abierto}`}>{estadoLabel(r.estado)}</span>
                 </div>
                 {r.descripcion && <p className="mt-1 text-sm text-zinc-300">{r.descripcion}</p>}
-                <p className="mt-1 text-xs text-zinc-400">{t.riesgos.probLabel}: {probLabel(r.probabilidad)} · {t.riesgos.impLabel}: {impLabel(r.impacto)}</p>
+                <p className="mt-1 text-xs text-zinc-400">{t.riesgos.probLabel}: <span className={nivelColor(r.probabilidad)}>{probLabel(r.probabilidad)}</span> · {t.riesgos.impLabel}: <span className={nivelColor(r.impacto)}>{impLabel(r.impacto)}</span></p>
                 {r.mitigacion && <p className="mt-1 text-xs text-zinc-400">{t.riesgos.mitigLabel}: {r.mitigacion}</p>}
                 {r.responsable && <p className="text-xs text-zinc-400">{t.riesgos.respLabel}: {r.responsable}</p>}
                 {isAdmin && (
@@ -202,10 +226,10 @@ export function RiesgosPanel() {
           </ul>
         )}
         {isAdmin && (
-          <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+          <form id="riesgos-form" onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
             <p className="text-sm font-semibold text-zinc-200">{editingId !== null ? t.riesgos.editTitle : t.riesgos.newTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={t.riesgos.riesgoAria}><input aria-label={t.riesgos.riesgoAria} className={inputCls} placeholder={t.riesgos.riesgoPlaceholder} value={riesgo} onChange={(e) => setRiesgo(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
+              <Field label={t.riesgos.riesgoAria}><input id="riesgos-nuevo-riesgo" aria-label={t.riesgos.riesgoAria} className={inputCls} placeholder={t.riesgos.riesgoPlaceholder} value={riesgo} onChange={(e) => setRiesgo(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
               <Field label={t.riesgos.respAria}><input aria-label={t.riesgos.respAria} className={inputCls} placeholder={t.riesgos.respPlaceholder} value={responsable} onChange={(e) => setResponsable(e.target.value)} maxLength={128} autoComplete="off" /></Field>
               <Field label={t.riesgos.probAria}><select className={inputCls} value={probabilidad} onChange={(e) => setProbabilidad(e.target.value as RiesgoProbabilidad)} aria-label={t.riesgos.probAria}>
                 <option value="baja">{t.riesgos.probBaja}</option>

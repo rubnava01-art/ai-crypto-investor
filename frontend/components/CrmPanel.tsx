@@ -8,6 +8,7 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
@@ -16,13 +17,22 @@ import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
 // principal del CRM, fuera de la vista inicial — se descargan solo cuando
 // la página CRM se renderiza, con el mismo patrón dynamic de app/page.tsx.
 // El panel CRM principal no cambia de comportamiento.
+// Esqueleto de carga diferida con nombre accesible (corrección QA
+// 2026-11-25): el `loading` de dynamic() corre fuera del componente,
+// así que el propio esqueleto lee la traducción con useLanguage —
+// nunca se hardcodea español aquí (mismo patrón que loading.tsx).
+function CrmLazyLoading() {
+  const { t } = useLanguage();
+  return <ListSkeleton rows={2} ariaLabel={t.misc.loadingAria} />;
+}
+
 const CrmHistorial = dynamic(
   () => import("./CrmHistorial").then((m) => m.CrmHistorial),
-  { loading: () => <p className="py-4 text-center text-sm text-zinc-400">Cargando…</p> },
+  { loading: () => <CrmLazyLoading /> },
 );
 const CrmAsistente = dynamic(
   () => import("./CrmAsistente").then((m) => m.CrmAsistente),
-  { loading: () => <p className="py-4 text-center text-sm text-zinc-400">Cargando…</p> },
+  { loading: () => <CrmLazyLoading /> },
 );
 
 const inputCls =
@@ -300,12 +310,21 @@ export function CrmPanel({
       ) : null}
       {contacts === null ? (
         loadError ? null : (
-          <p className="py-4 text-center text-sm text-zinc-400">{t.crm.loadingContacts}</p>
+          <ListSkeleton ariaLabel={t.misc.loadingAria} />
         )
       ) : visible.length === 0 ? (
-        <p className="py-4 text-center text-sm text-zinc-400">
-          {t.crm.emptyContacts}{query || statusFilter || tagFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.
-        </p>
+        <EmptyState
+          text={`${t.crm.emptyContacts}${query || statusFilter || tagFilter ? t.crm.emptyForFilter : t.crm.emptyYet}.`}
+          actionLabel={isAdmin ? t.crm.createContact : undefined}
+          onAction={
+            isAdmin
+              ? () => {
+                  document.getElementById("crm-nuevo-contacto")?.scrollIntoView({ behavior: "smooth" });
+                  document.getElementById("crm-nuevo-nombre")?.focus({ preventScroll: true });
+                }
+              : undefined
+          }
+        />
       ) : (
         <>
         {/* Tarjetas apiladas en teléfono (F7): la tabla, con 6 columnas y

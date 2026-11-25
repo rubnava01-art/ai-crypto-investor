@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-25",
+    title: "Mejora de interfaz: estados de carga, vacíos claros y mejor uso en móvil",
+    body: "Publicado el 25 de noviembre: mejora visual y de uso en toda la plataforma — en Inicio, Estudiar y Crear, los estados de carga ahora muestran esqueletos con la forma real del contenido en vez de texto plano, y los estados vacíos explican qué falta y qué hacer; en Gestión (CRM, Facturas, Inventario, Riesgos, Planillas y Talento humano) y en Correos e Invertir, los botones y tarjetas se adaptan mejor al móvil (390 px), con áreas táctiles de 44 px y cabeceras que no se cortan; además, en Inventario se corrigió un error real: un fallo de carga se veía como 'sin artículos' y ahora muestra el error con botón de reintento. Solo presentación y estados, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-25",
     title: "Servicios de diseño y marketing, calculadora de rentabilidad y formulario de contacto",
     body: "Publicado el 25 de noviembre: tres novedades para tu negocio — en la sección Herramientas, una banda de servicios por proyecto (camisetas, material publicitario y marketing digital) sin precio publicado, con «Pide tu cotización» hacia el nuevo formulario de contacto; en Estudiar, la calculadora de rentabilidad: escribe ingresos y costos y ve margen bruto, margen neto, punto de equilibrio y rentabilidad, todo en tu navegador; y en Correos, una bandeja nueva para el administrador con los mensajes que llegan del formulario. Los precios de los servicios siguen sin publicarse: cada proyecto se cotiza. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

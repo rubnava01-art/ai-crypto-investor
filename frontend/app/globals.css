@@ -356,6 +356,31 @@ input[type="file"]::file-selector-button:hover {
     letter-spacing: 0.2em;
     color: var(--fintech-blue-hover);
   }
+
+  /* Estado vacío compartido (2026-11-25, Agente UX/UI): antes cada
+   * panel pintaba su "todavía no hay…" como un párrafo gris suelto;
+   * ahora todos usan la misma caja punteada centrada, con el mismo
+   * texto de antes (nunca se inventa contenido). Solo presentación:
+   * el llamador conserva su cadena i18n. */
+  .fintech-empty {
+    border: 1px dashed var(--fintech-border);
+    border-radius: var(--fintech-radius-lg);
+    background: rgb(148 163 184 / 0.04);
+    padding: 1.25rem 1rem;
+    text-align: center;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--fintech-text-muted);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Saltos por ancla (navegación de Herramientas, pestañas de
+   * Estudiar): desplazamiento suave en vez de salto brusco. Con
+   * movimiento reducido no se aplica (ver bloque de abajo). */
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

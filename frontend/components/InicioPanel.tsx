@@ -203,7 +203,7 @@ export function InicioPanel() {
       {(() => {
         if (avances.length === 0) return null;
         return (
-          <section aria-label={t.inicio.progressTitle} className="mb-5 rounded-lg border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
+          <section aria-label={t.inicio.progressTitle} className="mb-5 rounded-xl border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-zinc-100">{t.inicio.progressTitle}</h2>
               <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
@@ -260,7 +260,7 @@ export function InicioPanel() {
             <Skeleton className="h-24 w-full" ariaLabel={t.inicio.loadingPosts} />
           </div>
         ) : items.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">
+          <p className="fintech-empty">
             {t.inicio.emptyPosts}
           </p>
         ) : (
@@ -269,7 +269,7 @@ export function InicioPanel() {
               const open = expanded.has(p.id);
               const rows = comments[p.id];
               return (
-                <li key={p.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 shadow-sm sm:p-5">
+                <li key={p.id} className="fintech-card p-4 sm:p-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-lg font-semibold leading-snug text-zinc-100">{p.title}</span>
                     {isAdmin && (
@@ -308,7 +308,7 @@ export function InicioPanel() {
                       {rows === undefined ? (
                         <p className="text-sm text-zinc-400">{t.inicio.loadingComments}</p>
                       ) : rows.length === 0 ? (
-                        <p className="text-sm text-zinc-400">{t.inicio.firstComment}</p>
+                        <p className="fintech-empty">{t.inicio.firstComment}</p>
                       ) : (
                         <>
                         <ul className="space-y-2">

@@ -6,6 +6,7 @@ import {
   type EduClass, type EduClassKind, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
+import { Skeleton } from "./Skeleton";
 import { ClasesHerramientas } from "./ClasesHerramientas";
 import { useConfirm, Field, ApiErrorBanner, apiErrorText } from "./ui";
 import { useLanguage } from "../lib/i18n";
@@ -13,7 +14,7 @@ import { useCancelled } from "../lib/useLoad";
 import { normalizeClassUrl } from "../lib/urls";
 
 const inputCls =
-  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40";
 
 const fmtDateTime = (iso: string | null, locale: string) =>
   iso
@@ -159,7 +160,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
     <Panel
       title={isLive ? t.clases.liveTitle : t.clases.recordedTitle}
       badge={
-        <span aria-live="polite" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isLive ? "bg-red-500/15 text-red-300" : "bg-indigo-500/15 text-indigo-300"}`}>
+        <span aria-live="polite" className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isLive ? "bg-red-500/15 text-red-300" : "bg-sky-500/15 text-sky-300"}`}>
           {rows === null
             ? t.clases.badgeLoading
             : search.trim() !== ""
@@ -179,7 +180,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
           data-no-swipe
           onClick={() => setShowForm((v) => !v)}
           aria-expanded={showForm}
-          className="mb-3 min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+          className="mb-3 min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
         >
           {showForm ? t.clases.hideForm : t.clases.addClass}
         </button>
@@ -203,15 +204,18 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
         {loadError ? (
           <ApiErrorBanner error={loadError} t={t} onRetry={load} />
         ) : rows === null ? (
-          <p className="py-2 text-sm text-zinc-400">{t.clases.loadingClasses}</p>
+          <div className="space-y-3 py-2" aria-label={t.clases.loadingClasses}>
+            <Skeleton className="h-20 w-full" ariaLabel={t.clases.loadingClasses} />
+            <Skeleton className="h-20 w-full" ariaLabel={t.clases.loadingClasses} />
+          </div>
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">
+          <p className="fintech-empty">
             {isLive
               ? t.clases.emptyLive
               : t.clases.emptyRecorded}
           </p>
         ) : visible.length === 0 ? (
-          <p className="py-2 text-sm text-zinc-400">{t.clases.noResults}</p>
+          <p className="fintech-empty">{t.clases.noResults}</p>
         ) : (
           <ul className="divide-y divide-zinc-800/70">
             {visible.map((c) => (
@@ -226,7 +230,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                         href={c.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-white motion-safe:active:scale-[0.98] ${isLive ? "bg-red-600 hover:bg-red-700 active:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-700"}`}
+                        className={`inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-xs font-semibold text-white motion-safe:active:scale-[0.98] ${isLive ? "bg-red-600 hover:bg-red-700 active:bg-red-700" : "bg-sky-700 hover:bg-sky-800 active:bg-sky-800"}`}
                       >
                         {isLive ? t.clases.joinLive : t.clases.watchRecorded}
                       </a>
@@ -270,7 +274,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
           <button
             type="submit"
             disabled={busy || !title.trim()}
-            className="w-full rounded-lg bg-indigo-600 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 active:bg-indigo-700 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
+            className="w-full rounded-lg bg-sky-700 min-h-[44px] px-3 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 active:bg-sky-800 motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50"
           >
             {busy ? t.clases.saveBusy : isLive ? t.clases.saveLive : t.clases.saveRecorded}
           </button>

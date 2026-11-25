@@ -7,6 +7,7 @@ import {
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
@@ -148,6 +149,14 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
     borrador: tt.facturas.statusDraft,
     enviada: tt.facturas.statusSent,
     pagada: tt.facturas.statusPaid,
+  };
+  // Color semántico del estado (2026-11-25): antes todas las facturas
+  // llevaban el mismo chip gris; ahora borrador/enviada/pagada se
+  // distinguen de un vistazo, mismo patrón que los estados del CRM.
+  const STATUS_BADGE: Record<InvoiceStatus, string> = {
+    borrador: "bg-zinc-500/15 text-zinc-300",
+    enviada: "bg-sky-500/15 text-sky-300",
+    pagada: "bg-emerald-500/15 text-emerald-300",
   };
   const printTxt = {
     title: tt.facturas.printTitle, heading: tt.facturas.printHeading,
@@ -382,7 +391,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
             <ApiErrorBanner error={savedError} t={tt} onRetry={savedLoad.reload} />
           ) : null}
           {visibleSaved === null && !savedError ? (
-            <p className="py-2 text-sm text-zinc-400">{tt.facturas.loadingInvoices}</p>
+            <ListSkeleton ariaLabel={tt.misc.loadingAria} />
           ) : visibleSaved === null ? null : visibleSaved.length === 0 ? (
             <EmptyState
               text={saved !== null && saved.length > 0 ? tt.facturas.emptyFiltered : tt.facturas.emptyInvoices}
@@ -405,7 +414,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100">{inv.number}</span>
                       <span className="text-sm text-zinc-400">{inv.client_name}</span>
-                      <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{STATUS_LABEL[inv.status]}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
                       <span className="text-sm font-semibold text-emerald-400">{money(it.total)}</span>
                       <span className="ml-auto flex items-center gap-2">
                         <span className="text-xs text-zinc-400">{fmtDate(inv.created_at, locale)}</span>

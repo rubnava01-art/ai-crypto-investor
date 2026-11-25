@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { empresaApi, type Empleado, type EmpleadoEstado } from "../lib/api/empresa";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
@@ -167,9 +169,20 @@ export function TalentoPanel() {
         </div>
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (
-          loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.talento.loading}</p>
+          loadError ? null : <ListSkeleton ariaLabel={t.misc.loadingAria} />
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.talento.emptyFiltered : t.talento.empty}</p>
+          <EmptyState
+            text={(rows ?? []).length > 0 ? t.talento.emptyFiltered : t.talento.empty}
+            actionLabel={isAdmin && rows.length === 0 ? t.talento.create : undefined}
+            onAction={
+              isAdmin && rows.length === 0
+                ? () => {
+                    document.getElementById("talento-form")?.scrollIntoView({ behavior: "smooth" });
+                    document.getElementById("talento-nuevo-nombre")?.focus({ preventScroll: true });
+                  }
+                : undefined
+            }
+          />
         ) : (
           <>
             <ul className="space-y-3 sm:hidden">
@@ -177,7 +190,7 @@ export function TalentoPanel() {
                 <li key={r.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-semibold text-zinc-100">{r.nombre}</p>
-                    <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${r.estado === "activo" ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-500/15 text-zinc-400"}`}>
                       {r.estado === "activo" ? t.talento.estadoActivo : t.talento.estadoInactivo}
                     </span>
                   </div>
@@ -213,7 +226,7 @@ export function TalentoPanel() {
                       <td className="py-3 pr-3 text-zinc-300">{r.puesto || "—"}</td>
                       <td className="py-3 pr-3 text-zinc-300">{r.contacto || "—"}</td>
                       <td className="py-3 pr-3 text-zinc-300">{r.fecha_ingreso || "—"}</td>
-                      <td className="py-3 pr-3 text-zinc-300">{r.estado === "activo" ? t.talento.estadoActivo : t.talento.estadoInactivo}</td>
+                      <td className="py-3 pr-3"><span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${r.estado === "activo" ? "bg-emerald-500/15 text-emerald-300" : "bg-zinc-500/15 text-zinc-400"}`}>{r.estado === "activo" ? t.talento.estadoActivo : t.talento.estadoInactivo}</span></td>
                       {isAdmin && (
                         <td className="py-3">
                           <span className="flex gap-1.5">
@@ -230,10 +243,10 @@ export function TalentoPanel() {
           </>
         )}
         {isAdmin && (
-          <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+          <form id="talento-form" onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
             <p className="text-sm font-semibold text-zinc-200">{editingId !== null ? t.talento.editTitle : t.talento.newTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={t.talento.nameAria}><input aria-label={t.talento.nameAria} className={inputCls} placeholder={t.talento.namePlaceholder} value={nombre} onChange={(e) => setNombre(e.target.value)} required maxLength={128} autoComplete="off" /></Field>
+              <Field label={t.talento.nameAria}><input id="talento-nuevo-nombre" aria-label={t.talento.nameAria} className={inputCls} placeholder={t.talento.namePlaceholder} value={nombre} onChange={(e) => setNombre(e.target.value)} required maxLength={128} autoComplete="off" /></Field>
               <Field label={t.talento.puestoAria}><input aria-label={t.talento.puestoAria} className={inputCls} placeholder={t.talento.puestoPlaceholder} value={puesto} onChange={(e) => setPuesto(e.target.value)} maxLength={128} autoComplete="off" /></Field>
               <Field label={t.talento.contactoAria}><input aria-label={t.talento.contactoAria} className={inputCls} placeholder={t.talento.contactoPlaceholder} value={contacto} onChange={(e) => setContacto(e.target.value)} maxLength={255} autoComplete="off" /></Field>
               <Field label={t.talento.ingresoAria}><input aria-label={t.talento.ingresoAria} className={inputCls} type="date" value={fechaIngreso} onChange={(e) => setFechaIngreso(e.target.value)} /></Field>

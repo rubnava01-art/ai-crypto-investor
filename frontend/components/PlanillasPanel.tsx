@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { empresaApi, type Planilla, type PlanillaEstado } from "../lib/api/empresa";
 import { Panel } from "./Panel";
+import { EmptyState } from "./badges";
+import { ListSkeleton } from "./Skeleton";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
@@ -200,16 +202,27 @@ export function PlanillasPanel() {
         </div>
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (
-          loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.planillas.loading}</p>
+          loadError ? null : <ListSkeleton ariaLabel={t.misc.loadingAria} />
         ) : visible.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{(rows ?? []).length > 0 ? t.planillas.emptyFiltered : t.planillas.empty}</p>
+          <EmptyState
+            text={(rows ?? []).length > 0 ? t.planillas.emptyFiltered : t.planillas.empty}
+            actionLabel={isAdmin && rows.length === 0 ? t.planillas.create : undefined}
+            onAction={
+              isAdmin && rows.length === 0
+                ? () => {
+                    document.getElementById("planillas-form")?.scrollIntoView({ behavior: "smooth" });
+                    document.getElementById("planillas-nuevo-periodo")?.focus({ preventScroll: true });
+                  }
+                : undefined
+            }
+          />
         ) : (
           <ul className="space-y-3">
             {visible.map((r) => (
               <li key={r.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold text-zinc-100">{r.periodo} · {fmt(r.monto)}</p>
-                  <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                  <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${r.estado === "pagado" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
                     {r.estado === "pagado" ? t.planillas.estadoPagado : t.planillas.estadoPendiente}
                   </span>
                 </div>
@@ -226,11 +239,11 @@ export function PlanillasPanel() {
           </ul>
         )}
         {isAdmin && (
-          <form onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
+          <form id="planillas-form" onSubmit={submit} className="mt-5 space-y-3 border-t border-zinc-800 pt-5">
             <p className="text-sm font-semibold text-zinc-200">{editingId !== null ? t.planillas.editTitle : t.planillas.newTitle}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={t.planillas.periodoAria}>
-                <input aria-label={t.planillas.periodoAria} className={inputCls} placeholder={t.planillas.periodoPlaceholder} value={periodo} onChange={(e) => setPeriodo(e.target.value)} required maxLength={7} autoComplete="off" />
+                <input id="planillas-nuevo-periodo" aria-label={t.planillas.periodoAria} className={inputCls} placeholder={t.planillas.periodoPlaceholder} value={periodo} onChange={(e) => setPeriodo(e.target.value)} required maxLength={7} autoComplete="off" />
               </Field>
               <Field label={t.planillas.empleadoAria}>
                 <select className={inputCls} value={empleadoId} onChange={(e) => setEmpleadoId(e.target.value)} aria-label={t.planillas.empleadoAria}>

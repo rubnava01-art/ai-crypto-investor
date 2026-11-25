@@ -58,7 +58,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
  * de salto del panel enlaza a su ancla. */
 function ToolCard({ id, num, title, badge, children }: { id: string; num: string; title: string; badge?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} aria-label={title} className="scroll-mt-24 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-5">
+    <section id={id} aria-label={title} className="fintech-card scroll-mt-24 p-4 sm:p-5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-700 text-xs font-bold text-white">{num}</span>
         <h3 className="min-w-0 flex-1 text-sm font-semibold text-zinc-100">{title}</h3>
@@ -190,10 +190,10 @@ function BtcConverter() {
         <>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="text-xs text-zinc-400">{t.clases.convBtc}
-              <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="0" step="any" inputMode="decimal" value={shownBtc} onChange={(e) => { setBtc(e.target.value); setLastEdited("btc"); }} />
+              <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40" type="number" min="0" step="any" inputMode="decimal" value={shownBtc} onChange={(e) => { setBtc(e.target.value); setLastEdited("btc"); }} />
             </label>
             <label className="text-xs text-zinc-400">{t.clases.convUsd}
-              <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40" type="number" min="0" step="any" inputMode="decimal" value={shownUsd} onChange={(e) => { setUsd(e.target.value); setLastEdited("usd"); }} />
+              <input data-no-swipe className="mt-1 w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/40" type="number" min="0" step="any" inputMode="decimal" value={shownUsd} onChange={(e) => { setUsd(e.target.value); setLastEdited("usd"); }} />
             </label>
           </div>
           <p className={`mt-2 text-xs leading-relaxed ${fresh ? "text-zinc-400" : "text-amber-400"}`}>
@@ -584,7 +584,7 @@ export function ClasesHerramientas() {
             <a
               key={j.href}
               href={j.href}
-              className="inline-flex min-h-[44px] items-center rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-sky-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+              className="inline-flex min-h-[44px] items-center rounded-full border border-zinc-700 px-3.5 py-1.5 text-xs font-semibold text-zinc-200 hover:border-sky-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
             >
               {j.label}
             </a>

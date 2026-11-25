@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { ajustadorApi, youtubeVideoId, type VideoEducativo } from "../lib/api/ajustador";
 import { Panel } from "./Panel";
+import { Skeleton } from "./Skeleton";
 import { useLanguage, type Lang } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, useConfirm, Field } from "./ui";
 
 const inputCls =
-  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
+  "w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60";
 
 type SortMode = "newest" | "az";
 
@@ -191,9 +192,18 @@ export function VideosPanel() {
         )}
         {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
         {rows === null ? (
-          loadError ? null : <p className="py-4 text-center text-sm text-zinc-400">{t.videos.loading}</p>
+          loadError ? null : (
+            <div className="space-y-3 py-2" aria-label={t.videos.loading}>
+              <Skeleton className="aspect-video w-full" ariaLabel={t.videos.loading} />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Skeleton className="aspect-video w-full" ariaLabel={t.videos.loading} />
+                <Skeleton className="aspect-video w-full" ariaLabel={t.videos.loading} />
+                <Skeleton className="hidden aspect-video w-full sm:block" ariaLabel={t.videos.loading} />
+              </div>
+            </div>
+          )
         ) : rows.length === 0 ? (
-          <p className="py-4 text-center text-sm text-zinc-400">{t.videos.empty}</p>
+          <p className="fintech-empty">{t.videos.empty}</p>
         ) : (
           <>
             {/* Reproductor principal: el video seleccionado, 16:9. */}
@@ -239,7 +249,7 @@ export function VideosPanel() {
                 <span className="sr-only">{t.videos.sortAria}</span>
                 <select
                   aria-label={t.videos.sortAria}
-                  className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                  className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 focus:border-sky-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
                   value={sort}
                   onChange={(e) => setSort(e.target.value as SortMode)}
                 >
@@ -251,7 +261,7 @@ export function VideosPanel() {
 
             {/* Lista / cola: tarjetas con miniatura, título y fecha. */}
             {visible.length === 0 ? (
-              <p className="py-4 text-center text-sm text-zinc-400">{t.videos.noResults}</p>
+              <p className="fintech-empty">{t.videos.noResults}</p>
             ) : (
               <ul data-no-swipe className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {visible.map((v) => {

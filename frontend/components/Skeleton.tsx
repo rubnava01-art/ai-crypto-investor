@@ -25,6 +25,31 @@ export function Skeleton({
 
 export default Skeleton;
 
+/** Skeleton de lista (filas título + líneas): sustituye al texto plano
+ * "Cargando…" en listas de paneles (CRM, Facturas, Inventario, Riesgos,
+ * Planillas, Talento, Correos, Señales). `ariaLabel` la pasa el llamador
+ * ya traducida (p. ej. t.misc.loadingAria); sin ella no se emite
+ * aria-label — nunca se hardcodea español aquí. */
+export function ListSkeleton({
+  rows = 3,
+  ariaLabel,
+}: {
+  rows?: number;
+  ariaLabel?: string;
+}) {
+  return (
+    <div role="status" aria-label={ariaLabel} className="space-y-3 py-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} aria-hidden="true" className="space-y-2">
+          <div className="fintech-skeleton motion-safe:animate-pulse h-4 w-2/5 rounded bg-slate-800" />
+          <div className="fintech-skeleton motion-safe:animate-pulse h-3 w-full rounded bg-slate-800" />
+          <div className="fintech-skeleton motion-safe:animate-pulse h-3 w-3/4 rounded bg-slate-800" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Skeleton con la forma de una MetricCard: etiqueta + valor + cambio. */
 export function MetricCardSkeleton({
   className = "",

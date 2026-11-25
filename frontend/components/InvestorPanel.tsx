@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, ApiError } from "../lib/api";
 import { Panel } from "./Panel";
+import { Skeleton } from "./Skeleton";
 import { newId } from "./ui";
 import { useLanguage } from "../lib/i18n";
 
@@ -355,7 +356,7 @@ export function InvestorPanel({
                   </button>
                 </span>
               ) : (
-                <span className="text-sm text-zinc-400">{t.invertir.loadingPrice}</span>
+                <Skeleton className="h-8 w-32" ariaLabel={t.misc.loadingAria} />
               )}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">

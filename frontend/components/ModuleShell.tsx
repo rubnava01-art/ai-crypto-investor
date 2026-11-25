@@ -10,6 +10,7 @@ import { GUEST_MODULES } from "../lib/api/guest";
 import { ProfileMenu } from "./ProfileMenu";
 import { Footer } from "./Footer";
 import { SkipLink } from "./ui";
+import { Skeleton } from "./Skeleton";
 import { ColdStartNotice } from "./ColdStartNotice";
 import { LanguageToggle, useLanguage } from "../lib/i18n";
 
@@ -94,10 +95,12 @@ export function ModuleShell({
   if (!checked) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {/* Mismo Skeleton compartido que el resto de la app (antes eran
+            divs sueltos con animate-pulse y bg-slate-800). */}
         <div role="status" aria-label={t.shell.loading} className="space-y-4">
-          <div aria-hidden="true" className="h-8 w-48 motion-safe:animate-pulse rounded-lg bg-slate-800" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-slate-800" />
-          <div aria-hidden="true" className="h-40 motion-safe:animate-pulse rounded-xl bg-slate-800" />
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
         </div>
       </main>
     );

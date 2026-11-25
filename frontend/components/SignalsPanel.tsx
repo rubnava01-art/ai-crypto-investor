@@ -2,6 +2,7 @@
 
 import { Panel } from "../components/Panel";
 import { DemoBadge, EmptyState } from "../components/badges";
+import { ListSkeleton } from "../components/Skeleton";
 import { useLanguage } from "../lib/i18n";
 import type { SignalsResponse, SignalSide } from "../lib/api";
 
@@ -69,8 +70,13 @@ export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
             ))}
           </ul>
         )
+      ) : offline ? (
+        <EmptyState text={t.dashboard.noDataDemo} />
       ) : (
-        <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+        // Cargando: skeleton con forma de lista en vez del EmptyState con
+        // texto "Cargando…" (2026-11-25); el estado sin datos por
+        // desconexión sigue siendo EmptyState.
+        <ListSkeleton ariaLabel={t.misc.loadingAria} />
       )}
     </Panel>
   );

@@ -72,14 +72,16 @@ export function Hero({
             </p>
           ) : null}
           {/* Doble CTA con el sistema de botones: primario sólido de
-              marca, secundario glass con borde sutil. */}
+              marca, secundario glass con borde sutil. En móvil (390 px)
+              ocupan todo el ancho para un objetivo táctil cómodo; en
+              escritorio vuelven a su ancho natural. */}
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href={primaryHref} className="fintech-btn fintech-btn-primary">
+            <Link href={primaryHref} className="fintech-btn fintech-btn-primary w-full justify-center sm:w-auto">
               {primaryLabel}
             </Link>
             {secondaryButton ??
               (secondaryLabel && secondaryHref ? (
-                <Link href={secondaryHref} className="fintech-btn fintech-btn-secondary">
+                <Link href={secondaryHref} className="fintech-btn fintech-btn-secondary w-full justify-center sm:w-auto">
                   {secondaryLabel}
                 </Link>
               ) : null)}

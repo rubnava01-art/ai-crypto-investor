@@ -159,7 +159,7 @@ export function GuestTrialButton() {
         onClick={openTrial}
         onMouseEnter={prefetchIntent}
         onFocus={prefetchIntent}
-        className="fintech-btn fintech-btn-secondary"
+        className="fintech-btn fintech-btn-secondary w-full justify-center sm:w-auto"
       >
         {t.landing.guestCta}
       </button>

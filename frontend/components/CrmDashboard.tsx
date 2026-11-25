@@ -21,6 +21,7 @@ import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { crmMoney, sparklinePoints, weeklyBarHeight } from "../lib/crmResumen";
 import { MetricCard } from "./MetricCard";
+import { MetricCardSkeleton, Skeleton } from "./Skeleton";
 import { ChartCard } from "./bi/DashboardCard";
 import { ApiErrorBanner, isAdminOnlyForbidden } from "./ui";
 
@@ -127,7 +128,32 @@ export function CrmDashboard({
     return <ApiErrorBanner error={loadError} t={t} onRetry={load} />;
   }
   if (resumen === null) {
-    return <p className="py-4 text-center text-sm text-zinc-400">{t.crm.resumenCargando}</p>;
+    // Skeleton con la forma del resumen (2026-11-25): antes un texto
+    // plano "Cargando resumen…"; ahora barra superior + 4 tarjetas de
+    // pasos + 6 métricas, misma forma que el contenido real.
+    return (
+      <div className="mb-6 space-y-6" role="status" aria-label={t.misc.loadingAria}>
+        <div className="fintech-card p-4">
+          <Skeleton className="h-11 w-full max-w-md" />
+        </div>
+        <section>
+          <Skeleton className="mb-3 h-6 w-56" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <MetricCardSkeleton key={i} />
+            ))}
+          </div>
+        </section>
+        <section>
+          <Skeleton className="mb-3 h-6 w-64" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <MetricCardSkeleton key={i} />
+            ))}
+          </div>
+        </section>
+      </div>
+    );
   }
 
   const money = (v: number) => crmMoney(v);
@@ -273,7 +299,7 @@ export function CrmDashboard({
                 const isToday = d.etiqueta === "Hoy";
                 return (
                   <div key={d.fecha} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                    <span className="text-xs tabular-nums text-zinc-300">{money(d.total)}</span>
+                    <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[11px] tabular-nums text-zinc-300 sm:text-xs">{money(d.total)}</span>
                     <div
                       className={`w-full max-w-[48px] rounded-t-md ${isToday ? "bg-emerald-500" : "bg-blue-500/80"}`}
                       style={{ height: `${height}px` }}
