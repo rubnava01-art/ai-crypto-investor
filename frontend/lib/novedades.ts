@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-24",
+    title: "Nueva sección pública Herramientas: 25 herramientas reales con sus precios",
+    body: "Publicado el 24 de noviembre: nueva sección pública Herramientas — 25 herramientas reales de la plataforma en cuatro grupos (Invierte, Aprende, Crea y Gestiona), con buscador y filtro; cada tarjeta dice en qué plan va incluida (Esencial $19, Crecimiento $49 o Negocio Total $99 al mes, 14 días gratis) y qué hace, con sus límites honestos. La sección también aparece en Inicio y está enlazada desde Planes, y el gancho libre (calculadora y educación Bitcoin) ahora lleva bien al invitado hasta Estudiar sin perderlo en el login. Solo presentación y enlaces, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-24",
     title: "Chat más potente y preciso, con la biblioteca de Estudiar y un login más claro",
     body: "Publicado el 24 de noviembre: el Asistente ahora responde con más potencia y precisión — ordena las respuestas por relevancia y confianza, dice siempre su fuente y su fecha, y cuando una pregunta es ambigua pregunta antes de adivinar en vez de suponer; las ventas que reporta son solo las pagadas. Además, el chat consulta primero la biblioteca real de Estudiar — guías, clases, videos de YouTube y manuales — y enlaza al recurso exacto, y resume cualquier módulo de la plataforma. En accesos, el login quedó más claro: validación temprana, errores precisos según el caso y menos viajes al servidor. Solo chat y entrada, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

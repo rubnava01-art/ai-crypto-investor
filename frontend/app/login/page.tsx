@@ -11,6 +11,7 @@ import { isPlanKey, planNameForKey, type PlanKey } from "../../components/Planes
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
 import { PublicNav } from "../../components/PublicNav";
+import { GuestTrialButton } from "../../components/GuestTrial";
 import { ColdStartNotice } from "../../components/ColdStartNotice";
 import { SkipLink } from "../../components/ui";
 
@@ -655,6 +656,15 @@ function LoginPageInner() {
           )}
         </p>
       </form>
+
+      {/* H-01 (QA TBT-Herramientas, 2026-11-24): vía de invitado en
+          /login — el visitante que llegó desde «Pruébala sin cuenta»
+          entra sin cuenta y sin volver al héroe; el botón enhebra
+          ?next= (validado, con fragmento) y cae a /inicio sin destino
+          válido. No toca el flujo entrar/registrarse de arriba. */}
+      <div className={`relative mt-6 flex w-full max-w-sm justify-center${introCls ? " login-intro" : ""}`} style={introStyle(400)}>
+        <GuestTrialButton />
+      </div>
 
       <p className={`mt-6 flex items-center justify-center gap-1.5 text-xs font-medium text-blue-100${introCls ? " login-intro" : ""}`} style={introStyle(450)}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" className="h-3.5 w-3.5">

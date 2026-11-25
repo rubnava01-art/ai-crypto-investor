@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
 
 /** Sitemap (gestión SEO 2026-11-03, reel Peter Lead).
- * Solo las entradas públicas: la raíz, /login, /planes y /contacto. El
- * resto de rutas vive tras login (token en localStorage) y no se lista,
- * porque un bot no vería contenido real en ellas. /planes se añadió en
- * Fase 4 (2026-11-23): es pública y tiene contenido real (precios). */
+ * Solo las entradas públicas: la raíz, /login, /planes, /contacto y
+ * /herramientas (TBT-Herramientas, FASE 2, C-1, 2026-11-24: pública de
+ * verdad, sin ModuleShell, con contenido SSR). El resto de rutas vive
+ * tras login (token en localStorage) y no se lista, porque un bot no
+ * vería contenido real en ellas. /planes se añadió en Fase 4
+ * (2026-11-23): es pública y tiene contenido real (precios). */
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://crypto-investor-web.onrender.com";
   return [
@@ -25,6 +27,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
+    },
+    {
+      url: `${base}/herramientas`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
     {
       url: `${base}/contacto`,

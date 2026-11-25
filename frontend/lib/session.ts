@@ -6,7 +6,10 @@
 // destino con isSafeNext antes de usarlo.
 
 /** Construye /login con destino preservado y, si se indica, expired=1.
- * `next` debe ser pathname+search internos (p. ej. "/crm?tab=x"). */
+ * `next` debe ser pathname+search internos (p. ej. "/crm?tab=x") y puede
+ * llevar fragmento (p. ej. "/estudiar#herramienta-calculadora", H-01 QA
+ * TBT-Herramientas): URLSearchParams lo codifica (%23) y /login lo
+ * recupera intacto con searchParams.get("next"). */
 export function loginUrl(next: string, opts: { expired?: boolean } = {}): string {
   const params = new URLSearchParams();
   if (next) params.set("next", next);
@@ -16,16 +19,19 @@ export function loginUrl(next: string, opts: { expired?: boolean } = {}): string
 }
 
 /** URL de login por sesión expirada desde la ubicación actual del
- * navegador (conserva pathname + query, p. ej. ?tab=… o filtros). */
+ * navegador (conserva pathname + query + fragmento, p. ej. ?tab=… o
+ * #herramienta-… — R-03 QA re-validación TBT-Herramientas). */
 export function expiredLoginUrlFromLocation(): string {
   if (typeof window === "undefined") return loginUrl("/", { expired: true });
-  return loginUrl(window.location.pathname + window.location.search, { expired: true });
+  return loginUrl(window.location.pathname + window.location.search + window.location.hash, { expired: true });
 }
 
 /** Validación estricta de ?next= (A4): solo rutas internas mismas.
  * Rechaza: backslash ("/\evil.com" se normaliza a "//evil.com"),
  * slashes codificados (%2f, %5c), caracteres de control, URLs absolutas
- * y el propio /login (quedarse atascado tras autenticarse). */
+ * y el propio /login (quedarse atascado tras autenticarse). El fragmento
+ * (#ancla) SÍ pasa: "/estudiar#herramienta-calculadora" es una ruta
+ * interna válida y el hash no cambia el destino (H-01 QA TBT-Herramientas). */
 export function isSafeNext(value: string | null | undefined): boolean {
   if (!value || typeof value !== "string") return false;
   if (!value.startsWith("/") || value.startsWith("//")) return false;
@@ -48,6 +54,23 @@ export function isSafeNext(value: string | null | undefined): boolean {
 /** Destino seguro tras el login, o el fallback si el ?next= no es válido. */
 export function safeNext(value: string | null | undefined, fallback = "/"): string {
   return isSafeNext(value) ? (value as string) : fallback;
+}
+
+/** Destino de la prueba de invitado desde la query actual (?next=, H-01
+ * QA TBT-Herramientas): solo rutas internas validadas (isSafeNext, con
+ * fragmento incluido); cualquier otro valor — ausente, absoluto, con
+ * backslash o al propio /login — cae al fallback ("/inicio"). El
+ * fragmento viaja codificado dentro de ?next= (loginUrl lo codifica con
+ * %23), así que "/estudiar#herramienta-calculadora" llega intacto. Se
+ * lee la query tal cual (`window.location.search`), sin useSearchParams
+ * (patrón Landing: sin límite Suspense). */
+export function guestNextFromSearch(search: string | null | undefined, fallback = "/inicio"): string {
+  if (!search) return fallback;
+  try {
+    return safeNext(new URLSearchParams(search).get("next"), fallback);
+  } catch {
+    return fallback;
+  }
 }
 
 /** Expiración del JWT solo para UX (B4, 2026-11-23): decodifica `exp`

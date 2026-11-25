@@ -195,6 +195,28 @@ export function PlanesPanel() {
         <p>{p.activationNote}</p>
         <p className="text-xs text-zinc-500">{p.currencyNote}</p>
       </div>
+
+      {/* M-1 (TBT-Herramientas, FASE 2, 2026-11-24): enlace cruzado al
+          final de PlanesPanel (NO en las tarjetas, para no tocar el
+          flujo de registro): ver las herramientas una a una y preguntar
+          gratis. En la landing queda entre las tarjetas y la tabla
+          comparativa (<PlanesCompare /> se monta después de este panel);
+          en la página /planes, que no monta la tabla, queda al pie de
+          los planes. PLAN_FEATURE_KEYS no se toca. */}
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <Link
+          href="/herramientas"
+          className="inline-flex min-h-[44px] items-center rounded-lg px-2 py-2.5 font-semibold text-blue-400 hover:text-blue-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+        >
+          {p.toolsLink}
+        </Link>
+        <Link
+          href="/contacto"
+          className="inline-flex min-h-[44px] items-center rounded-lg px-2 py-2.5 font-semibold text-blue-400 hover:text-blue-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+        >
+          {p.askFree}
+        </Link>
+      </p>
     </div>
   );
 }

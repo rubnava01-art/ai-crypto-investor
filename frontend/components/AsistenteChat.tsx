@@ -7,6 +7,7 @@ import { ApiError, getToken, isGuest } from "../lib/api/client";
 import { api } from "../lib/api";
 import { loginUrl } from "../lib/session";
 import { safeHttpHref } from "../lib/urls";
+import { OPEN_ASISTENTE_EVENT } from "../lib/herramientas";
 import {
   getCapacidades,
   normalizeSugerencias,
@@ -709,6 +710,15 @@ export function AsistenteChat() {
   useEffect(() => {
     if (open && perfil === "cliente") setOpen(false);
   }, [open, perfil]);
+  // TBT-Herramientas, FASE 2 (2026-11-24, A-1): la sección Herramientas
+  // abre este chat flotante con un evento (growbusiness:open-asistente)
+  // desde su bloque «pregunta gratis». No se crea un chat nuevo: es
+  // este mismo panel, que ya existe en el layout raíz.
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_ASISTENTE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_ASISTENTE_EVENT, onOpen);
+  }, []);
   // al input del chat; Tab cicla dentro del panel; al cerrar, el foco
   // vuelve al botón flotante. Escape también cierra.
   const fabRef = useRef<HTMLButtonElement | null>(null);

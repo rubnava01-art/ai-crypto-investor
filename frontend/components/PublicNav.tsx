@@ -7,8 +7,10 @@ import { LanguageToggle, useLanguage } from "../lib/i18n";
 import { getToken } from "../lib/api";
 
 /** Menú público (2026-11-12): lo que ve un visitante sin sesión.
- * Exactamente cuatro ítems — Inicio, Contacto, Registrarse, Login — y
- * nada más. Inicio va a la landing (/), Contacto a /contacto,
+ * Ítems — Inicio, Herramientas, Planes, Contacto, Registrarse, Login —
+ * y nada más (TBT-Herramientas, FASE 2, A-3, 2026-11-24: se añaden
+ * Herramientas y Planes; antes eran cuatro). Inicio va a la landing (/),
+ * Herramientas a /herramientas, Planes a /planes, Contacto a /contacto,
  * Registrarse a /login?mode=register (la página de login preselecciona
  * el modo registro con ese parámetro) y Login a /login. Sin props
  * obligatorias: la landing lo usa y la página de login lo reutiliza
@@ -39,6 +41,8 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
 
   const visitorItems = [
     { href: "/", label: t.publicNav.home, key: "home" },
+    { href: "/herramientas", label: t.publicNav.tools, key: "tools" },
+    { href: "/planes", label: t.publicNav.plans, key: "plans" },
     { href: "/contacto", label: t.publicNav.contact, key: "contact" },
     { href: "/login?mode=register", label: t.publicNav.register, key: "register" },
     { href: "/login", label: t.publicNav.login, key: "login" },
@@ -46,6 +50,8 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
   const items = authed
     ? [
         { href: "/", label: t.publicNav.home, key: "home" },
+        { href: "/herramientas", label: t.publicNav.tools, key: "tools" },
+        { href: "/planes", label: t.publicNav.plans, key: "plans" },
         { href: "/contacto", label: t.publicNav.contact, key: "contact" },
         { href: "/", label: t.publicNav.enterPlatform, key: "enter" },
       ]
@@ -74,6 +80,8 @@ export function PublicNav({ variant = "dark" }: { variant?: "dark" | "onBlue" } 
           {items.map((item) => {
             const active =
               (item.key === "home" && pathname === "/" && !registerMode) ||
+              (item.key === "tools" && pathname === "/herramientas") ||
+              (item.key === "plans" && pathname === "/planes") ||
               (item.key === "contact" && pathname === "/contacto") ||
               (item.key === "register" && pathname === "/login" && registerMode) ||
               (item.key === "login" && pathname === "/login" && !registerMode);

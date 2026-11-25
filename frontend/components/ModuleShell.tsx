@@ -81,10 +81,13 @@ export function ModuleShell({
     // Fase 4 (FE7): preservar el destino (?next=) para volver tras el login,
     // igual que el 401 centralizado del cliente API. El token ya se leyó en
     // el inicializador de estado; aquí solo queda redirigir si no hay sesión.
-    // La URL se construye en lib/session.ts (C2): conserva pathname + query.
+    // La URL se construye en lib/session.ts (C2): conserva pathname + query
+    // + fragmento (#ancla) — H-01 (QA TBT-Herramientas): sin el hash, el
+    // gancho libre «Pruébala sin cuenta» moría en /login y el invitado
+    // aterrizaba en /estudiar arriba, no en la herramienta.
     // Sin expired=1: no hay sesión, no es una expiración.
     if (!getToken()) {
-      router.replace(loginUrl(window.location.pathname + window.location.search));
+      router.replace(loginUrl(window.location.pathname + window.location.search + window.location.hash));
     }
   }, [router, pathname]);
 

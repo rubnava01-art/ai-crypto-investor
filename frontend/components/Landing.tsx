@@ -46,10 +46,30 @@ const PlanesCompare = dynamic(() => import("./PlanesCompare").then((m) => m.Plan
 // no vive en este componente: cada tarjeta enlaza a
 // /login?mode=register&plan=<clave> y /login lee `plan` de la URL y lo
 // envía como requested_plan; hacer lazy el panel no toca ese flujo.
+// H-02 (QA TBT-Herramientas, 2026-11-24): OPCIÓN 2 — se mantiene el
+// lazy-load y Landing desplaza al ancla #plan-* tras la hidratación
+// (efecto junto al aviso de invitado caducado). Se descartó la opción 1
+// (ssr: true): verificado por código, `/` prerenderiza un esqueleto
+// (app/page.tsx monta <Landing /> solo en cliente tras el chequeo de
+// token), así que ssr: true NO deja #plan-* en el HTML inicial y el
+// desplazamiento del router seguiría llegando antes de que el panel
+// exista; el efecto de reintento es lo que llega al plan de verdad.
 const PlanesPanel = dynamic(() => import("./PlanesPanel").then((m) => m.PlanesPanel), {
   ssr: false,
   loading: sectionLoading,
 });
+// TBT-Herramientas, FASE 2 (2026-11-24, A-2): la sección Herramientas en
+// la landing va con dynamic() como el resto bajo el pliegue; la ruta
+// pública /herramientas (SSR) es la indexable. Se monta después de los
+// 4 pilares y antes de Seguridad. El bloque de píldoras «más módulos»
+// no se toca: la sección lo complementa, no lo sustituye.
+const HerramientasSection = dynamic(
+  () => import("./HerramientasSection").then((m) => m.HerramientasSection),
+  {
+    ssr: false,
+    loading: sectionLoading,
+  },
+);
 
 /** Presentación pública de Grow Business Platform (2026-11-12): lo que
  * ve un visitante sin sesión en la raíz, en vez de acabar en /login.
@@ -165,6 +185,35 @@ export function Landing() {
       setGuestExpired(false);
     }
   }, []);
+  // H-02 (QA TBT-Herramientas, 2026-11-24): «Ver en qué plan va» desde
+  // /herramientas navega a /#plan-<clave>, pero el router intenta
+  // desplazar antes de que PlanesPanel (dynamic ssr: false) exista y el
+  // usuario cae en `/` arriba. Este efecto reintenta el desplazamiento
+  // cuando el elemento aparece (hasta ~5 s), solo si la URL trae
+  // #plan-*. Con la landing ya cargada el elemento existe al montar y
+  // el primer intento desplaza; sin ancla #plan-* no hace nada.
+  useEffect(() => {
+    let hash = "";
+    try {
+      hash = window.location.hash;
+    } catch {
+      return;
+    }
+    if (!hash.startsWith("#plan-")) return;
+    const id = hash.slice(1);
+    let tries = 0;
+    const timer = setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView();
+        clearInterval(timer);
+        return;
+      }
+      tries += 1;
+      if (tries >= 50) clearInterval(timer);
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
   // Mini-índice de las 5 herramientas de Clases (mini-panel Estudiar).
   const classTools = [
     { name: c.calcTitle, desc: l.pillarEstudiarTool1Desc },
@@ -187,7 +236,7 @@ export function Landing() {
   ];
 
   return (
-    <div className="min-h-dvh bg-[#030712] text-slate-100">
+    <div className="min-h-dvh bg-[#030712] text-slate-100 pb-20 sm:pb-0">
       <PublicNav />
       <main id="contenido" tabIndex={-1} className="mx-auto max-w-6xl px-4 outline-none sm:px-6">
         <SkipLink label={t.shell.skipLink} />
@@ -235,6 +284,18 @@ export function Landing() {
             className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-base font-bold text-blue-300 transition-colors hover:text-blue-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             {l.priceStripCta}
+          </a>
+        </p>
+
+        {/* M-2 (TBT-Herramientas, FASE 2, 2026-11-24): línea de subtítulo
+            bajo el héroe (patrón C5, sin tercer botón y sin tocar
+            Hero.tsx): atajo a la sección #herramientas. */}
+        <p className="mt-3 text-center">
+          <a
+            href="#herramientas"
+            className="inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+          >
+            {l.toolsTeaser}
           </a>
         </p>
 
@@ -382,6 +443,11 @@ export function Landing() {
           </div>
         </section>
 
+        {/* Herramientas, una a una (TBT-Herramientas, FASE 2, A-2): después
+            de los 4 pilares y antes de Seguridad — el visitante ve
+            primero el paquete y luego las piezas. */}
+        <HerramientasSection />
+
         {/* Seguridad y Transparencia: solo hechos reales (Fase 2). */}
         <section aria-label={l.securityTitle} className="border-t border-slate-800/80 py-10 sm:py-12">
           <h2 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">{l.securityTitle}</h2>
@@ -492,7 +558,10 @@ export function Landing() {
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-slate-400">{l.howStep2Desc}</p>
         </section>
       </main>
-      {/* M2: CTA sticky discreto solo en móvil, tras pasar el héroe. */}
+      {/* M2: CTA sticky discreto solo en móvil, tras pasar el héroe.
+          M-4 (TBT-Herramientas, FASE 2, 2026-11-24): la raíz lleva
+          pb-20 en móvil para que esta barra fija no tape el cierre ni
+          el footer al llegar al final (la barra mide ~64 px). */}
       {showStickyCta && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-800/80 bg-[#0B0F19]/95 backdrop-blur sm:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">

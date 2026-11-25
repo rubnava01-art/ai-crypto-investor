@@ -86,6 +86,33 @@ export default function EstudiarPage() {
     return () => observer.disconnect();
   }, []);
 
+  // R-01 (QA re-validación TBT-Herramientas): el ancla #herramienta-*
+  // llega en la URL, pero ClasesPanel es dynamic(ssr: false) y el
+  // elemento no existe cuando el router intenta desplazar. Reintentar
+  // hasta ~5 s, solo si la URL trae #herramienta-.
+  useEffect(() => {
+    let hash = "";
+    try {
+      hash = window.location.hash;
+    } catch {
+      return;
+    }
+    if (!hash.startsWith("#herramienta-")) return;
+    const id = hash.slice(1);
+    let tries = 0;
+    const timer = setInterval(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView();
+        clearInterval(timer);
+        return;
+      }
+      tries += 1;
+      if (tries >= 50) clearInterval(timer);
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
+
   const activeIndex = Math.max(0, sections.findIndex((s) => s.id === activeId));
 
   const goNextSection = useCallback(() => {

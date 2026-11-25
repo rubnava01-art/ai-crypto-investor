@@ -2,13 +2,15 @@
 
 // Prueba sin registro (Fase 1, 2026-11-23): CTA del hero "Probar sin
 // registro" → reto matemático (mismo de /api/auth/register-challenge) →
-// POST /api/auth/guest → sesión de invitado (15 min) → /inicio.
+// POST /api/auth/guest → sesión de invitado (15 min) → destino ?next=
+// validado (H-01, QA TBT-Herramientas 2026-11-24) o /inicio.
 // Si el endpoint aún no existe (404/501), muestra el aviso de no
 // disponible y NO inventa el comportamiento. Sin PII.
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, guestApi } from "../lib/api";
+import { guestNextFromSearch } from "../lib/session";
 import { useLanguage } from "../lib/i18n";
 
 export function GuestTrialButton() {
@@ -48,7 +50,14 @@ export function GuestTrialButton() {
     setError(null);
     try {
       await guestApi.start(challenge.challenge_id, n);
-      router.push("/inicio");
+      // H-01 (QA TBT-Herramientas): enhebrar el destino — el invitado
+      // vuelve a ?next= cuando es una ruta interna válida (p. ej.
+      // /estudiar#herramienta-calculadora desde «Pruébala sin cuenta»,
+      // o /estudiar#herramienta-bitcoin); sin destino válido, /inicio.
+      // Se lee window.location.search (patrón Landing: sin
+      // useSearchParams, sin Suspense) porque este botón vive también
+      // en el héroe de la landing, fuera de todo límite Suspense.
+      router.push(guestNextFromSearch(window.location.search));
     } catch (err) {
       // 404/501: el endpoint aún no existe (backend en paralelo) — aviso
       // honesto, sin inventar la sesión. 400/422: respuesta incorrecta

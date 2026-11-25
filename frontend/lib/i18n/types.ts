@@ -119,6 +119,9 @@ export type Dictionary = {
   contacto: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
   estudiarGestos: Record<string, string>;
+  // Herramientas vendibles (TBT-Herramientas, FASE 2, 2026-11-24): sección
+  // pública #herramientas y página /herramientas. Mismo patrón Record.
+  herramientas: Record<string, string>;
   // Bandeja "Preguntas por enseñar" del Asistente (solo admin, 2026-11-23)
   // y textos de los gráficos de datos propios estilo Semrush.
   preguntas: Record<string, string>;
