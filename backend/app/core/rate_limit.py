@@ -98,6 +98,13 @@ market_limiter = RateLimiter(max_requests=60, window_seconds=60)
 # normal de un solo dueño).
 correos_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
+# Servicios + Calculadora (2026-11-25): formulario público de /contacto.
+# Sin auth, así que el límite es por IP (misma limitación documentada
+# arriba sobre el proxy de Render: segunda capa, umbral bajo). 5/hora:
+# un humano real rara vez escribe dos veces en una hora; un bot que
+# rellena el formulario se frena sin bloquear al dueño.
+contacto_limiter = RateLimiter(max_requests=5, window_seconds=3600)
+
 
 class LoginLockout:
     """Per-account backoff after failed logins (M3).

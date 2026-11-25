@@ -14,6 +14,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { guestNextFromSearch, isSafeNext, loginUrl, safeNext } from "./session";
+import { dictEs } from "./i18n/es";
+import { dictEn } from "./i18n/en";
 
 const FRONTEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const readSrc = (rel: string) => readFileSync(path.join(FRONTEND, rel), "utf8");
@@ -112,4 +114,45 @@ test("GuestTrial enhebra ?next= con guestNextFromSearch (no /inicio fijo)", () =
   const src = readSrc("components/GuestTrial.tsx");
   assert.ok(src.includes("guestNextFromSearch(window.location.search)"), "GuestTrial debe usar guestNextFromSearch");
   assert.ok(!src.includes('router.push("/inicio")'), "GuestTrial ya no debe empujar /inicio fijo");
+});
+
+// --- T-0 (plan servicios-calc, bloqueador — CRÍTICA-1, 2026-11-25) ---
+// La fusión de diccionarios i18n borró guest.challengeRetry y
+// guest.challengeAutoSubmit en ES y EN a la vez: tsc no lo ve (guest es
+// Record<string, string>), la paridad ES↔EN no lo ve (faltan en ambos
+// idiomas) y ningún test lo cubría. Este test falla si cualquiera de
+// las claves que el flujo invitado usa vuelve a faltar o queda vacía.
+
+test("T-0: claves críticas del flujo invitado existen no vacías en ES y EN", () => {
+  const guestKeys = [
+    "challengeTitle",
+    "challengeHint",
+    "challengeAnswer",
+    "challengeStart",
+    "challengeError",
+    "challengeLoadError",
+    "challengeRetry",
+    "challengeAutoSubmit",
+    "banner",
+    "bannerCta",
+    "menuName",
+    "inviteChat",
+    "inviteBlocked",
+    "inviteSave",
+    "expired",
+  ] as const;
+  for (const key of guestKeys) {
+    for (const [lang, dict] of [
+      ["es", dictEs],
+      ["en", dictEn],
+    ] as const) {
+      const value = dict.guest[key];
+      assert.ok(typeof value === "string" && value.trim() !== "", `guest.${key} falta o está vacía en ${lang}`);
+    }
+  }
+  // Las dos claves de CRÍTICA-1, con sus textos exactos restaurados.
+  assert.equal(dictEs.guest.challengeRetry, "Cargar otra pregunta");
+  assert.equal(dictEs.guest.challengeAutoSubmit, "Se envía sola en un momento — borra un dígito para corregir.");
+  assert.equal(dictEn.guest.challengeRetry, "Load another question");
+  assert.equal(dictEn.guest.challengeAutoSubmit, "Sending shortly — delete a digit to correct it.");
 });

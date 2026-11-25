@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api, ApiError,
+  type ContactoMensaje, type ContactoMensajeEstado, type ContactoServicio,
   type CrmContact, type EmailLog, type EmailLogStatus, type EmailTemplate,
   type Invoice, type MeResponse, type ReferralCampaign,
 } from "../lib/api";
@@ -734,6 +735,164 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
   );
 }
 
+/** Bandeja «Mensajes de contacto» (2026-11-25, servicios-calc):
+ * mensajes del formulario público /contacto. UBICACIÓN ELEGIDA: sección
+ * dentro de CorreosPanel (es la zona de correo del admin: plantillas,
+ * compositor y registro ya viven aquí) en vez de una vista aparte —
+ * el admin gestiona todo el correo en un solo módulo y se reutilizan
+ * Panel, ListSkeleton, ClampedBody, useConfirm y la paginación real
+ * (PAGE_SIZE) de LogsPanel. Solo se monta si isAdmin (CorreosPanel);
+ * el backend además impone admin en GET/PATCH/DELETE. */
+function MensajesContactoPanel({ isAdmin }: { isAdmin: boolean }) {
+  const { t, lang } = useLanguage();
+  const c = t.contacto;
+  const { confirm, dialog } = useConfirm(t);
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const [page, setPage] = useState(0);
+  const load = useAsyncLoad<ContactoMensaje[]>(
+    (signal) => api.listContactoMensajes({ signal, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    [page],
+  );
+  const loadError = load.error;
+  const forbidden = isAdminOnlyForbidden(loadError, isAdmin);
+  const [rows, setRows] = useState<ContactoMensaje[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const appliedRef = useRef<ContactoMensaje[] | null>(null);
+  useEffect(() => {
+    const d = load.data;
+    if (!d || appliedRef.current === d) return;
+    appliedRef.current = d;
+    setHasMore(d.length === PAGE_SIZE);
+    setRows((prev) => (page === 0 ? d : [...prev, ...d.filter((r) => !prev.some((p) => p.id === r.id))]));
+  }, [load.data, page]);
+  const loadingFirst = load.loading && rows.length === 0;
+  const [error, setError] = useState<string | null>(null);
+
+  const resetList = () => {
+    if (page === 0) load.reload();
+    else setPage(0);
+  };
+
+  const changeStatus = async (r: ContactoMensaje, estado: ContactoMensajeEstado) => {
+    try {
+      await api.updateContactoMensajeEstado(r.id, estado);
+      resetList();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : c.inboxErrChangeStatus);
+    }
+  };
+
+  const remove = async (r: ContactoMensaje) => {
+    if (!(await confirm(c.inboxConfirmDelete))) return;
+    try {
+      await api.deleteContactoMensaje(r.id);
+      resetList();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : c.inboxErrDelete);
+    }
+  };
+
+  const statusLabel = (estado: ContactoMensajeEstado) =>
+    estado === "nuevo" ? c.inboxStatusNuevo : estado === "leído" ? c.inboxStatusLeido : c.inboxStatusRespondido;
+  const statusBorderCls = (estado: ContactoMensajeEstado) =>
+    estado === "nuevo" ? "border-l-amber-400" : estado === "leído" ? "border-l-sky-400" : "border-l-emerald-500";
+  const statusBadgeCls = (estado: ContactoMensajeEstado) =>
+    estado === "nuevo"
+      ? "bg-amber-500/15 text-amber-300"
+      : estado === "leído"
+        ? "bg-sky-500/15 text-sky-300"
+        : "bg-emerald-500/15 text-emerald-300";
+  const serviceLabel = (servicio: ContactoServicio) =>
+    servicio === "camisetas"
+      ? c.formServiceCamisetas
+      : servicio === "publicitario"
+        ? c.formServicePublicitario
+        : servicio === "marketing"
+          ? c.formServiceMarketing
+          : c.formServiceOtro;
+
+  return (
+    <>
+      {dialog}
+      <Panel
+        title={c.inboxTitle}
+        badge={
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-300">
+            {loadingFirst ? t.correos.badgeLoading : loadError && rows.length === 0 ? "—" : c.inboxCount.replace("{n}", String(rows.length))}
+          </span>
+        }
+      >
+        <p className="mb-4 text-sm leading-relaxed text-zinc-400">{c.inboxIntro}</p>
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        {forbidden ? (
+          <EmptyState text={t.reliability.adminOnlySection} />
+        ) : loadError ? (
+          <ApiErrorBanner error={loadError} t={t} onRetry={load.reload} />
+        ) : null}
+        {loadingFirst && !loadError ? (
+          <ListSkeleton />
+        ) : rows.length === 0 ? (
+          forbidden ? null : (
+            <div className="rounded-xl border border-dashed border-zinc-700 px-4 py-6 text-center">
+              <p className="text-sm text-zinc-400">{c.inboxEmpty}</p>
+            </div>
+          )
+        ) : (
+          <>
+            <ul className="space-y-3">
+              {rows.map((r) => (
+                <li key={r.id} className={`rounded-xl border border-zinc-800 border-l-4 bg-zinc-950/60 p-3.5 ${statusBorderCls(r.estado)}`}>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm font-semibold text-zinc-100">{r.nombre}</span>
+                    <span className="text-sm text-zinc-400">{r.email}</span>
+                    <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{serviceLabel(r.servicio)}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${statusBadgeCls(r.estado)}`}>
+                      {statusLabel(r.estado)}
+                    </span>
+                    <span className="ml-auto flex items-center gap-2">
+                      <span className="text-xs text-zinc-400">{fmtDate(r.created_at, locale)}</span>
+                      {r.estado === "nuevo" && (
+                        <button onClick={() => changeStatus(r, "leído")} className="min-h-[44px] rounded-lg border border-sky-900/60 px-3 py-1.5 text-xs text-sky-400 hover:bg-sky-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60">
+                          {c.inboxMarkRead}
+                        </button>
+                      )}
+                      {r.estado !== "respondido" && (
+                        <button onClick={() => changeStatus(r, "respondido")} className="min-h-[44px] rounded-lg border border-emerald-900/60 px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                          {c.inboxMarkAnswered}
+                        </button>
+                      )}
+                      <button onClick={() => remove(r)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
+                        {c.inboxDelete}
+                      </button>
+                    </span>
+                  </div>
+                  {r.mensaje && (
+                    <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-900/60 px-3 py-1">
+                      <ClampedBody text={r.mensaje} t={t} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {hasMore && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={load.loading}
+                  className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
+                >
+                  {load.loading ? t.correos.badgeLoading : t.reliability.loadMore}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </Panel>
+    </>
+  );
+}
+
 export function CorreosPanel() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -756,6 +915,7 @@ export function CorreosPanel() {
         onTemplateApplied={() => setPendingTemplate(null)}
       />
       <LogsPanel isAdmin={isAdmin} refreshKey={refreshKey} />
+      {isAdmin && <MensajesContactoPanel isAdmin={isAdmin} />}
     </div>
   );
 }

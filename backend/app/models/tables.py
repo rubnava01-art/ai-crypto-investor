@@ -660,6 +660,31 @@ class EmailLog(Base):
     )
 
 
+class ContactMessage(Base):
+    """Mensaje enviado desde el formulario público de /contacto.
+
+    Servicios + Calculadora (2026-11-25): la página de contacto es
+    pública, así que cualquiera puede escribir; solo el admin lee,
+    marca el estado y borra (spam). `estado`: nuevo | leído |
+    respondido. NO se guarda la IP (PII): el rate limit por IP vive
+    solo en memoria (rate_limit.contacto_limiter) y nunca llega a la
+    BD. `servicio`: camisetas | publicitario | marketing | otro.
+    """
+
+    __tablename__ = "contact_messages"
+    __table_args__ = (Index("ix_contact_messages_created_at", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(200), nullable=False)
+    servicio: Mapped[str] = mapped_column(String(30), nullable=False)
+    mensaje: Mapped[str] = mapped_column(Text, nullable=False)
+    estado: Mapped[str] = mapped_column(String(32), default="nuevo", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class Course(Base):
     """Academia catalog item (Grow Business Platform — Fase 2, módulo Estudiar).
 

@@ -15,6 +15,7 @@ import { ApiErrorBanner } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { CompoundCalculator } from "./CompoundCalculator";
+import { RentabilidadCalculator } from "./RentabilidadCalculator";
 
 type LoadStatus = "loading" | "ready" | "nodata" | "error";
 
@@ -52,7 +53,7 @@ function SectionTitle({ children }: { children: ReactNode }) {
 }
 
 /** Tarjeta de una herramienta: número de orden + título a primera vista
- * (2026-11-12): las 5 herramientas vivían en un solo flujo sin
+ * (2026-11-12): las 6 herramientas vivían en un solo flujo sin
  * separación visual; cada una tiene ahora su propia tarjeta y el índice
  * de salto del panel enlaza a su ancla. */
 function ToolCard({ id, num, title, badge, children }: { id: string; num: string; title: string; badge?: ReactNode; children: ReactNode }) {
@@ -550,6 +551,20 @@ function BitcoinEducation() {
   );
 }
 
+// ---------- (f) Calculadora de rentabilidad (solo navegador, nº 6) ----------
+// Montada después de BitcoinEducation (nº 5 se queda en 5; no se
+// renumera nada). El aviso honesto vive dentro del componente
+// (rentHypothetical + rentManual, patrón calcHypothetical de
+// CompoundCalculator): no se duplica la línea ámbar de límite aquí.
+function RentabilidadCalculatorCard() {
+  const { t } = useLanguage();
+  return (
+    <ToolCard id="herramienta-rentabilidad" num="6" title={t.clases.rentTitle}>
+      <RentabilidadCalculator idPrefix="clases-rent" />
+    </ToolCard>
+  );
+}
+
 export function ClasesHerramientas() {
   const { t } = useLanguage();
   const jump = [
@@ -558,6 +573,7 @@ export function ClasesHerramientas() {
     { href: "#herramienta-grafica", label: t.clases.chartTitle },
     { href: "#herramienta-indicadores", label: t.clases.indTitle },
     { href: "#herramienta-bitcoin", label: t.clases.btcTitle },
+    { href: "#herramienta-rentabilidad", label: t.clases.rentTitle },
   ];
   return (
     <div data-no-swipe>
@@ -568,7 +584,7 @@ export function ClasesHerramientas() {
             <a
               key={j.href}
               href={j.href}
-              className="inline-flex min-h-[36px] items-center rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-sky-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+              className="inline-flex min-h-[44px] items-center rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-sky-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
             >
               {j.label}
             </a>
@@ -580,6 +596,7 @@ export function ClasesHerramientas() {
           <BtcChart />
           <IndicatorsStrip />
           <BitcoinEducation />
+          <RentabilidadCalculatorCard />
         </div>
       </Panel>
     </div>

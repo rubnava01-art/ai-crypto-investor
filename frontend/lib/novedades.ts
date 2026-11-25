@@ -27,6 +27,11 @@ export type NovedadSistema = {
 export const novedadesSistema: NovedadSistema[] = [
   {
     date: "2026-11-25",
+    title: "Servicios de diseño y marketing, calculadora de rentabilidad y formulario de contacto",
+    body: "Publicado el 25 de noviembre: tres novedades para tu negocio — en la sección Herramientas, una banda de servicios por proyecto (camisetas, material publicitario y marketing digital) sin precio publicado, con «Pide tu cotización» hacia el nuevo formulario de contacto; en Estudiar, la calculadora de rentabilidad: escribe ingresos y costos y ve margen bruto, margen neto, punto de equilibrio y rentabilidad, todo en tu navegador; y en Correos, una bandeja nueva para el administrador con los mensajes que llegan del formulario. Los precios de los servicios siguen sin publicarse: cada proyecto se cotiza. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
+    date: "2026-11-25",
     title: "Mejoras diarias: caché en Inventario y contadores visibles/total en Clases y Control de usuarios",
     body: "Publicado el 25 de noviembre: tres mejoras del día — en velocidad, la lista de Inventario ahora se guarda en caché 60 segundos y carga más rápido al navegar, con invalidación inmediata al crear, editar o borrar; en Estudiar, con búsqueda activa cada sección de Clases muestra cuántas clases coinciden (visibles / total); y en Control de usuarios, con búsqueda o filtro de rol aparece el contador de visibles / total junto al badge 'Solo admin'. Solo presentación y caché, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",
   },

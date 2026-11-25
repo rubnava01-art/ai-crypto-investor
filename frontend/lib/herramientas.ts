@@ -2,7 +2,7 @@
 // Módulo PURO (sin React ni imports de componentes): lo consumen el
 // componente <HerramientasSection /> y el test lib/herramientas.test.ts.
 //
-// CORTE DE LANZAMIENTO (A-4): SOLO las 25 herramientas con plan asignado
+// CORTE DE LANZAMIENTO (A-4): SOLO las 26 herramientas con plan asignado
 // por PLAN_FEATURE_KEYS (auditoría Agente 1, tabla §3). Las 11 «plan por
 // confirmar» NO aparecen en v1; nunca Ajustador, Terminal, Control de
 // usuarios, Privacidad, Perfil ni Chat.
@@ -36,6 +36,7 @@ export type HerramientaId =
   | "grafica"
   | "indicadores"
   | "bitcoin"
+  | "rentabilidad"
   | "copies"
   | "logo"
   | "mockup"
@@ -76,6 +77,12 @@ export const HERRAMIENTAS: HerramientaDef[] = [
   { id: "grafica", categoria: "aprende", featureKey: "fEstudiar", href: "/estudiar#herramienta-grafica" },
   { id: "indicadores", categoria: "aprende", featureKey: "fEstudiar", href: "/estudiar#herramienta-indicadores" },
   { id: "bitcoin", categoria: "aprende", featureKey: "fEstudiar", href: "/estudiar#herramienta-bitcoin", free: true },
+  // Calculadora de rentabilidad (2026-11-25, plan servicios-calc D-2):
+  // con cuenta en v1 (free: false) — el camino libre por ancla directa
+  // pierde el fragmento tras el login (limitación H-08); el CTA «Probar»
+  // va a /login?next=/estudiar%23herramienta-rentabilidad y aterriza
+  // en la herramienta gracias al ?next= enhebrado.
+  { id: "rentabilidad", categoria: "aprende", featureKey: "fEstudiar", href: "/estudiar#herramienta-rentabilidad", free: false },
   // Crea — Crecimiento (fCrear).
   { id: "copies", categoria: "crea", featureKey: "fCrear", href: "/crear#crear-copies" },
   { id: "logo", categoria: "crea", featureKey: "fCrear", href: "/crear" },

@@ -714,6 +714,29 @@ export interface EmailLog {
   created_at: string | null;
 }
 
+// ---------- Mensajes de contacto (formulario público /contacto, 2026-11-25) ----------
+
+/** Servicio del formulario público (contrato POST /api/contacto/mensajes). */
+export type ContactoServicio = "camisetas" | "publicitario" | "marketing" | "otro";
+
+/** Estado en la bandeja admin (GET/PATCH /api/contacto/mensajes). */
+export type ContactoMensajeEstado = "nuevo" | "leído" | "respondido";
+
+export interface ContactoMensaje {
+  id: number;
+  nombre: string;
+  email: string;
+  servicio: ContactoServicio;
+  mensaje: string;
+  estado: ContactoMensajeEstado;
+  created_at: string | null;
+}
+
+export interface ContactoMensajeCreated {
+  id: number;
+  created_at: string | null;
+}
+
 // ---------- Facturas ----------
 
 export interface InvoiceItem {

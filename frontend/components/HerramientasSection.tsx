@@ -30,8 +30,9 @@
 //   (en el límite de su tarjeta); ninguna tarjeta promete ganancias.
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLanguage } from "../lib/i18n";
+import { SERVICIO_CONTACTO_HREF, SERVICIOS_BANDA, type ContactoServicio } from "../lib/contacto";
 import {
   HERRAMIENTAS,
   HERRAMIENTA_CATEGORIES,
@@ -119,91 +120,121 @@ export function HerramientasSection({ headingLevel = "h2" }: { headingLevel?: "h
   const [query, setQuery] = useState("");
 
   // Títulos reales por herramienta (explícitos, sin acceso dinámico):
-  // t.nav para los módulos, t.clases para las 5 de Clases, t.crear /
+  // t.nav para los módulos, t.clases para las 6 de Clases, t.crear /
   // t.logo / t.mockup para Crear, t.estudiarGestos para las secciones
   // de Estudiar y t.landing.ai6Title para los precios en vivo.
-  const titles: Record<HerramientaId, string> = {
-    invertir: t.nav.invertir.label,
-    precios: l.ai6Title,
-    academia: t.estudiarGestos.tabAcademia,
-    manuales: t.estudiarGestos.tabManuales,
-    juego: t.estudiarGestos.tabJuego,
-    videos: t.estudiarGestos.tabVideos,
-    calculadora: t.clases.calcTitle,
-    conversor: t.clases.convTitle,
-    grafica: t.clases.chartTitle,
-    indicadores: t.clases.indTitle,
-    bitcoin: t.clases.btcTitle,
-    copies: t.crear.copyTitle,
-    logo: t.logo.title,
-    mockup: t.mockup.title,
-    tendencias: t.crear.trendsTitle,
-    crm: t.nav.crm.label,
-    facturas: t.nav.facturas.label,
-    inventario: t.nav.inventario.label,
-    correos: t.nav.correos.label,
-    referidos: t.nav.referidos.label,
-    talento: t.nav.talento.label,
-    riesgos: t.nav.riesgos.label,
-    planillas: t.nav.planillas.label,
-    analisis: t.nav.analisis.label,
-    espacio: t.nav.espacio.label,
-  };
+  // Memoizados (2026-11-25, servicios-calc): antes se reconstruían
+  // dos objetos de 26 entradas en CADA render (cada tecla del
+  // buscador); ahora solo cambian con el diccionario.
+  const titles: Record<HerramientaId, string> = useMemo(
+    () => ({
+      invertir: t.nav.invertir.label,
+      precios: l.ai6Title,
+      academia: t.estudiarGestos.tabAcademia,
+      manuales: t.estudiarGestos.tabManuales,
+      juego: t.estudiarGestos.tabJuego,
+      videos: t.estudiarGestos.tabVideos,
+      calculadora: t.clases.calcTitle,
+      conversor: t.clases.convTitle,
+      grafica: t.clases.chartTitle,
+      indicadores: t.clases.indTitle,
+      bitcoin: t.clases.btcTitle,
+      rentabilidad: t.clases.rentTitle,
+      copies: t.crear.copyTitle,
+      logo: t.logo.title,
+      mockup: t.mockup.title,
+      tendencias: t.crear.trendsTitle,
+      crm: t.nav.crm.label,
+      facturas: t.nav.facturas.label,
+      inventario: t.nav.inventario.label,
+      correos: t.nav.correos.label,
+      referidos: t.nav.referidos.label,
+      talento: t.nav.talento.label,
+      riesgos: t.nav.riesgos.label,
+      planillas: t.nav.planillas.label,
+      analisis: t.nav.analisis.label,
+      espacio: t.nav.espacio.label,
+    }),
+    [t, l],
+  );
   // Qué hace + límite honesto por herramienta (explícitos, mismo patrón
-  // que LandingAi: ai{N}Title/Desc/Limit).
-  const texts: Record<HerramientaId, { desc: string; limit: string }> = {
-    invertir: { desc: h.invertirDesc, limit: h.invertirLimit },
-    precios: { desc: h.preciosDesc, limit: h.preciosLimit },
-    academia: { desc: h.academiaDesc, limit: h.academiaLimit },
-    manuales: { desc: h.manualesDesc, limit: h.manualesLimit },
-    juego: { desc: h.juegoDesc, limit: h.juegoLimit },
-    videos: { desc: h.videosDesc, limit: h.videosLimit },
-    calculadora: { desc: h.calculadoraDesc, limit: h.calculadoraLimit },
-    conversor: { desc: h.conversorDesc, limit: h.conversorLimit },
-    grafica: { desc: h.graficaDesc, limit: h.graficaLimit },
-    indicadores: { desc: h.indicadoresDesc, limit: h.indicadoresLimit },
-    bitcoin: { desc: h.bitcoinDesc, limit: h.bitcoinLimit },
-    copies: { desc: h.copiesDesc, limit: h.copiesLimit },
-    logo: { desc: h.logoDesc, limit: h.logoLimit },
-    mockup: { desc: h.mockupDesc, limit: h.mockupLimit },
-    tendencias: { desc: h.tendenciasDesc, limit: h.tendenciasLimit },
-    crm: { desc: h.crmDesc, limit: h.crmLimit },
-    facturas: { desc: h.facturasDesc, limit: h.facturasLimit },
-    inventario: { desc: h.inventarioDesc, limit: h.inventarioLimit },
-    correos: { desc: h.correosDesc, limit: h.correosLimit },
-    referidos: { desc: h.referidosDesc, limit: h.referidosLimit },
-    talento: { desc: h.talentoDesc, limit: h.talentoLimit },
-    riesgos: { desc: h.riesgosDesc, limit: h.riesgosLimit },
-    planillas: { desc: h.planillasDesc, limit: h.planillasLimit },
-    analisis: { desc: h.analisisDesc, limit: h.analisisLimit },
-    espacio: { desc: h.espacioDesc, limit: h.espacioLimit },
-  };
-  const categoryTitle: Record<HerramientaCategoria, string> = {
-    invierte: l.catSimTitle,
-    aprende: l.catAcademyTitle,
-    crea: l.catContentTitle,
-    gestiona: l.catManageTitle,
-  };
+  // que LandingAi: ai{N}Title/Desc/Limit). Memoizado igual que titles.
+  const texts: Record<HerramientaId, { desc: string; limit: string }> = useMemo(
+    () => ({
+      invertir: { desc: h.invertirDesc, limit: h.invertirLimit },
+      precios: { desc: h.preciosDesc, limit: h.preciosLimit },
+      academia: { desc: h.academiaDesc, limit: h.academiaLimit },
+      manuales: { desc: h.manualesDesc, limit: h.manualesLimit },
+      juego: { desc: h.juegoDesc, limit: h.juegoLimit },
+      videos: { desc: h.videosDesc, limit: h.videosLimit },
+      calculadora: { desc: h.calculadoraDesc, limit: h.calculadoraLimit },
+      conversor: { desc: h.conversorDesc, limit: h.conversorLimit },
+      grafica: { desc: h.graficaDesc, limit: h.graficaLimit },
+      indicadores: { desc: h.indicadoresDesc, limit: h.indicadoresLimit },
+      bitcoin: { desc: h.bitcoinDesc, limit: h.bitcoinLimit },
+      rentabilidad: { desc: h.rentabilidadDesc, limit: h.rentabilidadLimit },
+      copies: { desc: h.copiesDesc, limit: h.copiesLimit },
+      logo: { desc: h.logoDesc, limit: h.logoLimit },
+      mockup: { desc: h.mockupDesc, limit: h.mockupLimit },
+      tendencias: { desc: h.tendenciasDesc, limit: h.tendenciasLimit },
+      crm: { desc: h.crmDesc, limit: h.crmLimit },
+      facturas: { desc: h.facturasDesc, limit: h.facturasLimit },
+      inventario: { desc: h.inventarioDesc, limit: h.inventarioLimit },
+      correos: { desc: h.correosDesc, limit: h.correosLimit },
+      referidos: { desc: h.referidosDesc, limit: h.referidosLimit },
+      talento: { desc: h.talentoDesc, limit: h.talentoLimit },
+      riesgos: { desc: h.riesgosDesc, limit: h.riesgosLimit },
+      planillas: { desc: h.planillasDesc, limit: h.planillasLimit },
+      analisis: { desc: h.analisisDesc, limit: h.analisisLimit },
+      espacio: { desc: h.espacioDesc, limit: h.espacioLimit },
+    }),
+    [h],
+  );
+  const categoryTitle: Record<HerramientaCategoria, string> = useMemo(
+    () => ({
+      invierte: l.catSimTitle,
+      aprende: l.catAcademyTitle,
+      crea: l.catContentTitle,
+      gestiona: l.catManageTitle,
+    }),
+    [l],
+  );
 
-  // 25 herramientas: el filtrado es trivial, sin memoizar.
+  // 26 herramientas: el filtrado es trivial, sin memoizar.
   const q = norm(query.trim());
-  const filtered = HERRAMIENTAS.filter((tool) => {
-    if (category !== "todas" && tool.categoria !== category) return false;
-    if (!q) return true;
-    const haystack = norm(`${titles[tool.id]} ${texts[tool.id].desc} ${categoryTitle[tool.categoria]}`);
-    return haystack.includes(q);
-  });
+  const filtered = useMemo(() => {
+    if (!q) return category === "todas" ? HERRAMIENTAS : HERRAMIENTAS.filter((tool) => tool.categoria === category);
+    return HERRAMIENTAS.filter((tool) => {
+      if (category !== "todas" && tool.categoria !== category) return false;
+      const haystack = norm(`${titles[tool.id]} ${texts[tool.id].desc} ${categoryTitle[tool.categoria]}`);
+      return haystack.includes(q);
+    });
+  }, [q, category, titles, texts, categoryTitle]);
 
   const openAsistente = () => {
     window.dispatchEvent(new CustomEvent(OPEN_ASISTENTE_EVENT));
   };
 
   const Heading = headingLevel;
-  const kitPlans = [
-    { name: p.nameEsencial, price: p.priceEsencial },
-    { name: p.nameCrecimiento, price: p.priceCrecimiento },
-    { name: p.nameTotal, price: p.priceTotal },
-  ];
+  const kitPlans = useMemo(
+    () => [
+      { name: p.nameEsencial, price: p.priceEsencial },
+      { name: p.nameCrecimiento, price: p.priceCrecimiento },
+      { name: p.nameTotal, price: p.priceTotal },
+    ],
+    [p],
+  );
+  // Textos de la banda de Servicios por servicio (títulos/descs de
+  // t.herramientas; los href viven en lib/contacto.ts, fuente única).
+  const serviciosText: Record<ContactoServicio, { title: string; desc: string }> = useMemo(
+    () => ({
+      camisetas: { title: h.servicioCamisetasTitle, desc: h.servicioCamisetasDesc },
+      publicitario: { title: h.servicioPublicidadTitle, desc: h.servicioPublicidadDesc },
+      marketing: { title: h.servicioMarketingTitle, desc: h.servicioMarketingDesc },
+      otro: { title: "", desc: "" },
+    }),
+    [h],
+  );
 
   return (
     <section id="herramientas" aria-label={h.sectionAria} className="scroll-mt-20 border-t border-slate-800/80 py-10 sm:py-12">
@@ -319,6 +350,48 @@ export function HerramientasSection({ headingLevel = "h2" }: { headingLevel?: "h
           })}
         </div>
       )}
+
+      {/* Banda de servicios (2026-11-25, plan servicios-calc D-3/D-4):
+          bloque ESTÁTICO entre el grid y el cierre «kit», fuera del
+          array HERRAMIENTAS (los servicios no tienen featureKey: en
+          HERRAMIENTAS romperían el guard H-06 y el test de corte).
+          No la afectan el filtro ni el buscador (solo recorren
+          HERRAMIENTAS) y sigue visible aunque el filtro no dé
+          resultados. Cáscara pública (slate + blur, patrón LandingAi),
+          sin icono de categoría, sin badge de plan y sin línea ámbar
+          de límite: un solo CTA por servicio, «Pide tu cotización»
+          → /contacto?servicio=<servicio> (preselección del formulario,
+          lib/contacto.ts SERVICIO_CONTACTO_HREF). Sin precios, sin
+          clientes, sin testimonios, sin cifras. BLOQUEADOR P0 (plan D-3): /contacto hoy no tiene
+          formulario ni datos de contacto — la banda se construye pero
+          NO se publica hasta resolverlo. */}
+      <section aria-label={h.serviciosTitle} className="mt-8">
+        <h3 className="text-xl font-bold tracking-tight text-slate-50">{h.serviciosTitle}</h3>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">{h.serviciosIntro}</p>
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {SERVICIOS_BANDA.map((servicio) => {
+            const { title, desc } = serviciosText[servicio];
+            return (
+              <article
+                key={servicio}
+                className="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{h.serviciosEyebrow}</p>
+                <h3 className="mt-3 text-lg font-bold text-slate-50">{title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-400">{desc}</p>
+                <div className="mt-4">
+                  <Link
+                    href={SERVICIO_CONTACTO_HREF[servicio]}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+                  >
+                    {h.serviciosQuoteCta}
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Cierre «una herramienta o todo el kit» (precios de t.planes). */}
       <div className="mt-8 rounded-xl border border-blue-500/30 bg-blue-500/[0.07] px-4 py-6 backdrop-blur sm:px-6">

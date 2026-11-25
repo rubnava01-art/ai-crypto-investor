@@ -6,6 +6,7 @@ import { getToken } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
 import { PublicNav } from "../../components/PublicNav";
 import { Footer } from "../../components/Footer";
+import { ContactoForm } from "../../components/ContactoForm";
 
 /** Página de contacto (2026-11-12).
  * PENDIENTE (dato del dueño): todavía no hay email, teléfono ni
@@ -29,6 +30,10 @@ export default function ContactoPage() {
       <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{c.title}</h1>
         <p className="mt-3 text-base leading-relaxed text-zinc-400">{c.subtitle}</p>
+
+        {/* Formulario público (2026-11-25, servicios-calc): el visitante
+            escribe sin cuenta; el mensaje lo revisa un admin en Correos. */}
+        <ContactoForm />
 
         <section aria-label={c.visitorTitle} className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
           <h2 className="text-lg font-bold text-zinc-50">{c.visitorTitle}</h2>

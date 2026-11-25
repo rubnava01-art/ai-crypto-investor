@@ -284,10 +284,10 @@ def test_migration_single_head_and_new_tables(tmp_path):
     heads = script.get_heads()
     assert len(heads) == 1, heads
     head_rev = script.get_revision(heads[0])
-    # 2026-11-21 (borrado de usuarios): la migración de ondelete en
-    # las FK a users es la nueva cabeza.
-    assert head_rev.revision == "b7c3e91a4f02"
-    assert head_rev.down_revision == "9c2e7b4a1f08"
+    # 2026-11-25 (mensajes de contacto): la tabla contact_messages es
+    # la nueva cabeza.
+    assert head_rev.revision == "ef98abd287f8"
+    assert head_rev.down_revision == "b7c3e91a4f02"
 
     # Fresh DB: upgrade head creates the three tables with model columns.
     db_file = tmp_path / "fresh.db"

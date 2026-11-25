@@ -82,29 +82,31 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * la entrada de optimización del chat del 2026-11-23 antepuesta: todos los
  * índices +1 y la entrada nueva (business, crear, estudiar, invertir) en [0] — y con
  * la entrada de mejoras diarias del 2026-11-24 antepuesta: todos los
- * índices +1 y la entrada nueva (talento, riesgos, planillas, usuarios) en [0]. */
+ * índices +1 y la entrada nueva (talento, riesgos, planillas, usuarios) en [0] — y con
+ * la entrada de Servicios + calculadora + contacto del 2026-11-25 antepuesta: todos los
+ * índices +1 y la entrada nueva (estudiar, correos) en [0]. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [6, 8, 9, 10, 12, 13, 16, 18, 19, 20, 21],
-  planes: [2, 31],
-  terminal: [32],
-  flujos: [25, 32],
-  analizador: [32],
-  auditor: [9, 32, 35],
-  ajustador: [42],
-  correos: [11],
-  crear: [5, 6, 8, 9, 10, 12, 15, 19, 34],
-  estudiar: [0, 1, 2, 3, 5, 8, 9, 10, 12, 13, 19, 23, 30, 32, 40, 42, 45, 46],
-  inicio: [1, 2, 5, 9, 10, 19, 32, 43, 51],
-  perfil: [9, 14, 22, 44],
-  talento: [4, 15, 23, 47],
-  riesgos: [4, 16, 47],
-  planillas: [4, 13, 19, 47],
-  crm: [7, 11, 16, 47],
-  analisis: [9, 47],
-  invertir: [8, 9, 10, 12, 19, 24, 28, 29, 33, 48, 50],
-  usuarios: [0, 3, 4, 9, 10, 11, 14, 15, 17, 26, 50, 51],
-  espacio: [51],
-  facturas: [7, 13, 19],
+  business: [7, 9, 10, 11, 13, 14, 17, 19, 20, 21, 22],
+  planes: [3, 32],
+  terminal: [33],
+  flujos: [26, 33],
+  analizador: [33],
+  auditor: [10, 33, 36],
+  ajustador: [43],
+  correos: [0, 12],
+  crear: [6, 7, 9, 10, 11, 13, 16, 20, 35],
+  estudiar: [0, 1, 2, 3, 4, 6, 9, 10, 11, 13, 14, 20, 24, 31, 33, 41, 43, 46, 47],
+  inicio: [2, 3, 6, 10, 11, 20, 33, 44, 52],
+  perfil: [10, 15, 23, 45],
+  talento: [5, 16, 24, 48],
+  riesgos: [5, 17, 48],
+  planillas: [5, 14, 20, 48],
+  crm: [8, 12, 17, 48],
+  analisis: [10, 48],
+  invertir: [9, 10, 11, 13, 20, 25, 29, 30, 34, 49, 51],
+  usuarios: [1, 4, 5, 10, 11, 12, 15, 16, 18, 27, 51, 52],
+  espacio: [52],
+  facturas: [8, 14, 20],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

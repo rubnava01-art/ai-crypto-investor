@@ -17,6 +17,7 @@ import { facturasApi } from "./api/facturas";
 import { marketApi } from "./api/market";
 import { clasesApi } from "./api/clases";
 import { correosApi } from "./api/correos";
+import { contactoApi } from "./api/contacto";
 import { referidosApi } from "./api/referidos";
 import { businessApi } from "./api/business";
 import { perfilApi } from "./api/perfil";
@@ -47,6 +48,7 @@ export const api = {
   ...facturasApi,
   ...clasesApi,
   ...correosApi,
+  ...contactoApi,
   ...referidosApi,
   ...businessApi,
   ...perfilApi,

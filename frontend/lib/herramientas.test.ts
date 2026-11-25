@@ -33,9 +33,9 @@ function planIndexForFeature(featureKey: string): number {
   return includedByPlan.findIndex((included) => included.has(featureKey));
 }
 
-test("corte de lanzamiento: exactamente 25 herramientas, ids únicos", () => {
-  assert.equal(HERRAMIENTAS.length, 25);
-  assert.equal(new Set(HERRAMIENTAS.map((t) => t.id)).size, 25);
+test("corte de lanzamiento: exactamente 26 herramientas, ids únicos", () => {
+  assert.equal(HERRAMIENTAS.length, 26);
+  assert.equal(new Set(HERRAMIENTAS.map((t) => t.id)).size, 26);
 });
 
 test("nunca: ajustador, terminal, usuarios, privacidad, perfil ni chat", () => {
@@ -140,7 +140,66 @@ test("R-01: /estudiar reintenta el desplazamiento a #herramienta-* tras hidratar
   assert.ok(estudiarSrc.includes("document.getElementById(id)"), "/estudiar debe buscar el elemento de la herramienta");
   assert.ok(estudiarSrc.includes("scrollIntoView()"), "/estudiar debe desplazar al elemento de la herramienta");
   const clasesSrc = readFileSync(path.join(FRONTEND, "components/ClasesHerramientas.tsx"), "utf8");
-  for (const id of ["herramienta-calculadora", "herramienta-bitcoin"]) {
+  for (const id of ["herramienta-calculadora", "herramienta-bitcoin", "herramienta-rentabilidad"]) {
     assert.ok(clasesSrc.includes(`"${id}"`), `ClasesHerramientas debe tener el id ${id}`);
+  }
+});
+
+// T-3 (plan servicios-calc, 2026-11-25): la lista de salto del panel
+// de Clases incluye la 6ª entrada con su ancla (el test genérico de
+// anclas no verifica la lista de salto).
+test("T-3: la lista de salto de Clases incluye #herramienta-rentabilidad", () => {
+  const clasesSrc = readFileSync(path.join(FRONTEND, "components/ClasesHerramientas.tsx"), "utf8");
+  assert.ok(
+    clasesSrc.includes('{ href: "#herramienta-rentabilidad", label: t.clases.rentTitle }'),
+    "la lista jump debe tener la 6ª entrada a #herramienta-rentabilidad",
+  );
+  assert.ok(clasesSrc.includes('id="herramienta-rentabilidad"'), "falta el ToolCard herramienta-rentabilidad");
+  assert.ok(clasesSrc.includes('num="6"'), "la calculadora de rentabilidad debe ser la nº 6");
+  assert.ok(
+    clasesSrc.includes('className="inline-flex min-h-[44px] items-center rounded-full border border-zinc-700'),
+    "las píldoras de salto deben medir 44px (H-05)",
+  );
+});
+
+// D-2 (plan servicios-calc): ai7Desc cuenta 6 herramientas — dos sin
+// registro y cuatro dentro de la cuenta — en ambos idiomas.
+test("ai7Desc: seis herramientas, dos sin registro y cuatro dentro de tu cuenta", () => {
+  assert.ok(dictEs.landing.ai7Desc.includes("Seis"), `ai7Desc ES: ${dictEs.landing.ai7Desc}`);
+  assert.ok(dictEs.landing.ai7Desc.includes("cuatro"), `ai7Desc ES: ${dictEs.landing.ai7Desc}`);
+  assert.ok(dictEn.landing.ai7Desc.includes("Six"), `ai7Desc EN: ${dictEn.landing.ai7Desc}`);
+  assert.ok(dictEn.landing.ai7Desc.includes("four"), `ai7Desc EN: ${dictEn.landing.ai7Desc}`);
+});
+
+// D-3 / B-1 (plan servicios-calc): la banda de servicios es un bloque
+// estático fuera de HERRAMIENTAS — sin featureKey, sin badge de plan —
+// con sus 10 claves i18n en ES y EN y un solo CTA a /contacto.
+test("servicios: banda estática fuera de HERRAMIENTAS, sin precio, CTA a /contacto", () => {
+  for (const id of ["camisetas", "publicidad", "marketing"]) {
+    assert.ok(!HERRAMIENTAS.some((t) => t.id === id), `el servicio ${id} no debe ser entrada de HERRAMIENTAS`);
+  }
+  const sectionSrc = readFileSync(path.join(FRONTEND, "components/HerramientasSection.tsx"), "utf8");
+  assert.ok(sectionSrc.includes("h.serviciosTitle"), "la banda debe usar t.herramientas.serviciosTitle");
+  assert.ok(sectionSrc.includes("h.serviciosQuoteCta"), "la banda debe usar t.herramientas.serviciosQuoteCta");
+  assert.ok(sectionSrc.includes('href="/contacto"'), "el CTA de cada servicio debe ir a /contacto");
+  for (const key of [
+    "serviciosTitle",
+    "serviciosIntro",
+    "serviciosEyebrow",
+    "serviciosQuoteCta",
+    "servicioCamisetasTitle",
+    "servicioCamisetasDesc",
+    "servicioPublicidadTitle",
+    "servicioPublicidadDesc",
+    "servicioMarketingTitle",
+    "servicioMarketingDesc",
+  ]) {
+    for (const [lang, dict] of [
+      ["es", dictEs],
+      ["en", dictEn],
+    ] as const) {
+      const value = dict.herramientas[key];
+      assert.ok(typeof value === "string" && value.trim() !== "", `herramientas.${key} falta o está vacía en ${lang}`);
+    }
   }
 });
