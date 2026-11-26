@@ -55,6 +55,7 @@ import time
 import unicodedata
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -90,7 +91,7 @@ from app.core.security import (
 from app.data import ingest
 from app.database import get_db
 from app.indicators import technical as ind
-from app.internet import buscar_en_internet
+from app.internet import buscar_en_internet, precio_coingecko
 from app.models.tables import (
     Appointment,
     AsistenteFeedback,
@@ -103,6 +104,7 @@ from app.models.tables import (
     EduClass,
     HomePost,
     Invoice,
+    MarketingCampaign,
     PreguntaSinRespuesta,
     ReglaAsistente,
     Signal,
@@ -129,16 +131,33 @@ asistente_limiter = RateLimiter(max_requests=20, window_seconds=60)
 # conservadores de partida. El dueño debe confirmarlos o cambiarlos
 # antes de publicar la Fase 6. UN SOLO SITIO: cambiar un número aquí
 # cambia el límite en el chat y en GET /api/asistente/uso.
+# Corrida 2026-11-26 (A2): cada límite se lee de su variable de
+# entorno (ASISTENTE_LIMITE_PRUEBA/ESENCIAL/CRECIMIENTO/TOTAL) con
+# los valores propuestos (10/50/200/1000) como predeterminados; un
+# valor ausente, no numérico o <= 0 cae al predeterminado. Sin
+# cambio de esquema: sigue siendo un dict en memoria, no una tabla.
 # Día = día natural UTC (toda la BD guarda en UTC); al cambiar de día
 # el contador vuelve a cero porque la fila es otra (ver
 # AsistenteUsoDiario). La subida de plan hoy la hace el administrador
 # (no hay pago en línea: la Fase 7 la prepara); el 429 lo dice así,
 # sin prometer nada que no exista.
+def _limite_env(nombre: str, defecto: int) -> int:
+    """Límite diario desde variable de entorno, o el predeterminado."""
+    raw = (os.environ.get(nombre) or "").strip()
+    if not raw:
+        return defecto
+    try:
+        valor = int(raw)
+    except ValueError:
+        return defecto
+    return valor if valor > 0 else defecto
+
+
 LIMITES_MENSAJES_POR_DIA: dict[str, int] = {
-    "prueba": 10,        # rol prueba / sin plan elegido
-    "esencial": 50,      # Esencial $19/mes
-    "crecimiento": 200,  # Crecimiento $49/mes
-    "total": 1000,       # Negocio Total $99/mes
+    "prueba": _limite_env("ASISTENTE_LIMITE_PRUEBA", 10),        # rol prueba / sin plan elegido
+    "esencial": _limite_env("ASISTENTE_LIMITE_ESENCIAL", 50),    # Esencial $19/mes
+    "crecimiento": _limite_env("ASISTENTE_LIMITE_CRECIMIENTO", 200),  # Crecimiento $49/mes
+    "total": _limite_env("ASISTENTE_LIMITE_TOTAL", 1000),        # Negocio Total $99/mes
 }
 NOMBRES_PLAN: dict[str, str] = {
     "prueba": "Prueba",
@@ -265,13 +284,13 @@ COMANDOS = [
     {
         "id": "precio_btc",
         "ejemplo": "¿Cuánto vale el bitcoin?",
-        "descripcion": "Precio actual de BTC y ETH con datos reales de la plataforma.",
+        "descripcion": "Precio actual de BTC, ETH, USDT y BNB con datos reales de la plataforma.",
         "requiere_admin": False,
     },
     {
         "id": "senales",
         "ejemplo": "Muéstrame las últimas señales",
-        "descripcion": "Resumen de las últimas señales reales registradas.",
+        "descripcion": "Resumen de las últimas señales demo/simuladas registradas en la plataforma.",
         "requiere_admin": False,
     },
     {
@@ -332,6 +351,24 @@ COMANDOS = [
         "id": "novedades",
         "ejemplo": "¿Qué hay nuevo?",
         "descripcion": "Últimas novedades publicadas en Inicio.",
+        "requiere_admin": False,
+    },
+    {
+        "id": "planes",
+        "ejemplo": "¿Cuánto vale el plan Esencial?",
+        "descripcion": "Precios de los planes (Esencial $19, Crecimiento $49, Negocio Total $99) y prueba gratis de 14 días.",
+        "requiere_admin": False,
+    },
+    {
+        "id": "campanas",
+        "ejemplo": "¿Qué campañas hay?",
+        "descripcion": "Lista las campañas de marketing y su estado (solo lectura).",
+        "requiere_admin": False,
+    },
+    {
+        "id": "flujos",
+        "ejemplo": "¿Qué son los flujos?",
+        "descripcion": "Explica qué son los flujos y dónde verlos (viven en el navegador, no en el servidor).",
         "requiere_admin": False,
     },
     {
@@ -469,6 +506,16 @@ def _iso(value: dt.datetime | None) -> str | None:
     if value.tzinfo is None:
         value = value.replace(tzinfo=dt.timezone.utc)
     return value.isoformat()
+
+
+def _extracto(texto: str | None, limite: int = 140) -> str:
+    """Extracto corto de un cuerpo (B2, 2026-11-26): novedades y
+    clases muestran de qué tratan, no solo el título. Una línea,
+    sin saltos, cortado a `limite` caracteres."""
+    limpio = re.sub(r"\s+", " ", (texto or "")).strip()
+    if len(limpio) <= limite:
+        return limpio
+    return limpio[:limite].rstrip() + "…"
 
 
 def _ahora_iso() -> str:
@@ -795,9 +842,10 @@ AYUDAS = [
                    "donde estan los manuales"),
         "titulo": "Usar Estudiar",
         "pasos": ("En Estudiar (/estudiar) están los cursos y manuales, "
-                  "las clases grabadas y en vivo, los vídeos y las 5 "
+                  "las clases grabadas y en vivo, los vídeos y las 6 "
                   "herramientas (calculadora de interés compuesto, "
-                  "conversor BTC/USD, gráfica, indicadores y BTC). La "
+                  "conversor BTC/USD, gráfica, indicadores, BTC y "
+                  "calculadora de rentabilidad). La "
                   "guía gratuita se descarga desde su ficha; los cursos "
                   "de pago se compran en su ficha (Hotmart o PayPal)."),
         "modulo": "estudiar",
@@ -847,8 +895,9 @@ AYUDAS = [
                   "(#herramienta-calculadora), conversor BTC/USD en "
                   "vivo (#herramienta-conversor), gráfica BTC/USD de 1 "
                   "hora (#herramienta-grafica), indicadores "
-                  "(#herramienta-indicadores) y BTC "
-                  "(#herramienta-bitcoin)."),
+                  "(#herramienta-indicadores), BTC "
+                  "(#herramienta-bitcoin) y calculadora de rentabilidad "
+                  "(#herramienta-rentabilidad)."),
         "modulo": "estudiar",
         "ruta": "/estudiar",
     },
@@ -919,6 +968,15 @@ def _regla_activa(db: Session, norm: str):
     return mejor
 
 
+# M7 (QA 2026-11-26): tope de preguntas NUEVAS por día en la
+# bandeja (200): sin tope, un usuario podía llenarla con preguntas
+# distintas sin parar. Tope global por día: la tabla no tiene
+# user_id, así que un tope por usuario exigiría un cambio de
+# esquema (no se hace en esta corrida). Las repetidas solo
+# incrementan `veces` y no crean fila, así que no cuentan.
+TOPE_PREGUNTAS_NUEVAS_DIA = 200
+
+
 def _registrar_pregunta(db: Session, pregunta: str):
     """Registra/incrementa una pregunta sin respuesta en la bandeja.
     Si ya existía resuelta o descartada y vuelve a quedarse sin
@@ -934,6 +992,14 @@ def _registrar_pregunta(db: Session, pregunta: str):
         .first()
     )
     if row is None:
+        nuevas_hoy = (
+            db.query(PreguntaSinRespuesta)
+            .filter(func.date(PreguntaSinRespuesta.primera_vez)
+                    == _hoy_utc().isoformat())
+            .count()
+        )
+        if nuevas_hoy >= TOPE_PREGUNTAS_NUEVAS_DIA:
+            return None
         row = PreguntaSinRespuesta(
             pregunta=texto, veces=1, primera_vez=ahora, ultima_vez=ahora,
             estado="pendiente",
@@ -1030,13 +1096,144 @@ def _es_orden_creacion(norm: str) -> bool:
 
 # ------------------------------------------------------------------ intenciones --
 
+# C2 (2026-11-26): qué incluye cada plan — matriz acumulativa que
+# espeja frontend/components/PlanesPanel.tsx (PLAN_FEATURE_KEYS):
+# Esencial trae 4 módulos; Crecimiento suma 4 más; Negocio Total
+# suma 6 más. No hay fuente backend de estas inclusiones (PLANES
+# solo trae nombre y precio): si el frontend cambia la matriz, hay
+# que cambiarla aquí también (misma advertencia que
+# HERRAMIENTAS_CLASES, F4-2). Los precios y los días de prueba SÍ
+# se leen de suscripciones.py (PLANES, DIAS_PRUEBA), nunca de texto
+# hardcodeado.
+_PLANES_INCLUYE: dict[str, tuple[str, ...]] = {
+    "esencial": ("crm", "facturas", "inventario", "correos"),
+    "crecimiento": ("invertir", "estudiar", "crear", "espacio"),
+    "negocio_total": ("talento", "riesgos", "planillas", "analisis",
+                      "referidos", "ajustador"),
+}
+_PLANES_CLAVES = ("esencial", "crecimiento", "negocio total")
+_PALABRAS_PLAN_PRECIO = ("precio", "cuanto", "cuesta", "vale")
+
+
+def _es_pregunta_planes(norm: str) -> bool:
+    """True si el mensaje pregunta por los planes de suscripción
+    (precio, qué incluye, prueba gratis, "mi plan").
+
+    Desambigua "precio del plan" de "precio de BTC": la intención
+    `precio` ya no debe capturar preguntas de planes (C2). "plan de
+    marketing" o "plan de negocio" NO son preguntas de planes: la
+    palabra "plan" sola no basta, hace falta un nombre de plan, una
+    palabra de precio/inclusión o "suscripción"."""
+    if "suscripci" in norm:
+        return True
+    # Los tokens se extraen sin puntuación: "¿cuál es mi plan?"
+    # deja "plan?" como token y el "plan" exacto no casaba (C2,
+    # 2026-11-26: "¿cuál es mi plan?" no llegaba a planes).
+    palabras = re.findall(r"[a-z0-9]+", norm)
+    menciona_plan = "plan" in palabras or "planes" in palabras
+    menciona_nombre = any(c in norm for c in _PLANES_CLAVES)
+    if menciona_plan:
+        if palabras in (["plan"], ["planes"]):
+            return True
+        if menciona_nombre:
+            return True
+        # "¿qué planes hay?" / "¿hay planes?": "que hay" no es
+        # contiguo ("que planes hay"), así que se mira el par.
+        if "planes" in palabras and "hay" in palabras:
+            return True
+        return any(p in norm for p in (
+            "precio", "cuanto", "cuesta", "vale", "incluye", "inclui",
+            "prueba", "gratis", "dias", "que hay", "cuales", "dime",
+            "muestra", "lista", "cambiar", "subir", "mi plan",
+            "planes hay", "hay planes"))
+    if menciona_nombre and any(p in norm for p in _PALABRAS_PLAN_PRECIO):
+        return True
+    return False
+
+
+def _h_planes(db: Session, user, norm: str) -> dict:
+    """Precios e inclusiones de los planes, leídos de PLANES de
+    suscripciones.py ($19/$49/$99, 14 días gratis). Si el mensaje
+    nombra un plan, responde solo ese; si no, los tres. "Mi plan"
+    añade el plan actual del usuario (de su suscripción o del plan
+    elegido al registrarse, misma fuente que el límite diario)."""
+    from app.api.suscripciones import DIAS_PRUEBA, PLANES
+
+    if "negocio total" in norm:
+        claves = ["negocio_total"]
+    elif "esencial" in norm:
+        claves = ["esencial"]
+    elif "crecimiento" in norm:
+        claves = ["crecimiento"]
+    else:
+        claves = ["esencial", "crecimiento", "negocio_total"]
+    datos_planes = []
+    lineas = ["Planes de Grow Business Platform (precios en USD, por mes):"]
+    acumuladas: list[str] = []
+    for clave in ("esencial", "crecimiento", "negocio_total"):
+        propias = [MODULOS_RESUMEN[m][0] for m in _PLANES_INCLUYE[clave]]
+        if clave not in claves:
+            acumuladas.extend(propias)
+            continue
+        info = PLANES[clave]
+        incluye = acumuladas + propias
+        if acumuladas:
+            linea = (f"- {info['nombre']}: ${info['precio_mensual_usd']}/mes. "
+                     f"Incluye todo lo anterior, más: {', '.join(propias)}.")
+        else:
+            linea = (f"- {info['nombre']}: ${info['precio_mensual_usd']}/mes. "
+                     f"Incluye: {', '.join(propias)}.")
+        lineas.append(linea)
+        datos_planes.append({
+            "clave": clave, "nombre": info["nombre"],
+            "precio_mensual_usd": info["precio_mensual_usd"],
+            "incluye": incluye,
+        })
+        acumuladas.extend(propias)
+    lineas.append(
+        f"Todos los planes incluyen {DIAS_PRUEBA} días de prueba gratis. "
+        "La prueba y la suscripción las activa el administrador "
+        "(todavía no hay cobro en línea). Más detalle en /planes.")
+    if "mi plan" in norm:
+        clave_actual, limite = _plan_usuario(user, db)
+        if limite is None:
+            lineas.append("Tu plan actual: Administrador (sin límite diario).")
+        else:
+            nombre_actual = next(
+                (PLANES[c]["nombre"] for c in ("esencial", "crecimiento", "negocio_total")
+                 if c == clave_actual or (c == "negocio_total" and clave_actual == "total")),
+                NOMBRES_PLAN.get(clave_actual, clave_actual))
+            lineas.append(
+                f"Tu plan actual: {nombre_actual} "
+                f"({limite} mensajes del Asistente al día).")
+    return _respuesta(
+        "\n".join(lineas),
+        tipo="planes",
+        datos={"planes": datos_planes, "dias_prueba_gratis": DIAS_PRUEBA},
+        fuente={"nombre": "Planes de suscripción", "url": "/planes"},
+        sugerencias=["¿Cuánto vale el plan Esencial?", "¿Qué puedes hacer?", "¿Cuánto vale el bitcoin?"],
+    )
+
+
 def _h_precio(db: Session, norm: str) -> dict:
     # F3-2: la edad del caché se mira antes de presentar el precio.
-    # Caché fresca (<=300 s): precio actual. Caché vieja: se cae a
-    # las velas guardadas CON su fecha; si tampoco hay velas, el
-    # precio viejo se presenta solo como viejo (con su antigüedad en
-    # minutos y su fecha de actualización), nunca como actual.
-    datos: dict = {"btc_usd": None, "eth_usd": None, "disponible": False, "fuente": "sin_datos"}
+    # B1 (2026-11-26): BTC/ETH/USDT/BNB (antes solo BTC/ETH aunque
+    # la caché de mercado trae las 4). Monedas pedidas en el mensaje;
+    # sin mención, BTC+ETH (comportamiento anterior). Fuentes, en
+    # orden: caché fresca (<=300 s) -> último cierre guardado en
+    # velas (BTC/ETH) -> CoinGecko en vivo (C1, solo si la pregunta
+    # es de precio explícita: "¿qué es el bitcoin?" es una
+    # definición y no merece un viaje a internet) -> caché vieja
+    # etiquetada con su antigüedad. Nunca se pega al exchange desde
+    # el chat y nunca se inventa un precio.
+    pedidas = [m for m in _MONEDAS_PRECIO
+               if any(w in norm for w in m[2])]
+    if not pedidas:
+        pedidas = list(_MONEDAS_PRECIO[:2])
+    simbolos = [m[0] for m in pedidas]
+    precios: dict[str, tuple[float, str, str]] = {}
+    datos: dict = {"btc_usd": None, "eth_usd": None, "usdt_usd": None,
+                   "bnb_usd": None, "disponible": False, "fuente": "sin_datos"}
     cached = (market_api._PRICES_CACHE or {}).get("payload")
     edad_s = None
     actualizado_en = None
@@ -1045,78 +1242,142 @@ def _h_precio(db: Session, norm: str) -> dict:
         actualizado_en = cached.get("updated_utc")
         if edad_s <= 300:
             for coin in cached["prices"]:
-                if coin.get("symbol") == "BTC":
-                    datos["btc_usd"] = coin.get("price_usd")
-                elif coin.get("symbol") == "ETH":
-                    datos["eth_usd"] = coin.get("price_usd")
-            if datos["btc_usd"] is not None or datos["eth_usd"] is not None:
-                datos["fuente"] = "cache_mercado"
-    if datos["fuente"] == "sin_datos":
+                sym = coin.get("symbol")
+                if sym in simbolos and coin.get("price_usd") is not None:
+                    precios[sym] = (float(coin["price_usd"]), "cache_mercado",
+                                    f"actualizada hace {int(edad_s)} s")
+    if any(s not in precios for s in simbolos):
         # Sin caché fresca: último cierre guardado en velas (datos
-        # reales de la plataforma) con la fecha de la vela. Nunca se
-        # pega al exchange desde el chat.
-        fecha_vela = None
-        for symbol, key in (("BTC/USD", "btc_usd"), ("ETH/USD", "eth_usd")):
-            velas = ingest.latest_candles(db, symbol, "1h", 1)
-            if velas:
-                datos[key] = float(velas[-1].close)
-                fecha_vela = _iso(velas[-1].open_time_utc)
-        if datos["btc_usd"] is not None or datos["eth_usd"] is not None:
-            datos["fuente"] = "velas_guardadas"
-            datos["fecha_vela"] = fecha_vela
-    datos["disponible"] = datos["btc_usd"] is not None or datos["eth_usd"] is not None
-    if not datos["disponible"]:
+        # reales de la plataforma) con la fecha de la vela. Solo
+        # BTC/USD y ETH/USD tienen velas guardadas.
+        for symbol, key in (("BTC/USD", "BTC"), ("ETH/USD", "ETH")):
+            if key in simbolos and key not in precios:
+                velas = ingest.latest_candles(db, symbol, "1h", 1)
+                if velas:
+                    precios[key] = (float(velas[-1].close), "velas_guardadas",
+                                    _iso(velas[-1].open_time_utc) or "sin fecha")
+    faltan = [s for s in simbolos if s not in precios]
+    coingecko_intentado = False
+    if faltan and any(p in norm for p in _PALABRAS_PRECIO_EXPLICITO):
+        # C1: CoinGecko en vivo como respaldo, sin llave. La llamada
+        # es corta (4 s) y nunca tumba el chat (devuelve None).
+        coingecko_intentado = True
+        try:
+            vivos = precio_coingecko(faltan)
+        except Exception:
+            vivos = None
+        if vivos:
+            hora = dt.datetime.now(TZ_LA).strftime("%H:%M")
+            for sym, valor in vivos.items():
+                if sym in faltan:
+                    precios[sym] = (valor, "coingecko", hora)
+    if not precios:
         if cached and cached.get("prices") and edad_s is not None:
             # Último recurso: el precio viejo, etiquetado como viejo.
             for coin in cached["prices"]:
-                if coin.get("symbol") == "BTC":
-                    datos["btc_usd"] = coin.get("price_usd")
-                elif coin.get("symbol") == "ETH":
-                    datos["eth_usd"] = coin.get("price_usd")
-            datos["fuente"] = "cache_mercado_vieja"
-            datos["cache_edad_s"] = round(edad_s)
-            datos["actualizado_en"] = actualizado_en
-            datos["disponible"] = datos["btc_usd"] is not None or datos["eth_usd"] is not None
-            if datos["disponible"]:
+                sym = coin.get("symbol")
+                if sym in simbolos and coin.get("price_usd") is not None:
+                    precios[sym] = (float(coin["price_usd"]), "cache_mercado_vieja",
+                                    f"{int(edad_s // 60)} min")
+            if precios:
+                for sym, (valor, _f, _d) in precios.items():
+                    datos[_MONEDA_A_CLAVE[sym]] = valor
+                datos["fuente"] = "cache_mercado_vieja"
+                datos["cache_edad_s"] = round(edad_s)
+                datos["actualizado_en"] = actualizado_en
+                datos["disponible"] = True
                 minutos = int(edad_s // 60)
+                lineas = [f"- {_MONEDA_A_ETIQUETA[s]}: {_money(v)}"
+                          for s, (v, _f, _d) in precios.items()]
                 return _respuesta(
                     "Este precio NO es actual: la caché de mercado tiene "
                     f"{minutos} minuto(s) de antigüedad "
                     f"(actualizada: {actualizado_en or 'sin fecha'}) y no "
-                    "hay velas guardadas más recientes.\n"
-                    f"- Bitcoin (BTC): {_money(datos['btc_usd'])}\n"
-                    f"- Ethereum (ETH): {_money(datos['eth_usd'])}",
+                    "hay velas guardadas más recientes.\n" + "\n".join(lineas),
                     tipo="precio_btc", datos=datos,
                     fuente={"nombre": "Caché de mercado (desactualizada)", "url": None},
                     sugerencias=["Analiza el mercado", "Muéstrame las últimas señales", "¿Qué hay nuevo?"],
                 )
+        pedido_txt = ", ".join(simbolos)
+        extra = (" Ni CoinGecko respondió."
+                 if coingecko_intentado else "")
         return _respuesta(
-            "Ahora mismo no tengo un precio real disponible: no hay caché "
-            "de mercado ni velas guardadas para BTC/ETH. Pídele al "
-            "administrador que active el escáner de mercado y vuelve a "
-            "preguntarme. No voy a inventar un precio.",
+            f"Ahora mismo no tengo un precio real disponible para "
+            f"{pedido_txt}: no hay caché de mercado ni velas guardadas."
+            f"{extra} Pídele al administrador que active el escáner "
+            "de mercado y vuelve a preguntarme. No voy a inventar un precio.",
             tipo="precio_btc", datos=datos,
             fuente={"nombre": "Caché de mercado", "url": None},
         )
-    if datos["fuente"] == "velas_guardadas":
-        fecha = datos.get("fecha_vela") or "sin fecha"
-        return _respuesta(
-            "Precios reales de la plataforma (última vela guardada, "
-            f"no precio en vivo; vela del {fecha}):\n"
-            f"- Bitcoin (BTC): {_money(datos['btc_usd'])}\n"
-            f"- Ethereum (ETH): {_money(datos['eth_usd'])}",
-            tipo="precio_btc", datos=datos,
-            fuente={"nombre": "Velas guardadas", "url": None},
-            sugerencias=["Analiza el mercado", "Muéstrame las últimas señales", "¿Qué hay nuevo?"],
-        )
+    for sym, (valor, _f, _d) in precios.items():
+        datos[_MONEDA_A_CLAVE[sym]] = valor
+    datos["disponible"] = True
+    fuentes = {f for _v, f, _d in precios.values()}
+    if len(fuentes) == 1:
+        fuente_unica = next(iter(fuentes))
+        datos["fuente"] = fuente_unica
+        if fuente_unica == "cache_mercado":
+            detalle = next(d for _v, _f, d in precios.values())
+            encabezado = (f"Precios reales de la plataforma (caché de "
+                          f"mercado, {detalle}):")
+            fuente_nombre = "Caché de mercado"
+        elif fuente_unica == "velas_guardadas":
+            fecha = next(d for _v, _f, d in precios.values())
+            encabezado = ("Precios reales de la plataforma (última vela "
+                          f"guardada, no precio en vivo; vela del {fecha}):")
+            fuente_nombre = "Velas guardadas"
+        else:  # coingecko
+            hora = next(d for _v, _f, d in precios.values())
+            encabezado = (f"Precios en vivo (CoinGecko, consultado {hora} "
+                          "hora de Los Ángeles):")
+            fuente_nombre = "CoinGecko (precio en vivo)"
+        lineas = [f"- {_MONEDA_A_ETIQUETA[s]}: {_money(v)}"
+                  for s, (v, _f, _d) in precios.items()]
+    else:
+        datos["fuente"] = "mixta"
+        encabezado = "Precios (fuentes mezcladas):"
+        fuente_nombre = "Varias fuentes"
+        lineas = []
+        for s, (v, f, d) in precios.items():
+            nota = {"cache_mercado": f"caché, {d}",
+                    "velas_guardadas": f"vela del {d}",
+                    "coingecko": f"CoinGecko {d}"}.get(f, f)
+            lineas.append(f"- {_MONEDA_A_ETIQUETA[s]}: {_money(v)} ({nota})")
+    # D2 (QA 2026-11-26): con caché fresca la mini-tarjeta necesita
+    # la edad real del precio; antes actualizado_en y cache_edad_s
+    # solo existían como variables locales (la rama de caché vieja
+    # ya los ponía en datos). Solo cuando la caché aportó precio.
+    if "cache_mercado" in fuentes and edad_s is not None:
+        datos["actualizado_en"] = actualizado_en
+        datos["cache_edad_s"] = round(edad_s)
+    faltan_txt = [s for s in simbolos if s not in precios]
+    if faltan_txt:
+        lineas.append(
+            "Sin dato para " + ", ".join(faltan_txt) +
+            ": no hay caché, ni velas, ni respuesta de CoinGecko.")
     return _respuesta(
-        "Precios reales de la plataforma (caché de mercado, actual):\n"
-        f"- Bitcoin (BTC): {_money(datos['btc_usd'])}\n"
-        f"- Ethereum (ETH): {_money(datos['eth_usd'])}",
+        encabezado + "\n" + "\n".join(lineas),
         tipo="precio_btc", datos=datos,
-        fuente={"nombre": "Caché de mercado", "url": None},
+        fuente={"nombre": fuente_nombre, "url": None},
         sugerencias=["Analiza el mercado", "Muéstrame las últimas señales", "¿Qué hay nuevo?"],
     )
+
+
+# B1: monedas con precio en el chat (símbolo, etiqueta, palabras
+# que la piden, par de velas/clave de datos).
+_MONEDAS_PRECIO: tuple[tuple[str, str, tuple[str, ...], tuple[str | None, str]], ...] = (
+    ("BTC", "Bitcoin (BTC)", ("btc", "bitcoin"), ("BTC/USD", "btc_usd")),
+    ("ETH", "Ethereum (ETH)", ("eth", "ethereum"), ("ETH/USD", "eth_usd")),
+    ("USDT", "Tether (USDT)", ("usdt", "tether"), (None, "usdt_usd")),
+    ("BNB", "BNB (BNB)", ("bnb",), (None, "bnb_usd")),
+)
+_MONEDA_A_CLAVE = {m[0]: m[3][1] for m in _MONEDAS_PRECIO}
+_MONEDA_A_ETIQUETA = {m[0]: m[1] for m in _MONEDAS_PRECIO}
+# Solo una pregunta de precio explícita merece el viaje a CoinGecko
+# (C1): "¿qué es el bitcoin?" es una definición y se responde con
+# los datos locales o con "no tengo precio".
+_PALABRAS_PRECIO_EXPLICITO = ("precio", "cuanto vale", "cotizacion",
+                              "cuanto cuesta", "a cuanto esta")
 
 
 def _h_senales(db: Session) -> dict:
@@ -1134,7 +1395,10 @@ def _h_senales(db: Session) -> dict:
         datos.append({"id": s.id, "symbol": s.symbol, "side": s.side,
                       "reason": s.reason, "status": s.status})
     return _respuesta(
-        "Últimas señales reales:\n" + "\n".join(lineas),
+        "Últimas señales (demo/simuladas, no señales reales de mercado):\n"
+        + "\n".join(lineas)
+        + "\nSon señales demo/simuladas registradas en la plataforma, "
+          "no señales reales de mercado ni consejo de inversión.",
         tipo="senales", datos={"senales": datos},
         fuente={"nombre": "Tabla de señales", "url": None},
         sugerencias=["Analiza el mercado", "¿Cuánto vale el bitcoin?", "¿Qué hay nuevo?"],
@@ -1308,9 +1572,19 @@ def _h_crear_borrador(db: Session, user: User, mensaje: str) -> dict:
     # Patrones anclados a un verbo de creación: el "borrador" suelto
     # ya no extrae tema (A1). Si no hay verbo, tema queda vacío y se
     # pregunta el tema en vez de crear nada.
+    # A-3: "crea un borrador de campaña sobre X" reutiliza este
+    # handler (el borrador es de contenido, no una MarketingCampaign):
+    # los patrones con "de campana" van ANTES que los genéricos para
+    # que el tema sea X y no "de campaña sobre X".
     tema = _extraer_despues(
         mensaje,
-        (r"crea un borrador", r"crear un borrador", r"haz un borrador",
+        (r"crea un borrador de campa[nñ]a",
+         r"crear un borrador de campa[nñ]a",
+         r"haz un borrador de campa[nñ]a",
+         r"hacer un borrador de campa[nñ]a",
+         r"genera un borrador de campa[nñ]a",
+         r"generar un borrador de campa[nñ]a",
+         r"crea un borrador", r"crear un borrador", r"haz un borrador",
          r"hacer un borrador", r"genera un borrador", r"generar un borrador",
          r"redacta un borrador", r"escribe un borrador", r"nuevo borrador",
          r"crea una publicaci[oó]n", r"crear una publicaci[oó]n",
@@ -1641,6 +1915,90 @@ def _h_contactos(db: Session, user: User) -> dict:
     )
 
 
+def _h_campanas(db: Session, user: User, norm: str) -> dict:
+    # A-3 (2026-11-26): campañas de SOLO LECTURA (listar/estado).
+    # M1 (resuelto 2026-11-23): prueba no ve datos reales de
+    # marketing por chat. Activar/pausar/finalizar NO se hace desde
+    # el chat: es lectura y, para cambios, el módulo Tendencias.
+    if not user.is_admin:
+        return _no_disponible_demo(user)
+    if re.search(r"\b(activa|pausa|finaliza|lanza|desactiva)\b", norm) and "campana" in norm:
+        return _respuesta(
+            "Desde el chat solo puedo listar campañas y crear borradores; "
+            "para activar, pausar o finalizar una campaña ve a Tendencias "
+            "> Campañas (/tendencias).",
+            tipo="campanas", datos={"campanas": []},
+            fuente={"nombre": "Campañas de marketing", "url": "/tendencias"},
+            sugerencias=["¿Qué campañas hay?", "Crea un borrador sobre el nuevo curso", "¿Qué puedes hacer?"],
+        )
+    estado = next((e for e in ("borrador", "activa", "pausada", "finalizada")
+                   if re.search(r"\b" + e + r"\b", norm)), None)
+    # Estado de una campaña concreta: "¿cómo está la campaña X?"
+    if "estado" in norm or "como esta" in norm:
+        candidatas = (db.query(MarketingCampaign)
+                      .order_by(MarketingCampaign.id.desc()).limit(20).all())
+        for c in candidatas:
+            if len(_norm(c.name)) >= 4 and _norm(c.name) in norm:
+                return _respuesta(
+                    f"Campaña «{c.name}» ({c.channel}): estado {c.status}."
+                    + (f" Presupuesto: {_money(c.budget)}." if c.budget is not None else "")
+                    + (f" Gastado: {_money(c.spend)}." if c.spend else "")
+                    + (f" Del {c.starts_on.isoformat() if c.starts_on else ''} al {c.ends_on.isoformat() if c.ends_on else ''}."
+                       if c.starts_on or c.ends_on else "")
+                    + (f" Notas: {_extracto(c.notes)}" if c.notes else ""),
+                    tipo="campanas",
+                    datos={"campana": {"id": c.id, "name": c.name, "channel": c.channel,
+                                       "status": c.status,
+                                       "budget": float(c.budget) if c.budget is not None else None,
+                                       "spend": float(c.spend),
+                                       "starts_on": c.starts_on.isoformat() if c.starts_on else None,
+                                       "ends_on": c.ends_on.isoformat() if c.ends_on else None}},
+                    fuente={"nombre": "Campañas de marketing", "url": "/tendencias"},
+                    sugerencias=["¿Qué campañas hay?", "Crea un borrador sobre el nuevo curso", "¿Qué puedes hacer?"],
+                )
+        # "estado" sin nombre que case: se lista y se dice.
+    q = db.query(MarketingCampaign)
+    if estado:
+        q = q.filter(MarketingCampaign.status == estado)
+    rows = q.order_by(MarketingCampaign.id.desc()).limit(10).all()
+    if not rows:
+        texto = ("No hay campañas registradas"
+                 + (f" en estado {estado}" if estado else "") + ".")
+        return _respuesta(texto, tipo="campanas", datos={"campanas": []},
+                           fuente={"nombre": "Campañas de marketing", "url": "/tendencias"})
+    datos = [{"id": c.id, "name": c.name, "channel": c.channel, "status": c.status,
+              "budget": float(c.budget) if c.budget is not None else None,
+              "spend": float(c.spend)} for c in rows]
+    lineas = [f"- {c.name} ({c.channel}, {c.status})"
+              + (f" — presupuesto {_money(c.budget)}" if c.budget is not None else "")
+              for c in rows]
+    return _respuesta(f"Campañas ({len(rows)} mostradas):\n" + "\n".join(lineas),
+                       tipo="campanas", datos={"campanas": datos},
+                       fuente={"nombre": "Campañas de marketing", "url": "/tendencias"},
+                       sugerencias=["Crea un borrador sobre el nuevo curso", "¿Qué citas tengo?", "¿Qué hay nuevo?"])
+
+
+def _h_flujos() -> dict:
+    """A-3 (2026-11-26): los flujos NO tienen modelo en el servidor
+    (frontend/components/FlujosPanel.tsx: constructor visual 100 %
+    en el navegador, guardado en localStorage `grow-flows`,
+    ejecución solo simulación). El chat no puede listarlos ni
+    activarlos: no hay nada que leer en la BD. Activar/desactivar
+    desde el chat queda en backlog: haría falta un modelo de flujos
+    en el servidor (sin cambios de esquema en esta corrida)."""
+    return _respuesta(
+        "Los flujos (automatizaciones) viven solo en tu navegador: se "
+        "guardan en el almacenamiento local y su ejecución es solo "
+        "simulación — nunca se envía un correo ni se crea nada real. "
+        "Por eso el chat no puede listarlos ni activarlos: no hay "
+        "datos de flujos en el servidor. Para verlos, crearlos o "
+        "correr una simulación, ve a Flujos (/flujos).",
+        tipo="flujos", datos={"ruta": "/flujos"},
+        fuente={"nombre": "Módulo Flujos", "url": "/flujos"},
+        sugerencias=["¿Qué campañas hay?", "¿Qué puedes hacer?", "¿Qué hay nuevo?"],
+    )
+
+
 def _h_clases(db: Session) -> dict:
     rows = db.query(EduClass).order_by(EduClass.id.desc()).limit(10).all()
     if not rows:
@@ -1648,9 +2006,16 @@ def _h_clases(db: Session) -> dict:
                            tipo="clases", datos={"clases": []},
                            fuente={"nombre": "Clases de Estudiar", "url": None})
     datos = [{"id": c.id, "kind": c.kind, "title": c.title,
+              "extracto": _extracto(c.description),
               "scheduled_at": _iso(c.scheduled_at)} for c in rows]
-    lineas = [f"- {c.title} ({c.kind})" + (f" — {_iso(c.scheduled_at)}" if c.scheduled_at else "")
-              for c in rows]
+    lineas = []
+    for c in rows:
+        linea = f"- {c.title} ({c.kind})"
+        if c.scheduled_at:
+            linea += f" — {_iso(c.scheduled_at)}"
+        if c.description and c.description.strip():
+            linea += f" — {_extracto(c.description)}"
+        lineas.append(linea)
     return _respuesta(f"Clases ({len(rows)} mostradas):\n" + "\n".join(lineas),
                        tipo="clases", datos={"clases": datos},
                        fuente={"nombre": "Clases de Estudiar", "url": None},
@@ -1663,8 +2028,16 @@ def _h_novedades(db: Session) -> dict:
         return _respuesta("No hay novedades publicadas todavía en Inicio.",
                            tipo="novedades", datos={"novedades": []},
                            fuente={"nombre": "Novedades de Inicio", "url": None})
-    datos = [{"id": p.id, "title": p.title, "created_at": _iso(p.created_at)} for p in rows]
-    lineas = [f"- {p.title}" + (f" ({_iso(p.created_at)[:10]})" if p.created_at else "") for p in rows]
+    datos = [{"id": p.id, "title": p.title, "extracto": _extracto(p.body),
+              "created_at": _iso(p.created_at)} for p in rows]
+    lineas = []
+    for p in rows:
+        linea = f"- {p.title}"
+        if p.created_at:
+            linea += f" ({_iso(p.created_at)[:10]})"
+        if p.body and p.body.strip():
+            linea += f" — {_extracto(p.body)}"
+        lineas.append(linea)
     return _respuesta("Últimas novedades:\n" + "\n".join(lineas),
                        tipo="novedades", datos={"novedades": datos},
                        fuente={"nombre": "Novedades de Inicio", "url": None},
@@ -1736,6 +2109,24 @@ def _sin_respuesta_rapida(norm: str) -> bool:
     if len(palabras) < 2:
         return False
     return not any(p in _PALABRAS_COMUNES_ES for p in palabras)
+
+
+# M2 (QA 2026-11-26): patrones de PII en la pregunta del usuario.
+# Un correo o un teléfono en una pregunta genérica NO se envía a
+# DDG/Wikipedia (saldría a terceros) ni se guarda en la bandeja.
+_RE_EMAIL = re.compile(r"[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}",
+                       re.IGNORECASE)
+_RE_TELEFONO = re.compile(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{10}\b")
+
+
+def _contiene_pii(mensaje: str) -> bool:
+    """True si el mensaje parece contener datos personales (correo
+    o teléfono). Un número suelto corto (un precio, un año) no
+    cuenta: el teléfono son 10 dígitos seguidos o en grupos 3-3-4."""
+    texto = mensaje or ""
+    if _RE_EMAIL.search(texto):
+        return True
+    return bool(_RE_TELEFONO.search(texto))
 
 
 def _h_sin_respuesta(motivo: str | None = None) -> dict:
@@ -1824,8 +2215,28 @@ def _detectar_resumen_modulo(norm: str) -> str | None:
     return None
 
 
-def _h_resumen_modulo(db: Session, clave: str) -> dict:
+def _h_resumen_modulo(db: Session, clave: str, principal=None) -> dict:
+    # M8 (QA 2026-11-26): el resumen de módulo respeta el perfil —
+    # prueba e invitado no enumeran módulos de admin (usuarios,
+    # terminal, auditor, ajustador, facturas, crm, correos...). El
+    # gate usa modulos_para() (misma fuente que el menú).
     label, hint, ruta = MODULOS_RESUMEN[clave]
+    if principal is not None:
+        from app.core.perfiles import modulos_para
+
+        if clave not in modulos_para(principal, db):
+            etiqueta = _etiqueta_principal(principal)
+            return _respuesta(
+                f"El módulo {label} ({ruta}) no está disponible para tu "
+                f"perfil ({etiqueta}): no lo ves en el menú y el chat "
+                "tampoco puede resumirlo. Pídele a un administrador que "
+                "te dé acceso.",
+                tipo="resumen_modulo",
+                datos={"modulo": clave, "label": label, "ruta": ruta,
+                       "no_disponible_perfil": True},
+                fuente={"nombre": "Registro de módulos", "url": ruta},
+                sugerencias=["¿Qué puedes hacer?", "¿Cuánto vale el bitcoin?", "¿Qué hay nuevo?"],
+            )
     texto = f"{label} ({ruta}): {hint}."
     datos: dict = {"modulo": clave, "label": label, "ruta": ruta}
     if clave == "estudiar":
@@ -1843,7 +2254,7 @@ def _h_resumen_modulo(db: Session, clave: str) -> dict:
 
 
 # --------------------------------------- biblioteca de Estudiar (F4-1) --
-# F4-2: constante estática de las 5 herramientas de Clases con sus
+# F4-2: constante estática de las 6 herramientas de Clases con sus
 # anclas reales (frontend/components/ClasesHerramientas.tsx). No hay
 # registro backend de estas herramientas: si el frontend renombra un
 # id, este enlace se rompe sin que ningún test backend lo detecte
@@ -1879,17 +2290,61 @@ HERRAMIENTAS_CLASES: list[dict] = [
      "enlace": "/estudiar#herramienta-bitcoin", "ruta": "/estudiar",
      "palabras_clave": "btc bitcoin",
      "precio_usd": None},
+    # B7 (QA 2026-11-26): la 6ª herramienta de Clases (ancla real en
+    # frontend/components/ClasesHerramientas.tsx, id
+    # "herramienta-rentabilidad", título t.clases.rentTitle).
+    {"id": "herramienta:rentabilidad", "tipo": "herramienta",
+     "titulo": "Calculadora de rentabilidad",
+     "descripcion": "Calcula la rentabilidad de una inversión.",
+     "enlace": "/estudiar#herramienta-rentabilidad", "ruta": "/estudiar",
+     "palabras_clave": "rentabilidad calculadora inversion retorno ganancia",
+     "precio_usd": None},
 ]
 
 
 def _indice_biblioteca(db: Session) -> list[dict]:
     """Índice en memoria de la biblioteca (F4-1): Course + EduClass +
-    VideoEducativo + las 5 herramientas. Sin tabla nueva: se
+    VideoEducativo + las 6 herramientas. Sin tabla nueva: se
     construye por petición desde las 3 consultas ya existentes.
     Campos: id/titulo/tipo/descripcion/enlace/palabras_clave/
     precio_usd/modulo/ruta. F4-4: solo la guía gratuita ($0) enlaza
     descarga directa; los cursos de pago enlazan a su ficha/compra
-    (buy_url), NUNCA al PDF por chat."""
+    (buy_url), NUNCA al PDF por chat.
+
+    A4 (2026-11-26): caché en memoria con TTL 300 s — antes se
+    reconstruía 2 veces por mensaje (búsqueda + calificador F4-07).
+    La caché se invalida por conteo (si cambia el nº de cursos,
+    clases o vídeos, se reconstruye) y por TTL; además los
+    endpoints que crean/borran cursos, clases o vídeos llaman a
+    invalidar_cache_biblioteca(). Un cambio de título/descripción
+    sin alta ni baja tarda como mucho el TTL en verse."""
+    ahora = time.monotonic()
+    conteos = (db.query(Course).count(), db.query(EduClass).count(),
+               db.query(VideoEducativo).count())
+    if (_BIBLIOTECA_CACHE["entries"] is not None
+            and _BIBLIOTECA_CACHE["conteos"] == conteos
+            and ahora - _BIBLIOTECA_CACHE["at"] < _BIBLIOTECA_TTL_S):
+        return _BIBLIOTECA_CACHE["entries"]
+    entries: list[dict] = _construir_indice_biblioteca(db)
+    _BIBLIOTECA_CACHE.update(
+        {"entries": entries, "conteos": conteos, "at": ahora})
+    return entries
+
+
+# A4: caché del índice de biblioteca (TTL 300 s + invalidación por
+# conteo; ver _indice_biblioteca).
+_BIBLIOTECA_TTL_S = 300
+_BIBLIOTECA_CACHE: dict = {"entries": None, "conteos": None, "at": 0.0}
+
+
+def invalidar_cache_biblioteca() -> None:
+    """Vacía la caché del índice (la llaman los endpoints que crean,
+    editan o borran cursos, clases o vídeos)."""
+    _BIBLIOTECA_CACHE.update({"entries": None, "conteos": None, "at": 0.0})
+
+
+def _construir_indice_biblioteca(db: Session) -> list[dict]:
+    """Construye el índice desde cero (sin caché)."""
     entries: list[dict] = []
     for c in db.query(Course).order_by(Course.sort_order.asc(), Course.id.asc()).all():
         precio = float(c.price_usd) if c.price_usd is not None else None
@@ -2055,6 +2510,8 @@ _INTENCIONES: list[tuple[str, tuple[str, ...], frozenset]] = [
     ("facturas", ("factura", "venta", "vendid", "ingresos"),
      frozenset(("venta", "vendid"))),
     ("contactos", ("contacto", "clientes"), frozenset()),
+    ("campanas", ("campana",), frozenset()),
+    ("flujos", ("flujos", "automatizacion", "automatizaciones"), frozenset()),
     ("clases", ("clase", "clases", "curso"), frozenset()),
     ("novedades", ("novedad", "novedades", "que hay nuevo"), frozenset()),
 ]
@@ -2090,6 +2547,33 @@ def _mejor_intencion(norm: str, es_orden: bool) -> tuple[str, int] | None:
     return (mejor[0], mejor[1])
 
 
+# Intenciones de datos (M6, QA 2026-11-26): precio, señales,
+# análisis y facturas se resuelven con datos en vivo. Decisión en
+# ejecución (ver test_regla_ensenada_precede_a_intencion_interna):
+# las reglas enseñadas SIGUEN ganando a la intención interna, pero
+# si una regla responde sobre uno de estos temas (o sobre planes),
+# la respuesta lleva la marca "respuesta enseñada, no dato en vivo".
+# Reordenar rompería ese test y la regla enseñada por el admin.
+_INTENCIONES_DATOS = frozenset(("precio", "senales", "analisis", "facturas"))
+
+
+def _cubre_intencion_datos(norm: str) -> bool:
+    """True si el mensaje casa con una intención de datos (o pregunta
+    por planes): la respuesta de regla sobre ese tema debe llevar la
+    marca de M6. Las claves genéricas solas ("mercado", "venta") no
+    cuentan: "mercado" a secas pide aclaración, no es un dato."""
+    if _es_pregunta_planes(norm):
+        return True
+    mejor = _mejor_intencion(norm, es_orden=False)
+    if mejor is None or mejor[0] not in _INTENCIONES_DATOS:
+        return False
+    claves = next((t[1] for t in _INTENCIONES if t[0] == mejor[0]), ())
+    genericas = next((t[2] for t in _INTENCIONES if t[0] == mejor[0]),
+                     frozenset())
+    hits = [k for k in claves if k in norm]
+    return bool(hits) and not all(h in genericas for h in hits)
+
+
 def _despachar_intencion(iid: str, db: Session, user, mensaje: str, norm: str) -> dict | None:
     if iid == "ayuda":
         return _h_ayuda()
@@ -2116,6 +2600,10 @@ def _despachar_intencion(iid: str, db: Session, user, mensaje: str, norm: str) -
         return _h_facturas(db, user)
     if iid == "contactos":
         return _h_contactos(db, user)
+    if iid == "campanas":
+        return _h_campanas(db, user, norm)
+    if iid == "flujos":
+        return _h_flujos()
     if iid == "clases":
         return _h_clases(db)
     if iid == "novedades":
@@ -2200,6 +2688,291 @@ def _aclaracion_alternativas(norm: str) -> dict | None:
             "opciones": [a, b]}
 
 
+# --------------------------------------- referencias al último objeto (C-2) --
+# Memoria de conversación acotada (2026-11-26): el frontend envía
+# los últimos turnos en ChatIn.historial y el backend los usa para
+# resolver referencias al último objeto creado ("esa cita",
+# "cámbiala a las 11"). Sin persistencia en BD. Si no se puede
+# resolver, se pregunta en vez de inventar. Las confirmaciones de
+# creación del propio asistente llevan el id ("Cita creada (id 5)"):
+# es la única fuente de la referencia — nunca se adivina un id.
+_RE_CREACION = (
+    ("cita", re.compile(r"Cita creada \(id (\d+)\)")),
+    ("nota", re.compile(r"Nota creada en [^()]*\(id (\d+)\)")),
+    ("tarea", re.compile(r"Tarea creada en [^()]*\(id (\d+)\)")),
+    ("borrador", re.compile(r"Borrador creado en [^()]*\(id (\d+)\)")),
+)
+_RE_REFERENCIA_TIPO = re.compile(
+    r"\b(es[ae]|est[ae]|la|el)\s+(cita|nota|tarea|borrador)\b")
+_RE_VERBO_CAMBIO = re.compile(
+    r"\b(cambiala|cambialo|muevela|muevelo|reprograma|cambia|mueve)\b")
+_RE_VERBO_MOSTRAR = re.compile(
+    r"\b(muestra|muestrame|muestrala|muestralo|ensename|ensena|dime|que dice|cuando es|cual es)\b")
+
+
+def _ultimo_objeto_creado(historial, tipo: str | None = None) -> tuple[str, int] | None:
+    """(tipo, id) del último objeto creado según las confirmaciones
+    del asistente en el historial, o None. Si `tipo` es None, vale
+    cualquier tipo (el más reciente)."""
+    turnos = historial or []
+    for turno in reversed(turnos):
+        if turno.get("rol") != "asistente":
+            continue
+        texto = turno.get("texto") or ""
+        for t, patron in _RE_CREACION:
+            if tipo is not None and t != tipo:
+                continue
+            m = patron.search(texto)
+            if m:
+                return (t, int(m.group(1)))
+    return None
+
+
+def _detectar_referencia(norm: str) -> tuple[str | None, str | None]:
+    """(tipo, acción) si el mensaje refiere al último objeto creado,
+    o (None, None). Tipo: "cita"/"nota"/"tarea"/"borrador" o None
+    (pronombre: "cámbiala", "muévela"). Acción: "cambiar_hora" o
+    "mostrar". Sin referencia explícita no hay nada que resolver:
+    "¿qué citas tengo?" es un listado, no una referencia."""
+    m = _RE_REFERENCIA_TIPO.search(norm)
+    tipo = m.group(2) if m else None
+    es_pronombre = _RE_VERBO_CAMBIO.search(norm) is not None and tipo is None
+    if tipo is None and not es_pronombre:
+        return None, None
+    if _RE_VERBO_CAMBIO.search(norm):
+        return tipo, "cambiar_hora"
+    if _RE_VERBO_MOSTRAR.search(norm):
+        return tipo, "mostrar"
+    # Referencia sin verbo claro ("¿esa cita?"): mostrar.
+    if tipo is not None:
+        return tipo, "mostrar"
+    return None, None
+
+
+def _parse_nueva_hora_cita(norm: str, cita: Appointment) -> tuple[dt.datetime | None, dict | None]:
+    """Nueva fecha/hora para una cita existente (C-2): misma
+    interpretación que _parse_cita (hora en America/Los_Angeles,
+    hora suelta sin AM/PM y fecha D/M ambigua piden aclaración en
+    vez de asumir), pero la fecha por defecto es la de la cita
+    actual, no "mañana"."""
+    ahora_la = dt.datetime.now(TZ_LA)
+    actual_la = cita.starts_at.astimezone(TZ_LA) if cita.starts_at.tzinfo else cita.starts_at.replace(tzinfo=dt.timezone.utc).astimezone(TZ_LA)
+    fecha: dt.date | None = None
+    aclaracion = None
+    if "pasado manana" in norm:
+        fecha = (ahora_la + dt.timedelta(days=2)).date()
+    elif "manana" in norm:
+        fecha = (ahora_la + dt.timedelta(days=1)).date()
+    elif "hoy" in norm:
+        fecha = ahora_la.date()
+    else:
+        m = re.search(r"(\d{4})-(\d{2})-(\d{2})", norm)
+        if m:
+            try:
+                fecha = dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            except ValueError:
+                fecha = None
+        else:
+            m = re.search(r"(\d{1,2})/(\d{1,2})(?:/(\d{4}))?", norm)
+            if m:
+                a, b = int(m.group(1)), int(m.group(2))
+                anio = int(m.group(3) or ahora_la.year)
+                if a <= 12 and b <= 12 and a != b:
+                    meses = ["enero", "febrero", "marzo", "abril", "mayo",
+                             "junio", "julio", "agosto", "septiembre",
+                             "octubre", "noviembre", "diciembre"]
+                    aclaracion = {
+                        "pregunta": (f"La fecha {a}/{b} es ambigua: "
+                                     f"¿{a} de {meses[b - 1]} o {b} de {meses[a - 1]}?"),
+                        "opciones": [f"{a} de {meses[b - 1]}", f"{b} de {meses[a - 1]}"],
+                    }
+                    return None, aclaracion
+                try:
+                    fecha = dt.date(anio, b, a)
+                except ValueError:
+                    fecha = None
+    if fecha is None:
+        fecha = actual_la.date()
+    hora: tuple[int, int] | None = None
+    m = re.search(r"(\d{1,2}):(\d{2})", norm)
+    if m:
+        hora = (int(m.group(1)), int(m.group(2)))
+        if re.search(r"\b" + str(hora[0]) + r":\d{2}\s*pm\b", norm) and hora[0] < 12:
+            hora = (hora[0] + 12, hora[1])
+    else:
+        m = re.search(r"a las (\d{1,2})\s*(am|pm)?\b", norm)
+        if m:
+            h = int(m.group(1))
+            marca = m.group(2)
+            if marca == "pm" and h < 12:
+                hora = (h + 12, 0)
+            elif marca == "am":
+                hora = (h % 12, 0)
+            else:
+                aclaracion = {
+                    "pregunta": f"¿La cita es a las {h}:00 de la mañana o de la noche?",
+                    "opciones": [f"{h}:00 de la mañana", f"{h}:00 de la noche"],
+                }
+                return None, aclaracion
+    if hora is None:
+        return None, None
+    try:
+        local = dt.datetime.combine(fecha, dt.time(hora[0], hora[1]), tzinfo=TZ_LA)
+        return local.astimezone(dt.timezone.utc), None
+    except ValueError:
+        return None, None
+
+
+def _h_referencia(db: Session, user: User, mensaje: str, norm: str,
+                  historial) -> dict | None:
+    """Seguimiento sobre el último objeto creado (C-2). Devuelve
+    None si el mensaje no refiere a ningún objeto (el llamador sigue
+    el flujo normal). Solo admin: las referencias son seguimientos
+    de creaciones que solo el admin puede hacer; prueba nunca tiene
+    un objeto creado en su historial."""
+    tipo, accion = _detectar_referencia(norm)
+    if tipo is None and accion is None:
+        return None
+    if not user.is_admin:
+        return _solo_lectura(user)
+    encontrado = _ultimo_objeto_creado(historial, tipo)
+    if encontrado is None:
+        if accion != "cambiar_hora":
+            # Sin objeto en el historial, "muéstrame esa cita" no se
+            # puede resolver, pero tampoco se inventa: se sigue el
+            # flujo normal (p. ej. "¿cuándo es la cita?" lista las
+            # próximas). Solo un cambio sin referencia pide aclaración.
+            return None
+        que = f"ninguna {tipo}" if tipo else "ningún objeto creado"
+        return _respuesta(
+            f"No veo {que} en esta conversación: no hay una creación "
+            "reciente a la que referirse. Dime cuál quieres cambiar "
+            "(por ejemplo, crea primero la cita y luego dime "
+            "«cámbiala a las 11»).",
+            sugerencias=["¿Qué citas tengo?", "¿Qué puedes hacer?"],
+        )
+    tipo_real, oid = encontrado
+    if accion == "mostrar":
+        if tipo_real == "cita":
+            obj = db.get(Appointment, oid)
+            if obj is None:
+                return _respuesta(f"Esa cita (id {oid}) ya no existe.",
+                                   sugerencias=["¿Qué citas tengo?"])
+            return _respuesta(
+                f"Esa cita (id {obj.id}): {obj.client_name or 'Sin cliente'} — "
+                f"{obj.service_type}, {_fmt_local_hora(obj.starts_at)} "
+                f"({obj.duration_min} min, {obj.status}).",
+                tipo="mostrar_cita",
+                datos={"id": obj.id, "client_name": obj.client_name,
+                       "service_type": obj.service_type,
+                       "starts_at": _iso(obj.starts_at),
+                       "duration_min": obj.duration_min, "status": obj.status},
+                sugerencias=["¿Qué citas tengo?", "Muéstrame los contactos", "¿Qué hay nuevo?"],
+            )
+        if tipo_real == "nota":
+            obj = db.get(BusinessNote, oid)
+            if obj is None:
+                return _respuesta(f"Esa nota (id {oid}) ya no existe.",
+                                   sugerencias=["¿Qué puedes hacer?"])
+            return _respuesta(
+                f"Esa nota (id {obj.id}): «{obj.title}»\n{obj.body}",
+                tipo="mostrar_nota", datos={"id": obj.id, "title": obj.title},
+                sugerencias=["¿Qué citas tengo?", "¿Qué puedes hacer?"],
+            )
+        if tipo_real == "tarea":
+            obj = db.get(BusinessTask, oid)
+            if obj is None:
+                return _respuesta(f"Esa tarea (id {oid}) ya no existe.",
+                                   sugerencias=["¿Qué puedes hacer?"])
+            estado = "hecha" if obj.done else "pendiente"
+            return _respuesta(
+                f"Esa tarea (id {obj.id}): «{obj.title}» ({estado}).",
+                tipo="mostrar_tarea",
+                datos={"id": obj.id, "title": obj.title, "done": obj.done},
+                sugerencias=["¿Qué citas tengo?", "¿Qué puedes hacer?"],
+            )
+        obj = db.get(ContentItem, oid)
+        if obj is None:
+            return _respuesta(f"Ese borrador (id {oid}) ya no existe.",
+                               sugerencias=["¿Qué puedes hacer?"])
+        return _respuesta(
+            f"Ese borrador (id {obj.id}): «{obj.title}» "
+            f"({obj.platform}, {obj.status}).",
+            tipo="mostrar_borrador",
+            datos={"id": obj.id, "title": obj.title, "platform": obj.platform,
+                   "status": obj.status},
+            sugerencias=["¿Qué citas tengo?", "¿Qué puedes hacer?"],
+        )
+    # cambiar_hora: solo citas. Editar notas/tareas/borradores desde
+    # el chat es backlog (no en esta corrida): se dice, no se inventa.
+    if tipo_real != "cita":
+        return _respuesta(
+            f"Solo puedo cambiar la hora de una cita desde el chat. "
+            f"Ese {tipo_real} se edita en su módulo "
+            "(Negocio > Marketing o Crear).",
+            sugerencias=["¿Qué citas tengo?", "¿Qué puedes hacer?"],
+        )
+    cita = db.get(Appointment, oid)
+    if cita is None:
+        return _respuesta(f"Esa cita (id {oid}) ya no existe.",
+                           sugerencias=["¿Qué citas tengo?"])
+    nuevo_inicio, aclaracion = _parse_nueva_hora_cita(norm, cita)
+    if aclaracion is not None:
+        return _respuesta(
+            "Antes de cambiar la cita necesito que me confirmes un dato.",
+            aclaracion=aclaracion,
+            sugerencias=["¿Qué citas tengo?"],
+        )
+    if nuevo_inicio is None:
+        return _respuesta(
+            "¿A qué hora la muevo? Escríbelo así: «Cámbiala a las 11:00» "
+            "o «Cámbiala a mañana a las 11:00».",
+            sugerencias=["¿Qué citas tengo?"],
+        )
+    if nuevo_inicio <= dt.datetime.now(dt.timezone.utc):
+        return _respuesta(
+            "Esa fecha y hora ya pasó: dime una fecha futura para la cita.",
+            sugerencias=["¿Qué citas tengo?"],
+        )
+    if cita.contact_id is not None and _overlaps(
+            db, cita.contact_id, nuevo_inicio, cita.duration_min,
+            exclude_id=cita.id):
+        return _respuesta(
+            f"No cambié la cita: {cita.client_name} ya tiene una cita que "
+            f"se solapa con {_fmt_local_hora(nuevo_inicio)} "
+            f"({cita.duration_min} min). Elige otro horario.",
+            tipo="cambiar_cita",
+            datos={"conflicto": True, "id": cita.id,
+                   "starts_at": nuevo_inicio.isoformat(), "solape_comprobado": True},
+            sugerencias=["¿Qué citas tengo?"],
+        )
+    anterior = cita.starts_at
+    cita.starts_at = nuevo_inicio
+    db.commit()
+    db.refresh(cita)
+    # B2: auditoría del cambio (sin el contenido del usuario).
+    audit(db, user, "asistente.cambiar_cita", "appointment", str(cita.id),
+          details={"contact_id": cita.contact_id})
+    nota_solape = (" Se comprobó que no se solapa con sus otras citas."
+                   if cita.contact_id is not None else
+                   " No se comprobó si se solapa con otra cita porque "
+                   "el cliente no está en el CRM.")
+    return _respuesta(
+        f"Cita cambiada (id {cita.id}): {cita.client_name} — "
+        f"{cita.service_type}, antes {_fmt_local_hora(anterior)}, ahora "
+        f"{_fmt_local_hora(nuevo_inicio)} ({cita.duration_min} min, "
+        f"{cita.status}).{nota_solape}",
+        tipo="cambiar_cita",
+        datos={"id": cita.id, "client_name": cita.client_name,
+               "service_type": cita.service_type,
+               "starts_at_anterior": _iso(anterior),
+               "starts_at": nuevo_inicio.isoformat(),
+               "duration_min": cita.duration_min, "status": cita.status,
+               "solape_comprobado": cita.contact_id is not None},
+        sugerencias=["¿Qué citas tengo?", "Muéstrame los contactos", "¿Qué hay nuevo?"],
+    )
+
+
 def _cortar_en_punto_final(texto: str, limite: int = 600) -> str:
     """Si el texto supera el límite, corta en el último punto final
     antes del límite (F3-4): nunca se devuelve una frase a medias."""
@@ -2213,10 +2986,21 @@ def _cortar_en_punto_final(texto: str, limite: int = 600) -> str:
 
 # ------------------------------------------------------------------ endpoints --
 
+class HistorialTurno(BaseModel):
+    """Un turno previo de la conversación (C-2, 2026-11-26): el
+    frontend envía los últimos turnos para que el backend resuelva
+    referencias ("esa cita", "cámbiala a las 11"). Sin persistencia
+    en BD en esta corrida: el historial vive solo en la petición."""
+    rol: Literal["usuario", "asistente"]
+    texto: str = Field("", max_length=MAX_MENSAJE)
+
+
 class ChatIn(BaseModel):
     # Transversal 2026-11-24: tope Pydantic (antes solo comprobación
     # manual en el handler, que devolvía 400; ahora 422).
     mensaje: str = Field("", max_length=MAX_MENSAJE)
+    # C-2: últimos turnos de la conversación (máx. 6), opcionales.
+    historial: list[HistorialTurno] | None = Field(default=None, max_length=6)
 
 
 @router.get("/capacidades")
@@ -2228,7 +3012,15 @@ def capacidades(principal: Principal = Depends(guest_read_guard),
     # de Rubén, pendiente). El invitado pasa: deny_linked_reader
     # devuelve None para Guest (sin id, sin vínculo posible).
     deny_linked_reader(db, principal)
-    return {"comandos": COMANDOS}
+    # M8 (QA 2026-11-26): a no-admin no se le listan los comandos
+    # requiere_admin (el frontend ya filtraba los chips, pero la
+    # API los exponía a cualquiera).
+    es_admin = getattr(principal, "is_admin", False) or (
+        not isinstance(principal, Guest) and is_super_admin(principal, db)
+    )
+    if es_admin:
+        return {"comandos": COMANDOS}
+    return {"comandos": [c for c in COMANDOS if not c["requiere_admin"]]}
 
 
 @router.get("/uso")
@@ -2237,7 +3029,10 @@ def uso_asistente(user: User = Depends(get_current_user),
     """Uso diario del Asistente del usuario actual (Fase 6, tarea 1):
     plan, límite, mensajes de hoy y restantes. Admin/super_admin:
     límite null (sin límite); mensajes_hoy es su conteo real,
-    informativo. El invitado no tiene fila: 401 (usa get_current_user)."""
+    informativo. El invitado no tiene fila: 401 (usa get_current_user).
+    B2 (QA 2026-11-26): cliente vinculado -> 403, como en chat y
+    capacidades."""
+    deny_linked_reader(db, user)
     clave, limite = _plan_usuario(user, db)
     hoy = _mensajes_hoy(db, user.id)
     return {
@@ -2262,6 +3057,7 @@ class FeedbackIn(BaseModel):
 
 @router.post("/feedback", status_code=status.HTTP_201_CREATED)
 def dar_feedback(payload: FeedbackIn,
+                 request: Request,
                  principal: Principal = Depends(get_current_principal),
                  db: Session = Depends(get_db)):
     """Voto útil / no útil sobre una respuesta del Asistente.
@@ -2271,7 +3067,10 @@ def dar_feedback(payload: FeedbackIn,
     AsistenteFeedback). Un "no_util" re-registra la pregunta en la
     bandeja del admin (GET /preguntas) para enseñarle una respuesta;
     el invitado vota pero no entra en la bandeja (misma regla que
-    las preguntas "no sé": un anónimo podría llenarla de spam)."""
+    las preguntas "no sé": un anónimo podría llenarla de spam).
+    B2 (QA 2026-11-26): cliente vinculado -> 403. M7: mismo limiter
+    de chat (20/min por usuario, 5/min por IP para invitado)."""
+    deny_linked_reader(db, principal)
     pregunta = (payload.pregunta or "").strip()
     voto = (payload.voto or "").strip().lower()
     if not pregunta:
@@ -2283,6 +3082,18 @@ def dar_feedback(payload: FeedbackIn,
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El voto debe ser 'util' o 'no_util'.",
+        )
+    if isinstance(principal, Guest):
+        client_ip = request.client.host if request.client else "unknown"
+        if not guest_chat_limiter.allow(f"asistente_feedback_guest:{client_ip}"):
+            raise too_many_requests(
+                "Demasiados votos como invitado. Espera un minuto.",
+                guest_chat_limiter.window,
+            )
+    elif not asistente_limiter.allow(f"asistente_feedback:{principal.id}"):
+        raise too_many_requests(
+            "Demasiados votos al asistente. Espera un minuto.",
+            asistente_limiter.window,
         )
     user_id = None if isinstance(principal, Guest) else principal.id
     fila = AsistenteFeedback(user_id=user_id, pregunta=pregunta[:1000], voto=voto)
@@ -2363,6 +3174,10 @@ def chat(payload: ChatIn, request: Request,
         )
     norm = _norm(mensaje)
     es_orden = _es_orden_creacion(norm)
+    # C-2: "cámbiala a las 11" también es una orden de mutación
+    # (cambiar la hora de la cita referida): el replay idempotente
+    # la cubre igual que las 4 creaciones.
+    es_cambio = _detectar_referencia(norm)[1] == "cambiar_hora"
     # F2-7: idempotencia de reintento (ver core/idempotency.py: el
     # mecanismo EXISTE y encaja sin cambio de esquema — tabla
     # idempotency_keys con (user_id, route, key) — así que se aplica
@@ -2373,7 +3188,7 @@ def chat(payload: ChatIn, request: Request,
     # devuelve la respuesta guardada sin re-ejecutar la mutación.
     idem_key = idempotency_key_from(request)
     idem_route = "asistente_chat"
-    if idem_key and es_orden and not isinstance(principal, Guest):
+    if idem_key and (es_orden or es_cambio) and not isinstance(principal, Guest):
         replay = check_idempotency(db, idem_key, user, idem_route)
         if replay is not None:
             _status, stored = replay
@@ -2413,22 +3228,58 @@ def chat(payload: ChatIn, request: Request,
     # (a) Reglas enseñadas por el admin (caché de activas, F2-10).
     regla = _regla_activa(db, norm)
     if regla is not None:
+        # M6 (QA 2026-11-26): la regla sigue ganando (el test
+        # test_regla_ensenada_precede_a_intencion_interna lo exige),
+        # pero si responde sobre un dato (precio, señales, análisis,
+        # facturas, planes) lleva la marca "respuesta enseñada, no
+        # dato en vivo" para no pasar por un dato real.
+        texto_regla = regla.respuesta
+        datos_regla = {"regla_id": regla.id, "modulo": regla.modulo,
+                       "ruta": regla.ruta}
+        if _cubre_intencion_datos(norm):
+            texto_regla += ("\n\nNota: respuesta enseñada por el "
+                            "administrador, no un dato en vivo.")
+            datos_regla["respuesta_ensenada_no_dato_vivo"] = True
         return _respuesta(
-            regla.respuesta,
+            texto_regla,
             tipo="regla",
-            datos={"regla_id": regla.id, "modulo": regla.modulo,
-                   "ruta": regla.ruta},
+            datos=datos_regla,
             fuente={"nombre": "Regla enseñada por el administrador",
                     "url": regla.ruta or ""},
             sugerencias=_SUGERENCIAS_LECTURA,
             confianza=min(95, 60 + len(regla.patron) // 2),
         )
+    # (a1) Planes de suscripción (C2): ANTES que el ranking, para
+    # que "¿cuánto vale el plan Esencial?" no caiga en la intención
+    # `precio` (BTC). Después de las reglas (M6: una regla sobre
+    # planes sigue ganando, pero marcada).
+    if _es_pregunta_planes(norm):
+        return _completar(_h_planes(db, user, norm), confianza=85)
+    # (a2) Referencias al último objeto creado (C-2): el historial
+    # de la petición resuelve "esa cita" / "cámbiala a las 11". Si
+    # no hay referencia, sigue el flujo normal.
+    historial = [
+        {"rol": t.rol, "texto": t.texto}
+        for t in (payload.historial or [])
+    ]
+    resp_ref = _h_referencia(db, user, mensaje, norm, historial)
+    if resp_ref is not None:
+        resp_ref = _completar(resp_ref, confianza=80)
+        if (idem_key and es_cambio and not isinstance(principal, Guest)
+                and resp_ref.get("accion") is not None
+                and resp_ref["accion"].get("tipo") == "cambiar_cita"
+                and resp_ref["accion"].get("datos", {}).get("id") is not None):
+            try:
+                store_idempotency(db, idem_key, user, idem_route, 200, resp_ref)
+            except Exception:
+                pass
+        return resp_ref
     # (b0) Resumir módulo (F2-3): antes que el ranking, para que
     # "resume el módulo Facturas" resuma y no devuelva el resumen
     # de facturación.
     modulo_clave = _detectar_resumen_modulo(norm)
     if modulo_clave is not None:
-        return _completar(_h_resumen_modulo(db, modulo_clave), confianza=75)
+        return _completar(_h_resumen_modulo(db, modulo_clave, principal), confianza=75)
     # (b) Intenciones internas por ranking (F2-1).
     mejor = _mejor_intencion(norm, es_orden)
     if mejor is not None:
@@ -2485,6 +3336,17 @@ def chat(payload: ChatIn, request: Request,
     if _sin_respuesta_rapida(norm):
         _registrar_pregunta_para(principal, db, mensaje.strip())
         return _completar(_h_sin_respuesta(motivo="via_rapida"), confianza=0)
+    # M2 (QA 2026-11-26): preguntas con patrones de PII (correo,
+    # teléfono) NO se envían a internet. No van a la bandeja
+    # (guardarlas sería almacenar PII) y la respuesta lo dice.
+    if _contiene_pii(mensaje):
+        return _completar(_respuesta(
+            "No puedo enviar esa pregunta a internet porque parece "
+            "contener datos personales (un correo o un teléfono). "
+            "Reformúlala sin datos personales, o pregúntame por datos "
+            "de la plataforma. Tu pregunta no quedó registrada.",
+            sin_respuesta=True, motivo="pii_en_pregunta",
+            sugerencias=_SUGERENCIAS_LECTURA), confianza=0)
     hallazgo = buscar_en_internet(mensaje.strip())
     if hallazgo is not None:
         consultado = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -2493,17 +3355,38 @@ def chat(payload: ChatIn, request: Request,
         # no indica fecha del dato, y no se finge que la tenga).
         texto = _cortar_en_punto_final(hallazgo["texto"])
         fecha_hoy = dt.datetime.now(TZ_LA).strftime("%d/%m/%Y")
-        texto = (texto + "\n\nConsultado el " + fecha_hoy +
-                 "; la fuente no indica fecha del dato.")
+        publicado_en = hallazgo.get("publicado_en")
+        if publicado_en:
+            vigencia = (f"Consultado el {fecha_hoy}; publicado el "
+                        f"{publicado_en[:10]}.")
+        else:
+            vigencia = (f"Consultado el {fecha_hoy}; la fuente no "
+                        "indica fecha del dato.")
+        texto = texto + "\n\n" + vigencia
+        # M2: origen degradado — "Página pública" tiene menos
+        # confianza que Wikipedia y lleva la etiqueta "fuente no
+        # verificada"; los resultados de búsqueda y el RSS, intermedia.
+        confianza = 60
+        if hallazgo["nombre"] == "Página pública":
+            confianza = 40
+            texto += ("\n(Fuente no verificada: es una página pública "
+                      "sin contrastar con otra fuente.)")
+        elif hallazgo["nombre"] == "DuckDuckGo (resultados)":
+            confianza = 50
+        elif hallazgo["nombre"] == "Google News (RSS)":
+            confianza = 55
+        datos = {"fuente": fuente, "consultado_en": consultado,
+                 "vigencia": vigencia}
+        if publicado_en:
+            datos["publicado_en"] = publicado_en
         return _respuesta(
             texto,
             tipo="internet",
-            datos={"fuente": fuente, "consultado_en": consultado,
-                   "vigencia": f"Consultado el {fecha_hoy}; la fuente no indica fecha del dato."},
+            datos=datos,
             fuente=fuente,
             consultado_en=consultado,
             sugerencias=_SUGERENCIAS_LECTURA,
-            confianza=60,
+            confianza=confianza,
         )
     # F3-4: desambiguación con opciones en vez de "sin respuesta"
     # cuando la pregunta ofrece dos alternativas ("¿A o B?").
@@ -2554,8 +3437,11 @@ def _regla_out(r: ReglaAsistente) -> dict:
 class ReglaIn(BaseModel):
     # F2-4: tope de respuesta 2000 caracteres.
     respuesta: str = Field("", max_length=2000)
-    modulo: str | None = None
-    ruta: str | None = None
+    # B4 (QA 2026-11-26): mismo tope que las columnas (String(64) y
+    # String(128)): sin esto, en Postgres un valor largo daba 500
+    # en vez de 422.
+    modulo: str | None = Field(default=None, max_length=64)
+    ruta: str | None = Field(default=None, max_length=128)
 
 
 @router.get("/preguntas")

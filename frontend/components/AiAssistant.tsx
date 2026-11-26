@@ -67,7 +67,7 @@ export function AiAssistant() {
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
           placeholder={t.ai.questionPlaceholder}
-          maxLength={2000}
+          maxLength={1000}
           className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
         />
         <button

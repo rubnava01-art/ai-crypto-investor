@@ -655,9 +655,10 @@ def test_biblioteca_manual_whatsapp_y_guia_gratuita(client, admin_headers):
 
 
 def test_herramientas_clases_constante_y_anclas_reales():
-    """F4-2: las 5 herramientas con anclas que existen en el frontend."""
+    """F4-2: las 6 herramientas con anclas que existen en el frontend
+    (B7, 2026-11-26: se añadió la calculadora de rentabilidad)."""
     from pathlib import Path
-    assert len(asistente_api.HERRAMIENTAS_CLASES) == 5
+    assert len(asistente_api.HERRAMIENTAS_CLASES) == 6
     frontend = Path(__file__).resolve().parents[2] / "frontend" / "components" / "ClasesHerramientas.tsx"
     texto = frontend.read_text(encoding="utf-8")
     for h in asistente_api.HERRAMIENTAS_CLASES:

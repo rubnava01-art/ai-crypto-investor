@@ -21,6 +21,7 @@ export const dictEn: Dictionary = {
       facturas: { label: "Invoices", hint: "Invoices · materials" },
       correos: { label: "Mail", hint: "Templates · CRM · log" },
       chat: { label: "Chat", hint: "Live chat" },
+      asistente: { label: "Assistant", hint: "Ask and request actions" },
       recomendaciones: { label: "Recommendations", hint: "Courses and tools" },
       desarrollo: { label: "Digital development", hint: "Digital adaptation for businesses" },
       talento: { label: "Talent management", hint: "Team · roles · people" },
@@ -545,7 +546,7 @@ export const dictEn: Dictionary = {
       colPrice24h: "Price · 24h",
     },
     ai: {
-      title: "AI assistant",
+      title: "Signal explainer",
       intro: "Read-only technical assistant: explains indicators and signals. It does not execute orders or change rules.",
       demoNote: "Local model (DEMO) — set up a provider for advanced answers.",
       questionAria: "Ask the assistant",
@@ -614,6 +615,47 @@ export const dictEn: Dictionary = {
       feedbackGracias: "Thanks for your feedback.",
       stepsTitle: "Steps",
       goToModule: "Open the module",
+      // Run 2026-11-26 (Practical Assistant, Agent 1).
+      // C-1: usage line and daily 429 with the backend detail.
+      usoLine: "Plan {plan} · {restantes} messages left today",
+      usoAdmin: "Plan {plan} · {n} messages today (no daily limit)",
+      viewPlans: "See plans",
+      // A-1: sessionStorage persistence + clear.
+      clearHistory: "Clear",
+      confirmClear: "Delete the conversation? This session's history will be lost.",
+      // B-1: chips only fill the input, they don't send.
+      chipsHint: "Tap a chip to write it into the message.",
+      // A-2: pre-confirmation for appointments and confirmation card.
+      pendingCitaTitle: "Create this appointment?",
+      pendingCitaBody: "This will be sent to the assistant: “{texto}”",
+      pendingCitaConfirm: "Yes, create it",
+      createdTitle: "Created on the platform",
+      createdClient: "Client",
+      createdService: "Service",
+      createdWhen: "Date and time",
+      createdDuration: "Duration",
+      createdStatus: "Status",
+      createdTitleField: "Title",
+      createdId: "ID",
+      viewInModule: "View in {modulo}",
+      // M-2/B6: price mini-card (never "live" on a stale cache).
+      priceTitle: "BTC/ETH price",
+      priceBtc: "Bitcoin (BTC)",
+      priceEth: "Ethereum (ETH)",
+      priceAgeMin: "updated {n} min ago",
+      priceAgeNow: "updated less than 1 min ago",
+      priceStale: "Not live data: last saved quote.",
+      priceVela: "Last saved candle, not a live price.",
+      // M-4: source publication date, when provided.
+      publishedAt: "published {fecha}",
+      // B-4: the vote is only marked after the send is confirmed.
+      feedbackError: "Your vote couldn't be saved. Try again.",
+      // M-5: contextual greeting (plan + remaining + today's appointments).
+      greetingPlanLine: "Your plan is {plan} and you have {restantes} messages left today.",
+      greetingUnlimited: "Your plan is {plan} (no daily limit).",
+      greetingCitasLine: "Today you have {n} appointment(s): {lista}.",
+      // M-6: link to the teaching inbox in the floating panel (admin only).
+      teachLink: "Questions to teach ({n})",
     },
     preguntas: {
       title: "Questions to teach",

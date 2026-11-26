@@ -86,10 +86,10 @@ const HerramientasSection = dynamic(
  * Orden de secciones: héroe (con calculadora) → franja de confianza →
  * franja de precios → 4 pilares → sección IA → etapas → planes + tabla
  * comparativa → cómo empezar → cierre final con CTA → footer.
- * Convención "25 módulos": landingModuleKeys().length (25) = rutas de
- * ModuleNav (29) menos las 4 con presentación propia: / (Invertir),
+ * Convención "26 módulos": landingModuleKeys().length (26) = rutas de
+ * ModuleNav (30) menos las 4 con presentación propia: / (Invertir),
  * /estudiar, /crear e /inicio (la propia portada). Gestionar es familia,
- * no ruta: sus módulos (crm, facturas, correos…) están dentro de los 25.
+ * no ruta: sus módulos (crm, facturas, correos…) están dentro de los 26.
  * La cifra se deriva de MODULES, nunca a mano; los 3 módulos solo-admin
  * van marcados con "(solo admin)". */
 

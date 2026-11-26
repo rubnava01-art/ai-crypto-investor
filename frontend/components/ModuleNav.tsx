@@ -113,6 +113,17 @@ export const MODULES = [
     icon: <Icon d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5z" />,
   },
   {
+    // M-1 (2026-11-26, Asistente práctico): entrada "Asistente" en el
+    // menú principal. El backend ya la incluye en `modulos` para admin,
+    // prueba e invitado (perfiles.py: MODULOS_TODOS/PRUEBA/INVITADO),
+    // no para el cliente vinculado; el menú solo la muestra si el
+    // perfil la trae, como el resto de módulos.
+    href: "/asistente",
+    label: "Asistente",
+    hint: "Pregunta y pide acciones",
+    icon: <Icon d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />,
+  },
+  {
     href: "/recomendaciones",
     label: "Recomendaciones",
     hint: "Cursos y herramientas",
@@ -297,6 +308,7 @@ export const KEY_BY_HREF: Record<string, NavKey> = {
   "/facturas": "facturas",
   "/correos": "correos",
   "/chat": "chat",
+  "/asistente": "asistente",
   "/recomendaciones": "recomendaciones",
   "/desarrollo": "desarrollo",
   "/talento": "talento",
@@ -320,12 +332,13 @@ export const KEY_BY_HREF: Record<string, NavKey> = {
  * falla, estos son los únicos módulos visibles — aprendizaje y perfil,
  * sin Invertir operativo ni módulos de negocio/admin. Es el mismo
  * conjunto que MODULOS_PRUEBA del backend (perfiles.py) menos
- * "asistente" y "portal", que no son entradas de este menú. Claves
+ * "portal", que no es entrada de este menú. Claves
  * NavKey, las mismas que devuelve GET /api/acceso/perfil. */
 export const PRUEBA_MIN_KEYS: readonly string[] = [
   "inicio",
   "estudiar",
   "crear",
+  "asistente",
   "perfil",
   "planes",
 ];
@@ -347,7 +360,7 @@ export function landingModuleKeys(): { key: NavKey; adminOnly: boolean }[] {
   }));
 }
 
-/** Familias de navegación (Fase 5, F1): las 29 rutas, sin borrar ni
+/** Familias de navegación (Fase 5, F1): las 30 rutas, sin borrar ni
  * renombrar ninguna. Se sigue la propuesta de la auditoría; dos rutas
  * que la propuesta no nombraba se ubican por afinidad y se reportan:
  * Recomendaciones (cursos y herramientas) en Estudiar, Desarrollo
@@ -369,7 +382,7 @@ const GROUPS: { key: string; hrefs: string[] }[] = [
   { key: "crear", hrefs: ["/crear", "/tendencias", "/analizador"] },
   { key: "negocio", hrefs: ["/crm", "/referidos", "/business", "/facturas", "/correos", "/inventario", "/desarrollo", "/talento", "/riesgos", "/planillas", "/analisis", "/planes", "/portal"] },
   { key: "personal", hrefs: ["/espacio", "/perfil"] },
-  { key: "sistema", hrefs: ["/chat", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal", "/flujos"] },
+  { key: "sistema", hrefs: ["/chat", "/asistente", "/auditor", "/privacidad", "/usuarios", "/ajustador", "/terminal", "/flujos"] },
 ];
 
 /** Acentos por familia (F13, decisión de Rubén 2026-11-02): UN acento por

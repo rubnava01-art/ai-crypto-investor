@@ -459,6 +459,11 @@ def update_course(
         course.delivery_note = payload.delivery_note
     db.commit()
     db.refresh(course)
+    # A4 (2026-11-26): el Asistente cachea el índice de biblioteca;
+    # un curso editado invalida esa caché.
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return _course_out(db, course, include_students=True)
 
 

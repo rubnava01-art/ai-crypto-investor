@@ -21,6 +21,7 @@ export const dictEs: Dictionary = {
       facturas: { label: "Facturas", hint: "Facturas · materiales" },
       correos: { label: "Correos", hint: "Plantillas · CRM · registro" },
       chat: { label: "Chat", hint: "Chat en vivo" },
+      asistente: { label: "Asistente", hint: "Pregunta y pide acciones" },
       recomendaciones: { label: "Recomendaciones", hint: "Cursos y herramientas" },
       desarrollo: { label: "Desarrollo digital", hint: "Adaptación digital para empresas" },
       talento: { label: "Talento humano", hint: "Equipo · roles · personas" },
@@ -545,7 +546,7 @@ export const dictEs: Dictionary = {
       colPrice24h: "Precio · 24 h",
     },
     ai: {
-      title: "Asistente IA",
+      title: "Explicador de señales",
       intro: "Asistente técnico de solo lectura: explica indicadores y señales. No ejecuta órdenes ni modifica reglas.",
       demoNote: "Modelo local (DEMO) — configura un proveedor para respuestas avanzadas.",
       questionAria: "Pregunta al asistente",
@@ -614,6 +615,47 @@ export const dictEs: Dictionary = {
       feedbackGracias: "Gracias por tu comentario.",
       stepsTitle: "Pasos",
       goToModule: "Ir al módulo",
+      // Corrida 2026-11-26 (Asistente práctico, Agente 1).
+      // C-1: línea de uso y 429 diario con el detalle del backend.
+      usoLine: "Plan {plan} · {restantes} mensajes restantes hoy",
+      usoAdmin: "Plan {plan} · {n} mensajes hoy (sin límite diario)",
+      viewPlans: "Ver planes",
+      // A-1: persistencia en sessionStorage + limpiar.
+      clearHistory: "Limpiar",
+      confirmClear: "¿Borrar la conversación? Se pierde el historial de esta sesión.",
+      // B-1: los chips solo rellenan el input, no envían.
+      chipsHint: "Toca un chip para escribirlo en el mensaje.",
+      // A-2: confirmación previa de citas y tarjeta de confirmación.
+      pendingCitaTitle: "¿Crear esta cita?",
+      pendingCitaBody: "Se enviará al asistente: «{texto}»",
+      pendingCitaConfirm: "Sí, crearla",
+      createdTitle: "Creado en la plataforma",
+      createdClient: "Cliente",
+      createdService: "Servicio",
+      createdWhen: "Fecha y hora",
+      createdDuration: "Duración",
+      createdStatus: "Estado",
+      createdTitleField: "Título",
+      createdId: "ID",
+      viewInModule: "Ver en {modulo}",
+      // M-2/B6: mini-tarjeta de precio (nunca "actual" con caché vieja).
+      priceTitle: "Precio BTC/ETH",
+      priceBtc: "Bitcoin (BTC)",
+      priceEth: "Ethereum (ETH)",
+      priceAgeMin: "actualizado hace {n} min",
+      priceAgeNow: "actualizado hace menos de 1 min",
+      priceStale: "Dato no en vivo: última cotización guardada.",
+      priceVela: "Última vela guardada, no precio en vivo.",
+      // M-4: fecha de publicación de la fuente, cuando la trae.
+      publishedAt: "publicado {fecha}",
+      // B-4: el voto solo se marca tras confirmar el envío.
+      feedbackError: "No se pudo registrar tu voto. Inténtalo de nuevo.",
+      // M-5: saludo contextual (plan + restantes + citas de hoy).
+      greetingPlanLine: "Tu plan es {plan} y te quedan {restantes} mensajes hoy.",
+      greetingUnlimited: "Tu plan es {plan} (sin límite diario).",
+      greetingCitasLine: "Hoy tienes {n} cita(s): {lista}.",
+      // M-6: enlace a la bandeja en el flotante (solo admin).
+      teachLink: "Preguntas por enseñar ({n})",
     },
     preguntas: {
       title: "Preguntas por enseñar",

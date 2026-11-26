@@ -301,6 +301,11 @@ def create_video(
     db.add(row)
     db.commit()
     db.refresh(row)
+    # A4 (2026-11-26): invalida la caché del índice de biblioteca
+    # del Asistente.
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return _video_out(row)
 
 
@@ -322,6 +327,11 @@ def update_video(
         row.titulo = payload.titulo.strip()
     db.commit()
     db.refresh(row)
+    # A4 (2026-11-26): invalida la caché del índice de biblioteca
+    # del Asistente (un título editado cambia el índice).
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return _video_out(row)
 
 
@@ -336,4 +346,9 @@ def delete_video(
         raise HTTPException(status_code=404, detail="Video not found")
     db.delete(row)
     db.commit()
+    # A4 (2026-11-26): invalida la caché del índice de biblioteca
+    # del Asistente.
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return None

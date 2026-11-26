@@ -132,6 +132,11 @@ def create_class(
     db.add(row)
     db.commit()
     db.refresh(row)
+    # A4 (2026-11-26): invalida la caché del índice de biblioteca
+    # del Asistente.
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return _class_out(row)
 
 
@@ -546,4 +551,9 @@ def delete_class(
         raise HTTPException(status_code=404, detail="Class not found")
     db.delete(row)
     db.commit()
+    # A4 (2026-11-26): invalida la caché del índice de biblioteca
+    # del Asistente.
+    from app.api.asistente import invalidar_cache_biblioteca
+
+    invalidar_cache_biblioteca()
     return None

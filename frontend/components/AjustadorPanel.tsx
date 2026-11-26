@@ -91,37 +91,38 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * mejoras-todas del 2026-11-26 antepuesta: todos los índices +1 y la
  * entrada nueva (inicio, estudiar, crear, planes, invertir, crm,
  * facturas, riesgos, planillas, talento, correos, usuarios, terminal)
- * en [0]. Sin mapear y por qué: [30] caché de cotizaciones (nombra un
+ * en [0] — y con la entrada del Asistente práctico del 2026-11-26 antepuesta: todos los índices +1 y la entrada nueva (inicio, estudiar, crear, invertir, planes, business) en [0]. Sin mapear y por qué: [31] caché de cotizaciones (nombra un
  * caché de backend, no una sección; ya se dejó sin mapear al
- * anteponerla), [40, 41, 42] login (el login no es una sección del
- * tablero), [44] cambio de nombre de toda la plataforma, [52] SEO y
- * [55] interfaz PRO (de todo el sitio, como dice arriba). NOTA: las
+ * anteponerla), [41, 42, 43] login (el login no es una sección del
+ * tablero), [45] cambio de nombre de toda la plataforma, [53] SEO y
+ * [56] interfaz PRO (de todo el sitio, como dice arriba). NOTA: las
  * claves planes/terminal/flujos/ajustador existen en este mapa pero no
  * son filas del tablero (SECCIONES_AJUSTADOR tiene 24 secciones), así
- * que [39] queda registrado pero no se muestra en el tablero hasta que
+ * que [40] queda registrado pero no se muestra en el tablero hasta que
  * Terminal sea fila del tablero. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [9, 11, 12, 13, 15, 16, 19, 21, 22, 23, 24],
-  planes: [0, 5, 34],
-  terminal: [0, 35, 39],
-  flujos: [28, 35],
-  analizador: [35],
-  auditor: [12, 35, 38],
-  ajustador: [45],
-  correos: [0, 1, 2, 14],
-  crear: [0, 1, 8, 9, 11, 12, 13, 15, 18, 22, 37],
-  estudiar: [0, 1, 2, 3, 4, 5, 6, 8, 11, 12, 13, 15, 16, 22, 26, 33, 35, 43, 45, 48, 49],
-  inicio: [0, 1, 4, 5, 8, 12, 13, 22, 35, 46, 54],
-  perfil: [12, 17, 25, 47],
-  talento: [0, 1, 7, 18, 26, 50],
-  riesgos: [0, 1, 7, 19, 50],
-  planillas: [0, 1, 7, 16, 22, 50],
-  crm: [0, 1, 10, 14, 19, 50],
-  analisis: [12, 50],
-  invertir: [0, 1, 11, 12, 13, 15, 22, 27, 31, 32, 36, 51, 53],
-  usuarios: [0, 3, 6, 7, 12, 13, 14, 17, 18, 20, 29, 53, 54],
-  espacio: [54],
-  facturas: [0, 1, 10, 16, 22],
+  business: [0, 10, 12, 13, 14, 16, 17, 20, 22, 23, 24, 25],
+  planes: [0, 1, 6, 35],
+  terminal: [1, 36, 40],
+  flujos: [29, 36],
+  analizador: [36],
+  auditor: [13, 36, 39],
+  ajustador: [46],
+  correos: [1, 2, 3, 15],
+  crear: [0, 1, 2, 9, 10, 12, 13, 14, 16, 19, 23, 38],
+  estudiar: [0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 13, 14, 16, 17, 23, 27, 34, 36, 44, 46, 49, 50],
+  inicio: [0, 1, 2, 5, 6, 9, 13, 14, 23, 36, 47, 55],
+  perfil: [13, 18, 26, 48],
+  talento: [1, 2, 8, 19, 27, 51],
+  riesgos: [1, 2, 8, 20, 51],
+  planillas: [1, 2, 8, 17, 23, 51],
+  crm: [1, 2, 11, 15, 20, 51],
+  analisis: [13, 51],
+  invertir: [0, 1, 2, 12, 13, 14, 16, 23, 28, 32, 33, 37, 52, 54],
+  usuarios: [1, 4, 7, 8, 13, 14, 15, 18, 19, 21, 30, 54, 55],
+  espacio: [55],
+  facturas: [1, 2, 11, 17, 23],
+
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,

@@ -12,12 +12,20 @@
 //   GET  /api/asistente/uso -> {"plan","plan_nombre","limite_diario","mensajes_hoy","restantes","fecha"} (Fase 6)
 //   POST /api/asistente/feedback {"pregunta","voto":"util"|"no_util"} -> {"id","voto","creado_en"} (Fase 6)
 //   GET  /api/asistente/feedback?voto= (solo admin, Fase 6)
+//   POST /api/asistente/chat {"mensaje","historial":[{"role","texto"}]} (2026-11-26, C-2):
+//     historial = últimos turnos (máx. 6) para resolver referencias
+//     ("esa cita", "cámbiala a las 11"); el backend lo ignora si aún
+//     no lo soporta — es aditivo y nunca rompe el contrato viejo.
+//   GET  /api/asistente/uso -> 401 para invitado (sin fila de usuario);
+//     el frontend lo trata como "sin línea de uso", nunca como error.
 // Respuestas del chat en español, servidas por el backend y mostradas tal cual.
-// Sin persistencia: el historial vive solo en la sesión (estado React).
-// Usa el fetch central (lib/api/client.ts): JWT Bearer con auth:true,
-// timeout largo de IA para el POST y reintento opt-in solo en el GET.
+// Sin persistencia en BD: el historial vive en sessionStorage (A-1), no
+// en el servidor. Usa el fetch central (lib/api/client.ts): JWT Bearer
+// con auth:true, timeout largo de IA para el POST y reintento opt-in
+// solo en el GET.
 import { request } from "./api/client";
 import { catalogMemo } from "./api/memo";
+import { tzOffsetMinutes, tzParts } from "./dates";
 
 // Timeout propio del chat (chat-opt 2026-11-23): el backend tiene un
 // presupuesto global de 5 s para el chat (Internet incluido), así que
@@ -41,6 +49,9 @@ export type AsistenteAccion = {
 export type AsistenteFuente = {
   nombre: string;
   url: string | null;
+  /** Fecha de publicación del contenido consultado, cuando la fuente
+   * la trae (M-4, noticias RSS); null si la fuente no la indica. */
+  publicado_en?: string | null;
 };
 
 /** Sugerencia del backend (chat-potencia 2026-11-24): el backend nuevo
@@ -92,6 +103,9 @@ export type AsistenteChatResponse = {
   pasos?: string[];
   /** Ruta del módulo al que lleva la ayuda (p. ej. "/facturas"). */
   ruta?: string | null;
+  /** Fecha de publicación del contenido consultado, cuando la fuente
+   * la trae (M-4, noticias RSS); null si no la hay. */
+  publicado_en?: string | null;
 };
 
 /** Normaliza sugerencias del backend a objetos; tolera el formato
@@ -149,14 +163,184 @@ export function getCapacidades(opts?: { signal?: AbortSignal }) {
   );
 }
 
-export function postChat(mensaje: string, opts?: { signal?: AbortSignal }) {
+export function postChat(
+  mensaje: string,
+  opts?: { signal?: AbortSignal; idempotencyKey?: string; historial?: HistorialTurno[] },
+) {
   return request<AsistenteChatResponse>("/api/asistente/chat", {
     method: "POST",
     auth: true,
-    body: { mensaje },
+    // C-2: el historial viaja solo si hay turnos previos; el backend
+    // que aún no lo soporte lo ignora (campo aditivo).
+    body:
+      opts?.historial && opts.historial.length > 0
+        ? { mensaje, historial: opts.historial }
+        : { mensaje },
     timeoutMs: CHAT_TIMEOUT_MS,
     signal: opts?.signal,
+    // A6/M3: una clave por intento; el reintento del mismo mensaje
+    // reutiliza la misma (el backend solo la aplica a las 4 mutaciones).
+    idempotencyKey: opts?.idempotencyKey,
   });
+}
+
+// ---------- Uso diario por plan (C-1) ----------
+
+/** Respuesta de GET /api/asistente/uso. Admin: limite_diario y
+ * restantes son null (sin límite); invitado: 401, sin fila. */
+export type AsistenteUso = {
+  plan: string;
+  plan_nombre: string;
+  limite_diario: number | null;
+  mensajes_hoy: number;
+  restantes: number | null;
+  fecha: string;
+};
+
+export function getUso(opts?: { signal?: AbortSignal }) {
+  return request<AsistenteUso>("/api/asistente/uso", {
+    auth: true,
+    retry: true,
+    signal: opts?.signal,
+  });
+}
+
+// ---------- Memoria de conversación (C-2) ----------
+
+/** Un turno previo del hilo: lo que viaja en `historial`. El
+ * backend exige `{rol: "usuario"|"asistente", texto}` (Pydantic
+ * HistorialTurno); el mapeo user→usuario / assistant→asistente se
+ * hace aquí, en buildHistorial, en un solo punto (D1, QA 2026-11-26:
+ * antes se enviaba `{role: "user"|"assistant"}` y cada mensaje a
+ * partir del segundo devolvía 422). */
+export type HistorialTurno = {
+  rol: "usuario" | "asistente";
+  texto: string;
+};
+
+/** Máximo de turnos que viajan en cada POST (plan, C-2). */
+export const HISTORIAL_MAX_TURNOS = 6;
+
+/** Últimos turnos del hilo, sin el saludo inicial ni los errores:
+ * solo mensajes de usuario y del asistente, con texto no vacío. */
+export function buildHistorial(
+  mensajes: Array<{ role: string; text: string; isGreeting?: boolean }>,
+  maxTurnos: number = HISTORIAL_MAX_TURNOS,
+): HistorialTurno[] {
+  const turnos: HistorialTurno[] = [];
+  for (const m of mensajes) {
+    if (m.isGreeting) continue;
+    if (m.role !== "user" && m.role !== "assistant") continue;
+    if (!m.text.trim()) continue;
+    // D1: el contrato del backend es {rol: "usuario"|"asistente"}.
+    turnos.push({
+      rol: m.role === "user" ? "usuario" : "asistente",
+      texto: m.text,
+    });
+  }
+  return turnos.slice(-maxTurnos);
+}
+
+// ---------- Idempotencia (A6/M3) ----------
+
+/** Clave única por intento de envío (UUID cuando hay crypto). */
+export function newIdempotencyKey(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  return `asistente-${Date.now()}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
+// ---------- Confirmación previa de citas (A-2) ----------
+
+/** Heurística por texto: orden de crear/agendar una cita. No
+ * interpreta fecha ni hora (eso lo hace el backend y lo muestra la
+ * tarjeta de confirmación); solo decide si pedir confirmación antes
+ * de enviar. "¿Qué citas tengo?" no casa: no lleva verbo de crear. */
+const VERBOS_CREAR_CITA =
+  /\b(crea|crear|agenda|agendar|programa|programar|reserva|reservar)\b/i;
+
+export function esOrdenCrearCita(texto: string): boolean {
+  return /\bcita\b/i.test(texto) && VERBOS_CREAR_CITA.test(texto);
+}
+
+// ---------- Mini-tarjeta de precio (M-2/B6) ----------
+
+/** Precio extraído de accion.datos (tipo "precio_btc") o null si no
+ * hay precio real. Nunca inventa: sin btc ni eth, no hay tarjeta.
+ * La hora es actualizado_en (caché, fresca o vieja) o fecha_vela
+ * (velas) o, si el backend no trae ninguna, la fecha de consulta. */
+export type AsistentePrecio = {
+  btcUsd: number | null;
+  ethUsd: number | null;
+  fuente: string;
+  timestamp: string | null;
+  /** Edad en segundos cuando el backend la da (cache_edad_s). */
+  edadSegundos: number | null;
+};
+
+export function extractPrecio(
+  accion: AsistenteAccion | null | undefined,
+  consultado_en?: string | null,
+): AsistentePrecio | null {
+  if (!accion || accion.tipo !== "precio_btc") return null;
+  const d = (accion.datos ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v ? v : null;
+  const btcUsd = num(d.btc_usd);
+  const ethUsd = num(d.eth_usd);
+  if (btcUsd === null && ethUsd === null) return null;
+  return {
+    btcUsd,
+    ethUsd,
+    fuente: str(d.fuente) ?? "sin_datos",
+    timestamp: str(d.actualizado_en) ?? str(d.fecha_vela) ?? str(consultado_en) ?? null,
+    edadSegundos: num(d.cache_edad_s),
+  };
+}
+
+// ---------- Tarjeta de confirmación (A-2) ----------
+
+/** Destino de "Ver en {módulo}" tras crear algo. Las notas, tareas
+ * y citas viven en /business (Marketing y citas); el borrador de
+ * contenido, en /crear. */
+export type AccionDestino = {
+  ruta: string;
+  modulo: "business" | "crear";
+};
+
+export function accionDestino(tipo: string): AccionDestino | null {
+  switch (tipo) {
+    case "crear_nota":
+    case "crear_tarea":
+    case "crear_cita":
+      return { ruta: "/business", modulo: "business" };
+    case "crear_borrador":
+      return { ruta: "/crear", modulo: "crear" };
+    default:
+      return null;
+  }
+}
+
+// ---------- Día de hoy en Los Ángeles (M-5) ----------
+
+/** Límites [from, to) en ISO UTC del día civil de hoy en
+ * America/Los_Angeles, para pedir las citas de hoy al backend. */
+export function diaBoundsISO(now: Date = new Date()): {
+  from: string;
+  to: string;
+  fecha: string;
+} {
+  const p = tzParts(now);
+  const medianochePared = Date.UTC(p.year, p.month - 1, p.day, 0, 0, 0);
+  const offsetMin = tzOffsetMinutes(new Date(medianochePared));
+  const fromMs = medianochePared - offsetMin * 60000;
+  return {
+    from: new Date(fromMs).toISOString(),
+    to: new Date(fromMs + 86400000).toISOString(),
+    fecha: `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`,
+  };
 }
 
 // ---------- Bandeja "Preguntas por enseñar" (solo admin) ----------

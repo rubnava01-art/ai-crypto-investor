@@ -34,7 +34,8 @@ export type NavKey =
   | "terminal"
   | "flujos"
   | "planes"
-  | "portal";
+  | "portal"
+  | "asistente";
 
 export type Dictionary = {
   header: {
