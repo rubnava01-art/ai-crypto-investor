@@ -254,7 +254,9 @@ def test_ayuda_y_fallback(client, admin_headers, monkeypatch):
     assert r.status_code == 200, r.text
     assert r.json()["accion"] is None
     assert r.json()["sin_respuesta"] is True
-    assert "No encontré información sobre eso" in r.json()["respuesta"]
+    # Fase 6, tarea 2: el fallback es "No sé" explícito.
+    assert "No sé" in r.json()["respuesta"]
+    assert "no tengo una fuente" in r.json()["respuesta"]
     assert len(r.json()["sugerencias"]) == 3
 
 

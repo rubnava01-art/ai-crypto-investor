@@ -64,6 +64,19 @@ export function formatDateTimeTz(
   });
 }
 
+/** Minutos enteros desde un instante ISO hasta `nowMs` (nunca negativo;
+ * null si el ISO no es válido). Fase 5a, tarea 1: la antigüedad de un
+ * precio en caché se muestra con su edad, no solo con su hora. */
+export function ageInMinutes(
+  iso: string | null | undefined,
+  nowMs: number = Date.now(),
+): number | null {
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return null;
+  return Math.max(0, Math.floor((nowMs - at) / 60000));
+}
+
 /** Fecha sola en la zona de negocio (con timeZone explícito). */
 export function formatDateTz(
   iso: string | null | undefined,
@@ -82,6 +95,18 @@ export function formatDateTz(
 /** Valor para <input type="date"> a partir de un ISO (fecha civil en la zona). */
 export function toDateInputValue(iso: string | null | undefined, timeZone: string = BUSINESS_TIME_ZONE): string {
   return dateKeyInTz(iso, timeZone) ?? "";
+}
+
+/** Fecha sola AAAA-MM-DD → "25 nov" en el idioma dado. Se construye en
+ * hora local (sin zona horaria) para que una fecha civil no se corra un
+ * día por el UTC — el mismo cuidado que InicioPanel.fmtDate. */
+export function formatDateOnly(iso: string | null | undefined, locale = "es-MX"): string {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  const d = m
+    ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    : new Date(iso);
+  return d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
 /** Valor para <input type="time"> a partir de un ISO (hora civil en la zona). */

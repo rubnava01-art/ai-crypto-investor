@@ -3,7 +3,7 @@
 // Sección pública "IA y Automatización" (2026-11-12). Contenido 100 %
 // estático: no lee el token ni dispara llamadas. Cada tarjeta nombra la
 // herramienta real, dice qué hace y cuál es su límite honesto en la
-// misma tarjeta. La tarjeta 7 lista las 5 herramientas de Clases por su
+// misma tarjeta. La tarjeta 7 lista las 6 herramientas de Clases por su
 // nombre real (t.clases.*). Ningún enlace va a rutas autenticadas: el
 // único CTA va a /login?mode=register.
 import Link from "next/link";
@@ -27,11 +27,13 @@ export function LandingAi() {
     { title: l.ai12Title, desc: l.ai12Desc, limit: l.ai12Limit },
     { title: l.ai13Title, desc: l.ai13Desc, limit: l.ai13Limit },
   ];
-  // Nombres reales de las 5 herramientas de Clases (tarjeta 7), en dos
-  // grupos (matiz Agente 2, verificado): sin registro — calculadora y
-  // educación Bitcoin, 100 % navegador — y dentro de tu cuenta —
-  // conversor, gráfica e indicadores, que usan /api/market/* autenticado.
-  const classToolsOpen = [t.clases.calcTitle, t.clases.btcTitle];
+  // Nombres reales de las 6 herramientas de Clases (tarjeta 7), en dos
+  // grupos (matiz Agente 2, verificado): sin registro — calculadora,
+  // educación Bitcoin y rentabilidad, 100 % navegador — y dentro de tu
+  // cuenta — conversor, gráfica e indicadores, que usan /api/market/*
+  // autenticado. La rentabilidad es solo-navegador (ClasesHerramientas
+  // nº 6), no dentro-de-cuenta: no dispara fetch ni necesita sesión.
+  const classToolsOpen = [t.clases.calcTitle, t.clases.btcTitle, t.clases.rentTitle];
   const classToolsAuth = [t.clases.convTitle, t.clases.chartTitle, t.clases.indTitle];
 
   return (

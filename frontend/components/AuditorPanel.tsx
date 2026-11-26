@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, type WebAudit } from "../lib/api";
+import { api, type WebAudit } from "../lib/api";
 import { Panel } from "./Panel";
 import { MetricCard } from "./MetricCard";
 import { ChartCard } from "./bi/DashboardCard";
@@ -199,7 +199,7 @@ export function AuditorPanel() {
       setResult(data);
       await loadRecent();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.auditor.errAudit);
+      setError(t.auditor.errAudit);
     } finally {
       setBusy(false);
     }

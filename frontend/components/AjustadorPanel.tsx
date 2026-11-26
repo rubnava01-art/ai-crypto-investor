@@ -84,29 +84,44 @@ const AGENT_BY_SECTION: Record<string, AgenteKey> = {
  * la entrada de mejoras diarias del 2026-11-24 antepuesta: todos los
  * índices +1 y la entrada nueva (talento, riesgos, planillas, usuarios) en [0] — y con
  * la entrada de Servicios + calculadora + contacto del 2026-11-25 antepuesta: todos los
- * índices +1 y la entrada nueva (estudiar, correos) en [0]. */
+ * índices +1 y la entrada nueva (estudiar, correos) en [0] — y con el
+ * recomputo del 2026-11-26 (55 entradas; sin mapear [29, 39, 40, 41, 43,
+ * 51, 54]): la entrada de Terminal del 2026-11-05 nombra claramente
+ * su módulo y se añade a terminal [34, 38] — y con la entrada de
+ * mejoras-todas del 2026-11-26 antepuesta: todos los índices +1 y la
+ * entrada nueva (inicio, estudiar, crear, planes, invertir, crm,
+ * facturas, riesgos, planillas, talento, correos, usuarios, terminal)
+ * en [0]. Sin mapear y por qué: [30] caché de cotizaciones (nombra un
+ * caché de backend, no una sección; ya se dejó sin mapear al
+ * anteponerla), [40, 41, 42] login (el login no es una sección del
+ * tablero), [44] cambio de nombre de toda la plataforma, [52] SEO y
+ * [55] interfaz PRO (de todo el sitio, como dice arriba). NOTA: las
+ * claves planes/terminal/flujos/ajustador existen en este mapa pero no
+ * son filas del tablero (SECCIONES_AJUSTADOR tiene 24 secciones), así
+ * que [39] queda registrado pero no se muestra en el tablero hasta que
+ * Terminal sea fila del tablero. */
 const LAST_BY_SECTION: Record<string, number[]> = {
-  business: [8, 10, 11, 12, 14, 15, 18, 20, 21, 22, 23],
-  planes: [4, 33],
-  terminal: [34],
-  flujos: [27, 34],
-  analizador: [34],
-  auditor: [11, 34, 37],
-  ajustador: [44],
-  correos: [0, 1, 13],
-  crear: [0, 7, 8, 10, 11, 12, 14, 17, 21, 36],
-  estudiar: [0, 1, 2, 3, 4, 5, 7, 10, 11, 12, 14, 15, 21, 25, 32, 34, 42, 44, 47, 48],
-  inicio: [0, 3, 4, 7, 11, 12, 21, 34, 45, 53],
-  perfil: [11, 16, 24, 46],
-  talento: [0, 6, 17, 25, 49],
-  riesgos: [0, 6, 18, 49],
-  planillas: [0, 6, 15, 21, 49],
-  crm: [0, 9, 13, 18, 49],
-  analisis: [11, 49],
-  invertir: [0, 10, 11, 12, 14, 21, 26, 30, 31, 35, 50, 52],
-  usuarios: [2, 5, 6, 11, 12, 13, 16, 17, 19, 28, 52, 53],
-  espacio: [53],
-  facturas: [0, 9, 15, 21],
+  business: [9, 11, 12, 13, 15, 16, 19, 21, 22, 23, 24],
+  planes: [0, 5, 34],
+  terminal: [0, 35, 39],
+  flujos: [28, 35],
+  analizador: [35],
+  auditor: [12, 35, 38],
+  ajustador: [45],
+  correos: [0, 1, 2, 14],
+  crear: [0, 1, 8, 9, 11, 12, 13, 15, 18, 22, 37],
+  estudiar: [0, 1, 2, 3, 4, 5, 6, 8, 11, 12, 13, 15, 16, 22, 26, 33, 35, 43, 45, 48, 49],
+  inicio: [0, 1, 4, 5, 8, 12, 13, 22, 35, 46, 54],
+  perfil: [12, 17, 25, 47],
+  talento: [0, 1, 7, 18, 26, 50],
+  riesgos: [0, 1, 7, 19, 50],
+  planillas: [0, 1, 7, 16, 22, 50],
+  crm: [0, 1, 10, 14, 19, 50],
+  analisis: [12, 50],
+  invertir: [0, 1, 11, 12, 13, 15, 22, 27, 31, 32, 36, 51, 53],
+  usuarios: [0, 3, 6, 7, 12, 13, 14, 17, 18, 20, 29, 53, 54],
+  espacio: [54],
+  facturas: [0, 1, 10, 16, 22],
 };
 
 /** Ajustador: tablero de mejora continua. Es un TABLERO DE GESTIÓN,
@@ -203,7 +218,7 @@ export function AjustadorPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.ajustador.errSave);
+      setError(t.ajustador.errSave);
     } finally {
       setBusy(false);
     }
@@ -219,7 +234,7 @@ export function AjustadorPanel() {
       setMsg(t.ajustador.msgDeleted);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.ajustador.errDelete);
+      setError(t.ajustador.errDelete);
     }
   };
 

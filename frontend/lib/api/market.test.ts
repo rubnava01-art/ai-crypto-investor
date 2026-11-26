@@ -209,3 +209,11 @@ test("Entrada rápida 2026-11-24: flag invitado → base pública SIN pedir /api
     `la vía rápida no debe pedir el perfil: ${urls.join(", ")}`,
   );
 });
+
+test("displaySourceName: la fuente del precio se muestra con nombre (Fase 5a, tarea 1)", async () => {
+  const { displaySourceName } = await import("./market");
+  assert.equal(displaySourceName("kraken"), "Kraken");
+  assert.equal(displaySourceName("coinbase"), "Coinbase");
+  // Fuente desconocida: capitalizada, sin inventar un nombre.
+  assert.equal(displaySourceName("otro"), "Otro");
+});

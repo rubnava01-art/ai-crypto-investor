@@ -162,13 +162,17 @@ test("T-3: la lista de salto de Clases incluye #herramienta-rentabilidad", () =>
   );
 });
 
-// D-2 (plan servicios-calc): ai7Desc cuenta 6 herramientas — dos sin
-// registro y cuatro dentro de la cuenta — en ambos idiomas.
-test("ai7Desc: seis herramientas, dos sin registro y cuatro dentro de tu cuenta", () => {
+// D-2 (plan servicios-calc): ai7Desc cuenta 6 herramientas — tres sin
+// registro y tres dentro de la cuenta — en ambos idiomas.
+// CORRECCIÓN (arreglos rápidos, 2026-11-25): el plan original decía
+// "dos sin registro y cuatro dentro", pero la rentabilidad es
+// solo-navegador, sin fetch ni sesión — como la calculadora y Bitcoin —
+// así que el reparto honesto es 3 + 3 (ai7Desc y ai7Limit coinciden).
+test("ai7Desc: seis herramientas, tres sin registro y tres dentro de tu cuenta", () => {
   assert.ok(dictEs.landing.ai7Desc.includes("Seis"), `ai7Desc ES: ${dictEs.landing.ai7Desc}`);
-  assert.ok(dictEs.landing.ai7Desc.includes("cuatro"), `ai7Desc ES: ${dictEs.landing.ai7Desc}`);
+  assert.ok(dictEs.landing.ai7Desc.includes("tres funcionan sin registro y tres dentro"), `ai7Desc ES: ${dictEs.landing.ai7Desc}`);
   assert.ok(dictEn.landing.ai7Desc.includes("Six"), `ai7Desc EN: ${dictEn.landing.ai7Desc}`);
-  assert.ok(dictEn.landing.ai7Desc.includes("four"), `ai7Desc EN: ${dictEn.landing.ai7Desc}`);
+  assert.ok(dictEn.landing.ai7Desc.includes("three work without sign-in and three inside"), `ai7Desc EN: ${dictEn.landing.ai7Desc}`);
 });
 
 // D-3 / B-1 (plan servicios-calc): la banda de servicios es un bloque

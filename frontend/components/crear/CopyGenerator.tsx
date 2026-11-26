@@ -63,7 +63,7 @@ export function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
       setTopic("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crear.errGenerate);
+      setError(t.crear.errGenerate);
     } finally {
       setBusy(false);
     }
@@ -77,7 +77,7 @@ export function CopyGenerator({ isAdmin }: { isAdmin: boolean }) {
       await api.deleteCopy(d.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crear.errDeleteCopy);
+      setError(t.crear.errDeleteCopy);
     }
   };
 

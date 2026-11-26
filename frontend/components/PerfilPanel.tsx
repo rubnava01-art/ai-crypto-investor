@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { api, ApiError, logout, type ReferralCampaign, type UserProfile } from "../lib/api";
+import { api, ApiError, logout, type MiSuscripcion, type ReferralCampaign, type Suscripcion, type UserProfile } from "../lib/api";
 import { Panel } from "./Panel";
 import { ProfileEditor } from "./ProfileMenu";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { encodeQr, type QrCode } from "../lib/qr";
+import { mostrarAvisoPrueba } from "../lib/suscripcion";
 import { MODULES } from "./ModuleNav";
-import { copyTextWithFallback } from "./ui";
+import { copyTextWithFallback, useDialogFocus } from "./ui";
 import { isSafeAvatarSrc } from "../lib/urls";
 
 const MAX_AVATAR_BYTES = 500 * 1024;
@@ -129,15 +130,11 @@ function ProfileBottomNav() {
   const { t } = useLanguage();
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreDialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [moreOpen]);
+  // 4.1: focus-trap + Escape + retorno de foco al botón «Más»
+  // (antes solo Escape, sin trap ni retorno).
+  useDialogFocus({ open: moreOpen, onEscape: () => setMoreOpen(false), dialogRef: moreDialogRef });
 
   const itemCls = (active: boolean) =>
     `flex min-h-[48px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-semibold transition-colors ${
@@ -185,6 +182,7 @@ function ProfileBottomNav() {
 
       {moreOpen && (
         <div
+          ref={moreDialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={t.perfil.moreTitle}
@@ -257,6 +255,46 @@ export function PerfilPanel() {
   const [cpMsg, setCpMsg] = useState<string | null>(null);
   const [cpError, setCpError] = useState<string | null>(null);
   const [cpBusy, setCpBusy] = useState(false);
+  // Mis datos (Fase 2 mejoras-v1, tarea 4): exportar los datos propios
+  // (JSON descargable) y borrar la propia cuenta (con contraseña).
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delPassword, setDelPassword] = useState("");
+  const [delBusy, setDelBusy] = useState(false);
+  const [delError, setDelError] = useState<string | null>(null);
+  const [delMsg, setDelMsg] = useState<string | null>(null);
+  // F1 (correcciones Fase 1 mejoras-v1): aviso + reenvío de verificación
+  // de correo, y enrollment 2FA para admin/super admin.
+  const [emailResendMsg, setEmailResendMsg] = useState<string | null>(null);
+  const [emailResendError, setEmailResendError] = useState<string | null>(null);
+  const [emailResendBusy, setEmailResendBusy] = useState(false);
+  const [twoFa, setTwoFa] = useState<{
+    enabled: boolean;
+    pending_setup: boolean;
+    recovery_codes_left: number;
+  } | null>(null);
+  const [twoFaFailed, setTwoFaFailed] = useState(false);
+  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; otpauth_url: string } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState("");
+  const [twoFaPw, setTwoFaPw] = useState("");
+  const [twoFaRecovery, setTwoFaRecovery] = useState<string[] | null>(null);
+  const [twoFaMsg, setTwoFaMsg] = useState<string | null>(null);
+  const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [twoFaBusy, setTwoFaBusy] = useState(false);
+  const [twoFaSecretCopied, setTwoFaSecretCopied] = useState(false);
+  const [twoFaCodesCopied, setTwoFaCodesCopied] = useState(false);
+  // Confirmar y desactivar revocan la sesión: hay que volver a entrar.
+  const [twoFaNeedsRelogin, setTwoFaNeedsRelogin] = useState(false);
+  // Fase 7 mejoras-v1: suscripción propia (plan, estado, aviso de
+  // fin de prueba y cancelación en un clic). Si la carga falla, la
+  // sección no se muestra: el perfil sigue funcionando.
+  const [sub, setSub] = useState<MiSuscripcion | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -266,6 +304,22 @@ export function PerfilPanel() {
   useEffect(() => {
     api.getMyProfile().then((v) => { if (!isCancelled()) setProfile(v); }).catch(() => { if (!isCancelled()) setFailed(true); });
   }, [editing]);
+
+  useEffect(() => {
+    api.getMiSuscripcion().then((v) => { if (!isCancelled()) setSub(v); }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Estado del 2FA propio (solo admin/super admin): se carga cuando el
+  // perfil ya dice si la cuenta es admin.
+  const profileIsAdmin = profile?.is_admin ?? false;
+  useEffect(() => {
+    if (!profileIsAdmin) return;
+    api.getTwoFactorStatus().then((v) => { if (!isCancelled()) setTwoFa(v); }).catch(() => { if (!isCancelled()) setTwoFaFailed(true); });
+    // Solo al cambiar el rol: el resto de cambios del perfil no
+    // recargan el estado 2FA.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileIsAdmin]);
 
   // Estadísticas reales, cada fuente por su lado: si una falla, esa
   // estadística se omite en vez de mostrar un número inventado.
@@ -298,14 +352,11 @@ export function PerfilPanel() {
     return () => window.clearTimeout(id);
   }, [toast]);
 
-  useEffect(() => {
-    if (!qrOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setQrOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [qrOpen]);
+  const qrDialogRef = useRef<HTMLDivElement>(null);
+
+  // 4.1: focus-trap + Escape + retorno de foco al botón «Ver QR»
+  // (antes solo Escape, sin trap ni retorno).
+  useDialogFocus({ open: qrOpen, onEscape: () => setQrOpen(false), dialogRef: qrDialogRef });
 
   const profileUrl = origin ? `${origin}/perfil` : "";
   const displayName = profile?.display_name?.trim() || profile?.username || "";
@@ -322,6 +373,153 @@ export function PerfilPanel() {
       return null;
     }
   }, [qrOpen, profileUrl]);
+
+  const twoFaQrCode = useMemo(() => {
+    if (!twoFaSetup) return null;
+    try {
+      return encodeQr(twoFaSetup.otpauth_url);
+    } catch {
+      return null;
+    }
+  }, [twoFaSetup]);
+
+  const resendEmailVerification = async () => {
+    if (!profile) return;
+    setEmailResendMsg(null);
+    setEmailResendError(null);
+    setEmailResendBusy(true);
+    try {
+      await api.resendVerification(profile.username);
+      setEmailResendMsg(t.perfil.resendSent);
+    } catch {
+      setEmailResendError(t.perfil.resendFailed);
+    } finally {
+      setEmailResendBusy(false);
+    }
+  };
+
+  const startTwoFaSetup = async () => {
+    setTwoFaError(null);
+    setTwoFaMsg(null);
+    setTwoFaRecovery(null);
+    setTwoFaBusy(true);
+    try {
+      const setup = await api.setupTwoFactor();
+      if (!isCancelled()) {
+        setTwoFaSetup({ secret: setup.secret, otpauth_url: setup.otpauth_url });
+        setTwoFa({ enabled: false, pending_setup: true, recovery_codes_left: 0 });
+      }
+    } catch {
+      if (!isCancelled()) setTwoFaError(t.perfil.twoFactorError);
+    } finally {
+      if (!isCancelled()) setTwoFaBusy(false);
+    }
+  };
+
+  const copyTwoFaSecret = async () => {
+    if (!twoFaSetup) return;
+    const ok = await copyTextWithFallback(twoFaSetup.secret);
+    setTwoFaSecretCopied(ok);
+    if (ok) window.setTimeout(() => setTwoFaSecretCopied(false), 4000);
+  };
+
+  const copyTwoFaCodes = async () => {
+    if (!twoFaRecovery) return;
+    const ok = await copyTextWithFallback(twoFaRecovery.join("\n"));
+    setTwoFaCodesCopied(ok);
+    if (ok) window.setTimeout(() => setTwoFaCodesCopied(false), 4000);
+  };
+
+  const confirmTwoFa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFaError(null);
+    setTwoFaMsg(null);
+    if (!twoFaCode.trim()) return;
+    setTwoFaBusy(true);
+    try {
+      const res = await api.confirmTwoFactor(twoFaCode.trim());
+      if (!isCancelled()) {
+        // Confirmar revoca la sesión actual: los códigos se muestran
+        // aquí y el usuario vuelve a entrar con clave + código.
+        setTwoFaRecovery(res.recovery_codes);
+        setTwoFa({ enabled: true, pending_setup: false, recovery_codes_left: res.recovery_codes.length });
+        setTwoFaSetup(null);
+        setTwoFaCode("");
+        setTwoFaNeedsRelogin(true);
+        setTwoFaMsg(t.perfil.twoFactorEnabledMsg);
+      }
+    } catch (err) {
+      if (!isCancelled()) {
+        setTwoFaError(
+          err instanceof ApiError && err.status === 401
+            ? t.perfil.twoFactorWrongCode
+            : t.perfil.twoFactorError,
+        );
+      }
+    } finally {
+      if (!isCancelled()) setTwoFaBusy(false);
+    }
+  };
+
+  const regenerateTwoFaCodes = async () => {
+    setTwoFaError(null);
+    setTwoFaMsg(null);
+    if (!twoFaCode.trim()) return;
+    setTwoFaBusy(true);
+    try {
+      const res = await api.regenerateTwoFactorRecoveryCodes(twoFaCode.trim());
+      if (!isCancelled()) {
+        setTwoFaRecovery(res.recovery_codes);
+        setTwoFa((s) => (s ? { ...s, recovery_codes_left: res.recovery_codes.length } : s));
+        setTwoFaCode("");
+        setTwoFaNeedsRelogin(false);
+        setTwoFaMsg(t.perfil.twoFactorRegenerated);
+      }
+    } catch (err) {
+      if (!isCancelled()) {
+        setTwoFaError(
+          err instanceof ApiError && err.status === 401
+            ? t.perfil.twoFactorWrongCode
+            : t.perfil.twoFactorError,
+        );
+      }
+    } finally {
+      if (!isCancelled()) setTwoFaBusy(false);
+    }
+  };
+
+  const disableTwoFa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFaError(null);
+    setTwoFaMsg(null);
+    if (!twoFaCode.trim() || !twoFaPw) return;
+    setTwoFaBusy(true);
+    try {
+      await api.disableTwoFactor(twoFaPw, twoFaCode.trim());
+      if (!isCancelled()) {
+        // Desactivar también revoca la sesión: el usuario vuelve a
+        // entrar con solo su clave.
+        setTwoFa({ enabled: false, pending_setup: false, recovery_codes_left: 0 });
+        setTwoFaRecovery(null);
+        setTwoFaCode("");
+        setTwoFaPw("");
+        setTwoFaNeedsRelogin(true);
+        setTwoFaMsg(t.perfil.twoFactorDisabledMsg);
+      }
+    } catch (err) {
+      if (!isCancelled()) {
+        setTwoFaError(
+          err instanceof ApiError && err.status === 401
+            ? (err.detail ?? "").includes("contraseña actual")
+              ? t.perfil.errPwCurrent
+              : t.perfil.twoFactorWrongCode
+            : t.perfil.twoFactorError,
+        );
+      }
+    } finally {
+      if (!isCancelled()) setTwoFaBusy(false);
+    }
+  };
 
   const onPhoto = (file: File | undefined) => {
     setPhotoError(null);
@@ -347,7 +545,7 @@ export function PerfilPanel() {
         if (!isCancelled()) setProfile(saved);
       } catch (err) {
         if (!isCancelled()) {
-          setPhotoError(err instanceof ApiError ? err.message : t.perfil.saveFailed);
+          setPhotoError(t.perfil.saveFailed);
         }
       } finally {
         if (!isCancelled()) setPhotoBusy(false);
@@ -396,6 +594,36 @@ export function PerfilPanel() {
       ? new Date(iso).toLocaleDateString(lang === "en" ? "en-US" : "es-MX", { day: "numeric", month: "long", year: "numeric" })
       : t.perfil.notRegistered;
 
+  // Fase 7 mejoras-v1: cancelar MI suscripción en un clic. El
+  // backend es idempotente (cancelar dos veces no rompe nada) y
+  // conserva el acceso hasta el fin del periodo.
+  const cancelSubscription = async () => {
+    setCancelError(null);
+    setCancelMsg(null);
+    setCancelBusy(true);
+    try {
+      const res = await api.cancelarMiSuscripcion();
+      setSub((prev) => (prev ? { ...prev, suscripcion: res.suscripcion } : prev));
+      setCancelOpen(false);
+      setCancelMsg(t.perfil.suscripcionCancelada.replace("{fecha}", fmtDate(res.suscripcion.acceso_hasta)));
+    } catch {
+      setCancelError(t.perfil.suscripcionCancelarError);
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
+  const estadoSuscripcion = (s: Suscripcion) => {
+    switch (s.estado_efectivo) {
+      case "prueba_activa": return t.perfil.suscripcionEstadoPruebaActiva;
+      case "activa": return t.perfil.suscripcionEstadoActiva;
+      case "cancelada": return t.perfil.suscripcionEstadoCancelada;
+      case "vencida": return t.perfil.suscripcionEstadoVencida;
+      case "en_pausa": return t.perfil.suscripcionEstadoEnPausa;
+      default: return s.estado_efectivo;
+    }
+  };
+
   const changeMyPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setCpMsg(null);
@@ -423,12 +651,68 @@ export function PerfilPanel() {
       setCpError(
         err instanceof ApiError && err.status === 401
           ? t.perfil.errPwCurrent
-          : err instanceof ApiError
-            ? err.message
-            : t.perfil.errChangePw,
+          : t.perfil.errChangePw,
       );
     } finally {
       setCpBusy(false);
+    }
+  };
+
+  // Mis datos (Fase 2 mejoras-v1, tarea 4): exportar los datos propios
+  // como JSON descargable. El nombre lleva el usuario y la fecha; si la
+  // descarga falla, se avisa sin borrar nada.
+  const exportMyData = async () => {
+    setExportMsg(null);
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const data = await api.exportMyData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `mis-datos-${profile?.username ?? "usuario"}-${today}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportMsg(t.perfil.exportDone);
+    } catch {
+      setExportError(t.perfil.exportFailed);
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  // Mis datos (Fase 2 mejoras-v1, tarea 4): borrar la propia cuenta con
+  // la contraseña como confirmación. Tras el éxito, mismo patrón que el
+  // cambio de clave: aviso + cierre de sesión a los 3 s (el token ya no
+  // vale: la cuenta no existe).
+  const deleteMyAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDelError(null);
+    setDelMsg(null);
+    if (!delPassword) return;
+    setDelBusy(true);
+    try {
+      await api.deleteMyAccount(delPassword);
+      setDelPassword("");
+      setDelMsg(t.perfil.deleteDone);
+      window.setTimeout(() => {
+        logout();
+        window.location.replace("/login");
+      }, 3000);
+    } catch (err) {
+      setDelError(
+        err instanceof ApiError && err.status === 401
+          ? t.perfil.deleteWrongPw
+          : err instanceof ApiError && err.status === 400
+            ? t.perfil.deleteBlocked
+            : t.perfil.deleteFailed,
+      );
+    } finally {
+      setDelBusy(false);
     }
   };
 
@@ -655,6 +939,185 @@ export function PerfilPanel() {
             </div>
           </dl>
 
+          {/* F1 (correcciones Fase 1): aviso + reenvío de verificación de
+              correo. Solo cuando hay correo sin verificar y la cuenta no
+              es admin (los admin están exentos del bloqueo de login). */}
+          {profile.email?.trim() && !profile.email_verified && !profile.is_admin && (
+            <div role="status" className="space-y-3 rounded-2xl border border-amber-700/60 bg-amber-500/10 p-4 shadow-sm">
+              <h3 className="text-base font-bold text-amber-300">{t.perfil.emailUnverifiedTitle}</h3>
+              <p className="text-sm leading-relaxed text-zinc-300">
+                {t.perfil.emailUnverifiedBody.replace("{email}", profile.email.trim())}
+              </p>
+              <button
+                type="button"
+                onClick={resendEmailVerification}
+                disabled={emailResendBusy}
+                className="min-h-[44px] rounded-lg border border-amber-500/60 px-4 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                {emailResendBusy ? t.perfil.resending : t.perfil.resendVerification}
+              </button>
+              {emailResendMsg && <p role="status" className="text-sm text-emerald-400">{emailResendMsg}</p>}
+              {emailResendError && <p role="alert" className="text-sm text-red-400">{emailResendError}</p>}
+            </div>
+          )}
+
+          {/* F1 (correcciones Fase 1): enrollment 2FA para admin/super
+              admin. Setup (QR + secreto) -> confirm con código -> códigos
+              de recuperación; desactivar exige clave + código. Confirmar
+              y desactivar revocan la sesión: hay que volver a entrar. */}
+          {profile.is_admin && (
+            <section aria-label={t.perfil.twoFactorTitle} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
+              <h3 className="text-base font-bold text-zinc-100">{t.perfil.twoFactorTitle}</h3>
+              <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.twoFactorHint}</p>
+              {twoFaFailed ? (
+                <p role="alert" className="text-sm text-red-400">{t.perfil.twoFactorLoadFailed}</p>
+              ) : twoFa === null ? (
+                <p className="text-sm text-zinc-400">{t.perfil.loadingProfile}</p>
+              ) : twoFa.enabled ? (
+                <>
+                  <p role="status" className="text-sm font-semibold text-emerald-400">{t.perfil.twoFactorEnabled}</p>
+                  <p className="text-sm text-zinc-400">
+                    {t.perfil.twoFactorRecoveryLeft.replace("{count}", String(twoFa.recovery_codes_left))}
+                  </p>
+                  {twoFaRecovery && (
+                    <div className="space-y-2 rounded-xl border border-emerald-700/50 bg-emerald-500/10 p-3">
+                      <h4 className="text-sm font-bold text-emerald-300">{t.perfil.twoFactorRecoveryTitle}</h4>
+                      <p className="text-xs leading-relaxed text-zinc-400">{t.perfil.twoFactorRecoveryHint}</p>
+                      <ul className="grid grid-cols-2 gap-1 font-mono text-sm text-zinc-100">
+                        {twoFaRecovery.map((code) => (
+                          <li key={code}>{code}</li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={copyTwoFaCodes}
+                        className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+                      >
+                        {twoFaCodesCopied ? t.perfil.twoFactorRecoveryCopied : t.perfil.twoFactorCopyCodes}
+                      </button>
+                    </div>
+                  )}
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.twoFactorCodeLabel}</span>
+                    <input
+                      aria-label={t.perfil.twoFactorCodeLabel}
+                      className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                      placeholder={t.perfil.twoFactorCodePlaceholder}
+                      value={twoFaCode}
+                      onChange={(e) => setTwoFaCode(e.target.value)}
+                      autoComplete="one-time-code"
+                      maxLength={16}
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={regenerateTwoFaCodes}
+                      disabled={twoFaBusy || !twoFaCode.trim()}
+                      className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      {t.perfil.twoFactorRegenerate}
+                    </button>
+                  </div>
+                  <p className="text-xs leading-relaxed text-zinc-400">{t.perfil.twoFactorRegenerateHint}</p>
+                  <form onSubmit={disableTwoFa} className="space-y-3 border-t border-zinc-800 pt-3">
+                    <h4 className="text-sm font-bold text-zinc-100">{t.perfil.twoFactorDisableTitle}</h4>
+                    <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.twoFactorDisableHint}</p>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.twoFactorCurrentPwLabel}</span>
+                      <input
+                        aria-label={t.perfil.twoFactorCurrentPwLabel}
+                        className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                        type="password"
+                        value={twoFaPw}
+                        onChange={(e) => setTwoFaPw(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={twoFaBusy || !twoFaCode.trim() || !twoFaPw}
+                      className="min-h-[44px] rounded-lg border border-red-700/60 px-4 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      {twoFaBusy ? t.perfil.twoFactorDisabling : t.perfil.twoFactorDisable}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <p role="status" className="text-sm text-zinc-400">{t.perfil.twoFactorDisabled}</p>
+                  {!twoFaSetup ? (
+                    <button
+                      type="button"
+                      onClick={startTwoFaSetup}
+                      disabled={twoFaBusy}
+                      className="min-h-[44px] rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                    >
+                      {twoFaBusy ? t.perfil.twoFactorActivating : t.perfil.twoFactorActivate}
+                    </button>
+                  ) : (
+                    <>
+                      <h4 className="text-sm font-bold text-zinc-100">{t.perfil.twoFactorScanTitle}</h4>
+                      <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.twoFactorScanHint}</p>
+                      {twoFaQrCode ? (
+                        <div className="flex justify-center">
+                          <QrSvg qr={twoFaQrCode} />
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-400">{t.perfil.twoFactorSecretLabel}</p>
+                      )}
+                      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                        <p className="text-xs font-medium text-zinc-400">{t.perfil.twoFactorSecretLabel}</p>
+                        <p className="mt-1 break-all font-mono text-sm text-zinc-100">{twoFaSetup.secret}</p>
+                        <button
+                          type="button"
+                          onClick={copyTwoFaSecret}
+                          className="mt-2 min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-800"
+                        >
+                          {twoFaSecretCopied ? t.perfil.twoFactorSecretCopied : t.perfil.twoFactorCopy}
+                        </button>
+                      </div>
+                      <form onSubmit={confirmTwoFa} className="space-y-3">
+                        <h4 className="text-sm font-bold text-zinc-100">{t.perfil.twoFactorConfirmTitle}</h4>
+                        <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.twoFactorConfirmHint}</p>
+                        <label className="block">
+                          <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.twoFactorCodeLabel}</span>
+                          <input
+                            aria-label={t.perfil.twoFactorCodeLabel}
+                            className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                            placeholder={t.perfil.twoFactorCodePlaceholder}
+                            value={twoFaCode}
+                            onChange={(e) => setTwoFaCode(e.target.value)}
+                            autoComplete="one-time-code"
+                            maxLength={16}
+                            required
+                          />
+                        </label>
+                        <button
+                          type="submit"
+                          disabled={twoFaBusy || !twoFaCode.trim()}
+                          className="min-h-[44px] w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                        >
+                          {twoFaBusy ? t.perfil.twoFactorConfirming : t.perfil.twoFactorConfirm}
+                        </button>
+                      </form>
+                    </>
+                  )}
+                </>
+              )}
+              {twoFaMsg && <p role="status" className="text-sm text-emerald-400">{twoFaMsg}</p>}
+              {twoFaError && <p role="alert" className="text-sm text-red-400">{twoFaError}</p>}
+              {twoFaNeedsRelogin && (
+                <p className="text-sm leading-relaxed text-zinc-400">
+                  <Link href="/login" className="font-semibold text-emerald-300 underline underline-offset-2 hover:text-emerald-200">
+                    {t.login.loginSubmit}
+                  </Link>
+                </p>
+              )}
+            </section>
+          )}
+
           <form onSubmit={changeMyPassword} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
             <h3 className="text-base font-bold text-zinc-100">{t.perfil.changePwTitle}</h3>
             <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.changePwHint}</p>
@@ -710,6 +1173,162 @@ export function PerfilPanel() {
             {cpError && <p role="alert" className="text-sm text-red-400">{cpError}</p>}
           </form>
 
+          {/* Fase 7 mejoras-v1: mi suscripción — plan, estado, aviso
+              de fin de prueba (≤3 días) y cancelación en un clic. El
+              pago en línea aún no está activo: lo dice en claro y la
+              activación la hace el administrador. */}
+          {sub !== null && (
+            <section aria-label={t.perfil.suscripcionTitle} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
+              <h3 className="text-base font-bold text-zinc-100">{t.perfil.suscripcionTitle}</h3>
+              {sub.suscripcion === null ? (
+                <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.suscripcionNone}</p>
+              ) : (
+                <>
+                  <p className="text-sm text-zinc-100">
+                    <span className="font-semibold">{t.perfil.suscripcionPlan}: </span>
+                    {sub.suscripcion.plan_nombre} ·{" "}
+                    {t.perfil.suscripcionPrecio.replace("{precio}", `$${sub.suscripcion.precio_mensual_usd}`)}
+                  </p>
+                  <p className="text-sm text-zinc-400">
+                    <span className="font-semibold text-zinc-300">{t.perfil.suscripcionEstado}: </span>
+                    {estadoSuscripcion(sub.suscripcion)}
+                  </p>
+                  {sub.suscripcion.estado_efectivo === "prueba_activa" && sub.suscripcion.prueba_fin && (
+                    <p className="text-sm text-zinc-400">{t.perfil.suscripcionPruebaFin.replace("{fecha}", fmtDate(sub.suscripcion.prueba_fin))}</p>
+                  )}
+                  {sub.suscripcion.estado_efectivo === "activa" && sub.suscripcion.renovacion_en && (
+                    <p className="text-sm text-zinc-400">{t.perfil.suscripcionRenovacion.replace("{fecha}", fmtDate(sub.suscripcion.renovacion_en))}</p>
+                  )}
+                  {sub.suscripcion.estado_efectivo === "cancelada" && sub.suscripcion.acceso_hasta && (
+                    <p className="text-sm text-zinc-400">{t.perfil.suscripcionAccesoHasta.replace("{fecha}", fmtDate(sub.suscripcion.acceso_hasta))}</p>
+                  )}
+                  {mostrarAvisoPrueba(sub.suscripcion) &&
+                    sub.suscripcion.prueba_fin && (
+                    <p role="status" className="rounded-xl border border-amber-700/60 bg-amber-500/10 p-3 text-sm leading-relaxed text-amber-200">
+                      {/* H3-1 (QA Fase 7): dias=0 es hoy (<24 h), no
+                          mañana: cada caso tiene su propio texto. */}
+                      {(sub.suscripcion.dias_restantes_prueba ?? 99) === 0
+                        ? t.perfil.suscripcionAvisoPruebaHoy.replace("{fecha}", fmtDate(sub.suscripcion.prueba_fin))
+                        : (sub.suscripcion.dias_restantes_prueba ?? 99) === 1
+                        ? t.perfil.suscripcionAvisoPrueba1dia.replace("{fecha}", fmtDate(sub.suscripcion.prueba_fin))
+                        : t.perfil.suscripcionAvisoPrueba
+                            .replace("{dias}", String(sub.suscripcion.dias_restantes_prueba))
+                            .replace("{fecha}", fmtDate(sub.suscripcion.prueba_fin))}
+                    </p>
+                  )}
+                  {(sub.suscripcion.estado_efectivo === "prueba_activa" || sub.suscripcion.estado_efectivo === "activa") && (
+                    !cancelOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => { setCancelOpen(true); setCancelError(null); setCancelMsg(null); }}
+                        className="min-h-[44px] w-full rounded-lg border border-red-700/60 px-3 py-2.5 text-sm font-semibold text-red-300 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                      >
+                        {t.perfil.suscripcionCancelar}
+                      </button>
+                    ) : (
+                      <div className="space-y-3 rounded-xl border border-red-700/60 bg-red-500/10 p-3">
+                        <p className="text-sm leading-relaxed text-zinc-200">
+                          {t.perfil.suscripcionCancelarConfirm.replace(
+                            "{fecha}",
+                            fmtDate(sub.suscripcion.estado_efectivo === "prueba_activa" ? sub.suscripcion.prueba_fin : sub.suscripcion.renovacion_en),
+                          )}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={cancelSubscription}
+                            disabled={cancelBusy}
+                            className="min-h-[44px] flex-1 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50"
+                          >
+                            {cancelBusy ? t.perfil.suscripcionCancelando : t.perfil.suscripcionCancelarSi}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCancelOpen(false)}
+                            className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                          >
+                            {t.perfil.suscripcionCancelarNo}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                  {cancelMsg && <p role="status" className="text-sm text-emerald-400">{cancelMsg}</p>}
+                  {cancelError && <p role="alert" className="text-sm text-red-400">{cancelError}</p>}
+                </>
+              )}
+              <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.suscripcionPagoNoActivo}</p>
+            </section>
+          )}
+
+          {/* Mis datos (Fase 2 mejoras-v1, tarea 4): exportar y borrar.
+              La zona de borrado es peligrosa y pide la contraseña: sin
+              ella no hay borrado, y el backend protege la última cuenta
+              super admin y la última administradora. */}
+          <section aria-label={t.perfil.misDatosTitle} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 shadow-sm">
+            <h3 className="text-base font-bold text-zinc-100">{t.perfil.misDatosTitle}</h3>
+            <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.misDatosIntro}</p>
+            <button
+              type="button"
+              onClick={exportMyData}
+              disabled={exportBusy}
+              className="min-h-[44px] w-full rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-50"
+            >
+              {exportBusy ? t.perfil.exporting : t.perfil.exportButton}
+            </button>
+            <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.exportHint}</p>
+            {exportMsg && <p role="status" className="text-sm text-emerald-400">{exportMsg}</p>}
+            {exportError && <p role="alert" className="text-sm text-red-400">{exportError}</p>}
+
+            <div className="border-t border-zinc-800 pt-3">
+              <h4 className="text-sm font-bold text-zinc-100">{t.perfil.deleteTitle}</h4>
+              <p className="mt-1 text-sm leading-relaxed text-zinc-400">{t.perfil.deleteHint}</p>
+              {!delOpen ? (
+                <button
+                  type="button"
+                  onClick={() => { setDelOpen(true); setDelError(null); setDelMsg(null); }}
+                  className="mt-3 min-h-[44px] w-full rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+                >
+                  {t.perfil.deleteButton}
+                </button>
+              ) : (
+                <form onSubmit={deleteMyAccount} className="mt-3 space-y-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.deletePwLabel}</span>
+                    <input
+                      aria-label={t.perfil.deletePwLabel}
+                      className="w-full min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                      placeholder={t.perfil.deletePwPlaceholder}
+                      type="password"
+                      value={delPassword}
+                      onChange={(e) => setDelPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={delBusy || !delPassword}
+                      className="min-h-[44px] flex-1 rounded-lg bg-red-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:opacity-50"
+                    >
+                      {delBusy ? t.perfil.deleting : t.perfil.deleteConfirm}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setDelOpen(false); setDelPassword(""); setDelError(null); }}
+                      className="min-h-[44px] rounded-lg border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    >
+                      {t.perfil.deleteCancel}
+                    </button>
+                  </div>
+                </form>
+              )}
+              {delMsg && <p role="status" className="mt-2 text-sm text-emerald-400">{delMsg}</p>}
+              {delError && <p role="alert" className="mt-2 text-sm text-red-400">{delError}</p>}
+            </div>
+          </section>
+
           <p className="text-sm leading-relaxed text-zinc-400">{t.perfil.note}</p>
         </div>
       )}
@@ -727,6 +1346,7 @@ export function PerfilPanel() {
 
       {qrOpen && (
         <div
+          ref={qrDialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={t.perfil.qrTitle}

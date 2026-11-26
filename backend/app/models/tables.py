@@ -26,6 +26,12 @@ def utcnow() -> dt.datetime:
 
 class User(Base):
     __tablename__ = "users"
+    # F2 (corrección Fase 1 mejoras-v1): el correo es único entre
+    # cuentas (Postgres y SQLite permiten varios NULL: las cuentas sin
+    # correo no chocan). La unicidad en la BD es el respaldo de la
+    # comprobación previa del registro/cambio de correo; sin ella dos
+    # cuentas podían registrar/verificar el mismo correo.
+    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
@@ -65,6 +71,61 @@ class User(Base):
     # PLAN_CARD_IDS sin el prefijo "plan-"). Llega por migración
     # Alembic, nunca solo con create_all, en BD existentes.
     requested_plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # 2FA TOTP (Fase 1 mejoras-v1, tarea 3): obligatorio para admin y
+    # super admin una vez activado. El secreto se guarda en claro en
+    # la BD (sin cifrado en reposo: riesgo conocido, ver two_factor.py);
+    # los códigos de recuperación se guardan solo como SHA-256.
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    totp_recovery_codes: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # el usuario confirmó su correo con el token. Solo importa cuando
+    # `email` tiene valor: las cuentas sin correo (todas las viejas y
+    # los registros sin correo) no pasan por verificación. Los admin
+    # están exentos del bloqueo de login (son operadores de confianza).
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Aceptación de Términos y Privacidad (Fase 2 mejoras-v1, tarea 1):
+    # fecha en que el usuario aceptó los textos legales al registrarse.
+    # NULL en cuentas viejas (registradas antes de existir el checkbox)
+    # y en cuentas creadas por un admin desde Control de usuarios.
+    # Llega por migración Alembic, nunca solo con create_all, en BD
+    # existentes.
+    terms_accepted_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Último inicio de sesión correcto (Fase 8 mejoras-v1, tarea 4):
+    # lo estampa el login al emitir el token. NULL = nunca ha entrado
+    # (cuenta aprobada pero sin primer acceso). Sirve para detectar
+    # inactividad y ofrecer reactivación; nunca se usa para bloquear.
+    # Llega por migración Alembic, nunca solo con create_all, en BD
+    # existentes.
+    last_login_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class EmailVerification(Base):
+    """Token de verificación de correo (Fase 1 mejoras-v1, tarea 1).
+
+    Un token por emisión; el token en claro NUNCA se guarda, solo su
+    SHA-256. TTL 24 h, un solo uso: verificar lo borra. Reenviar
+    invalida los anteriores (se borran las filas del usuario antes de
+    crear la nueva). La fila se borra en cascada con el usuario.
+    """
+
+    __tablename__ = "email_verifications"
+    __table_args__ = (Index("ix_email_verifications_user_id", "user_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class SuperAdminGrant(Base):
@@ -325,6 +386,76 @@ class AuditLog(Base):
     )
 
 
+class EventoAnalitica(Base):
+    """Evento agregado de uso de la plataforma (Fase 8 mejoras-v1,
+    tarea 3). Sin servicio externo, sin cookies de terceros.
+
+    Solo tipo de evento y referencias, nunca contenido privado: ni
+    preguntas del chat, ni datos de negocio, ni cuerpos de mensajes.
+    Tipos canónicos: "registro" (al crear la cuenta), "primera_herramienta"
+    (primer uso del Asistente por usuario), "uso_semanal" (un evento por
+    usuario y semana ISO, agregado, no por mensaje) y "paso_a_pago"
+    (al activar el admin una prueba o una suscripción de pago).
+
+    La unicidad (tipo, user_id, referencia) hace que cada evento se
+    registre una sola vez donde corresponde: "registro" y
+    "primera_herramienta" usan referencia "" (una vez por usuario);
+    "uso_semanal" usa la semana ISO ("2026-W48"); "paso_a_pago" usa
+    la clave del plan (una vez por usuario y plan). La tabla nace
+    vacía: no se inventan eventos pasados ni datos históricos.
+    """
+
+    __tablename__ = "eventos_analitica"
+    __table_args__ = (
+        UniqueConstraint(
+            "tipo", "user_id", "referencia",
+            name="uq_eventos_analitica_tipo_usuario_ref",
+        ),
+        Index("ix_eventos_analitica_tipo", "tipo"),
+        Index("ix_eventos_analitica_creado_en", "creado_en"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    referencia: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    creado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class EmailEnvio(Base):
+    """Registro de correos del sistema ya encolados (Fase 8 mejoras-v1,
+    tarea 4). No es un historial de envíos reales (no hay proveedor:
+    todo queda en la cola stub PENDIENTE de envío): es la guarda de
+    deduplicación — un mismo tipo de correo no se encola dos veces el
+    mismo día para el mismo usuario (bienvenida tras aprobar,
+    reactivación). La unicidad (user_id, tipo, fecha) lo impone en
+    la BD; el cuerpo del correo NO se guarda aquí (queda en la cola
+    en memoria de email_outbox hasta que haya proveedor).
+    """
+
+    __tablename__ = "email_envios"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "tipo", "fecha",
+            name="uq_email_envios_usuario_tipo_fecha",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    tipo: Mapped[str] = mapped_column(String(32), nullable=False)
+    fecha: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    creado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class RuntimeSetting(Base):
     """Persisted runtime state (Fase 2, A3): kill switch, scanner and
     simulation mode survive free-tier sleep/restarts. Single-key rows:
@@ -458,12 +589,68 @@ class Contact(Base):
     status: Mapped[str] = mapped_column(
         String(16), default="nuevo", nullable=False
     )  # nuevo|contactado|interesado|cliente|inactivo
+    # Etapa de venta (Fase 5b mejoras-v1, tarea 1): embudo propio,
+    # distinto del `status` general (que sigue existiendo: un cliente
+    # puede estar en etapa "ganado" y estado "cliente", o "perdido" e
+    # "inactivo"). nuevo|contactado|propuesta|negociacion|ganado|
+    # perdido. Backfill "nuevo" para los contactos existentes: sin
+    # historial inventado, el cambio queda registrado solo desde que
+    # la etapa se mueve por la API (ver CrmStageHistory).
+    stage: Mapped[str] = mapped_column(
+        String(16), default="nuevo", nullable=False
+    )
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class CrmStageHistory(Base):
+    """Cambio de etapa de venta de un contacto (Fase 5b, tarea 1).
+
+    Una fila por cambio real: `from_stage` es NULL solo en la fila
+    inicial que se crea con el contacto (etapa con la que nace).
+    Nunca se inventa historial para contactos anteriores: esos solo
+    tienen filas desde que su etapa se mueve por la API. CASCADE al
+    borrar el contacto.
+    """
+
+    __tablename__ = "crm_stage_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("crm_contacts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_stage: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_stage: Mapped[str] = mapped_column(String(16), nullable=False)
+    changed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class CrmReminder(Base):
+    """Recordatorio de seguimiento de un contacto (Fase 5b, tarea 1).
+
+    Fecha + nota. El panel "Hoy" muestra los no hechos con fecha <=
+    hoy (vencidos o de hoy). `done` lo marca el admin cuando el
+    seguimiento ya se hizo; no se borra solo. CASCADE al borrar el
+    contacto.
+    """
+
+    __tablename__ = "crm_reminders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("crm_contacts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    remind_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
     )
 
 
@@ -584,6 +771,10 @@ class Invoice(Base):
     items: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     tax_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="borrador", nullable=False)
+    # Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): opcional; el
+    # panel "Hoy" clasifica la factura enviada como vencida (<= hoy),
+    # por vencer (dentro de 7 días) o por cobrar (sin fecha).
+    due_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -611,6 +802,94 @@ class EduClass(Base):
         DateTime(timezone=True), nullable=True
     )
     duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class EduProgress(Base):
+    """Progreso de un usuario en una clase (Fase 5a, tarea 4).
+
+    Una fila por (usuario, clase): `completed` marca la clase como
+    terminada, con la fecha en que se marcó. Sin fila, la clase no está
+    empezada; la fila se conserva al desmarcar (completed=False) para
+    no perder el historial. Borrar el usuario o la clase borra su
+    progreso (CASCADE). El porcentaje por curso (por kind: grabada /
+    envivo) se calcula en el endpoint, no se guarda.
+    """
+
+    __tablename__ = "edu_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "class_id", name="uq_edu_progress_user_class"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    class_id: Mapped[int] = mapped_column(
+        ForeignKey("edu_classes.id", ondelete="CASCADE"), nullable=False
+    )
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class EduQuizQuestion(Base):
+    """Pregunta de quiz de una clase (Fase 5a, tarea 5).
+
+    Las preguntas las crea SOLO el administrador y solo a partir del
+    material real de la clase (su descripción, su enlace o un manual
+    de la plataforma): `source` dice de dónde sale la respuesta y es
+    obligatorio, para que ninguna pregunta nazca inventada. Sin
+    preguntas, la clase no tiene quiz y la UI lo marca PENDIENTE.
+    `options` es una lista JSON de 2-6 textos; `correct_index` es la
+    posición de la correcta; `explanation` es la corrección breve que
+    se muestra al responder.
+    """
+
+    __tablename__ = "edu_quiz_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    class_id: Mapped[int] = mapped_column(
+        ForeignKey("edu_classes.id", ondelete="CASCADE"), nullable=False
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list] = mapped_column(JSON, nullable=False)
+    correct_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    explanation: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    source: Mapped[str] = mapped_column(String(300), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class EduQuizAttempt(Base):
+    """Un intento de quiz de un usuario en una clase (Fase 5a, tarea 5).
+
+    Solo guarda el resultado (aciertos/total y fecha): las respuestas
+    concretas no se guardan. Borrar el usuario o la clase borra sus
+    intentos (CASCADE).
+    """
+
+    __tablename__ = "edu_quiz_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    class_id: Mapped[int] = mapped_column(
+        ForeignKey("edu_classes.id", ondelete="CASCADE"), nullable=False
+    )
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    total: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -867,6 +1146,10 @@ class BusinessTask(Base):
     area: Mapped[str] = mapped_column(String(32), nullable=False)
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): opcional; el
+    # panel "Hoy" cuenta la tarea como urgente si no está hecha y vence
+    # hoy o ya venció. NULL = sin fecha (no es urgente por fecha).
+    due_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -1157,6 +1440,9 @@ class Riesgo(Base):
     mitigacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
     responsable: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     estado: Mapped[str] = mapped_column(String(16), default="abierto", nullable=False)
+    # Fecha de revisión (Fase 5b mejoras-v1, tarea 4): cuándo hay que
+    # revisar este riesgo. NULL = sin fecha fijada (no se inventa una).
+    fecha_revision: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -1222,6 +1508,34 @@ class InventoryItem(Base):
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class InventoryMovement(Base):
+    """Historial de movimientos de stock (Fase 5b mejoras-v1, tarea 3).
+
+    Una fila por cambio real de cantidad: creación con stock inicial
+    (entrada), ajuste por PUT (ajuste) y movimiento explícito por
+    POST /movimientos (entrada/venta/ajuste). `cantidad_delta` lleva
+    signo (negativo en ventas y salidas); `cantidad_final` es el stock
+    tras el movimiento, para leer el historial sin reconstruirlo.
+    `motivo` es texto libre del admin ("Venta mostrador", "Compra a
+    proveedor"...). Sin movimientos no hay historial inventado: un
+    producto sin cambios no tiene filas. CASCADE al borrar el producto.
+    """
+
+    __tablename__ = "inventory_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(16), nullable=False)  # entrada|venta|ajuste
+    cantidad_delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    cantidad_final: Mapped[int] = mapped_column(Integer, nullable=False)
+    motivo: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
     )
 
 
@@ -1595,4 +1909,145 @@ class ReglaAsistente(Base):
     creado_por: Mapped[str | None] = mapped_column(String(64), nullable=True)
     creado_en: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class AsistenteUsoDiario(Base):
+    """Contador de mensajes del Asistente por usuario y día (Fase 6
+    mejoras-v1, tarea 1).
+
+    Una fila por (usuario, fecha UTC): `mensajes` cuenta cada mensaje
+    aceptado en POST /api/asistente/chat (incluidos los que caen en
+    "no sé", en consejo personalizado o en solo-lectura; el 429 por
+    límite NO se cuenta y el replay idempotente tampoco, porque no
+    es un mensaje nuevo). Al cambiar de día UTC la fila es otra y el
+    contador vuelve a cero: no hay borrado, el reinicio es por fecha.
+    El invitado no tiene fila (sin user_id): su tope sigue siendo el
+    limiter por minuto (5/min por IP), no un límite diario.
+    """
+
+    __tablename__ = "asistente_uso_diario"
+    __table_args__ = (
+        UniqueConstraint("user_id", "fecha", name="uq_asistente_uso_user_fecha"),
+        Index("ix_asistente_uso_fecha", "fecha"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    fecha: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    mensajes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    actualizado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class AsistenteFeedback(Base):
+    """Voto útil / no útil sobre una respuesta del Asistente
+    (Fase 6 mejoras-v1, tarea 3).
+
+    QUÉ SE GUARDA (minimización de datos, documentado): solo la
+    pregunta del usuario (truncada a 1000 caracteres, como en la
+    bandeja), el voto ("util" | "no_util"), el usuario (NULL si es
+    invitado) y la fecha. NO se guarda la respuesta del asistente ni
+    el contenido completo de la conversación: para saber qué falló
+    basta la pregunta + el voto + la fecha. Un "no_util" además
+    re-registra la pregunta en `preguntas_sin_respuesta` (bandeja del
+    admin), para que se pueda enseñar una regla; el invitado no entra
+    en la bandeja (misma regla que las preguntas "no sé": un anónimo
+    podría llenarla de spam), pero su voto sí queda aquí.
+    """
+
+    __tablename__ = "asistente_feedback"
+    __table_args__ = (
+        Index("ix_asistente_feedback_voto_fecha", "voto", "creado_en"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    pregunta: Mapped[str] = mapped_column(String(1000), nullable=False)
+    voto: Mapped[str] = mapped_column(String(8), nullable=False)  # util|no_util
+    creado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Suscripcion(Base):
+    """Suscripción de un usuario a un plan de pago (Fase 7 mejoras-v1).
+
+    PREPARAR, NO ACTIVAR: no hay pago en línea ni cobro real. La
+    suscripción la crea/activa el ADMINISTRADOR a mano (no hay
+    pasarela conectada: ver app/pagos_proveedor.py, todo PENDIENTE).
+    Una fila por usuario (user_id único): el plan vigente es esa
+    fila; sin fila no hay suscripción (el usuario es prueba).
+
+    Plan (canónico aquí): "esencial" | "crecimiento" |
+    "negocio_total". El alias histórico "total" (User.requested_plan
+    y PLAN_CARD_IDS, elegido al registrarse) significa lo mismo que
+    "negocio_total" y se normaliza al entrar (ver
+    app/api/suscripciones.py::normalizar_plan). Precios únicos:
+    Esencial $19/mes, Crecimiento $49/mes, Negocio Total $99/mes,
+    14 días de prueba gratis.
+
+    Estados:
+    - "prueba_activa": prueba gratuita de 14 días en curso; acceso
+      hasta prueba_fin.
+    - "activa": suscripción pagada vigente; acceso hasta
+      renovacion_en.
+    - "cancelada": el usuario (o el admin) la canceló, pero CONSERVA
+      el acceso hasta acceso_hasta (= fin del periodo pagado o de la
+      prueba, lo que aplique). No borra datos. Pasado acceso_hasta
+      el acceso efectivo termina (estado efectivo "vencida").
+    - "vencida": periodo terminado sin renovación; sin acceso.
+    - "en_pausa": pausada por el admin; sin acceso mientras dure.
+    El estado EFECTIVO (con fecha) lo calcula
+    estado_efectivo_suscripcion(): una "cancelada" con acceso_hasta
+    pasado y una "prueba_activa"/"activa" con su fin pasado se leen
+    como "vencida" sin reescribir la fila.
+
+    proveedor / proveedor_suscripcion_id: NULL siempre por ahora
+    (sin pasarela). Cuando se conecte PayPal o Stripe, aquí irá el
+    id de la suscripción en el proveedor; nunca claves.
+    """
+
+    __tablename__ = "suscripciones"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_suscripciones_user_id"),
+        Index("ix_suscripciones_prueba_fin", "prueba_fin"),
+        Index("ix_suscripciones_estado", "estado"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    plan: Mapped[str] = mapped_column(String(32), nullable=False)
+    estado: Mapped[str] = mapped_column(String(32), nullable=False)
+    prueba_inicio: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    prueba_fin: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    renovacion_en: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelada_en: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acceso_hasta: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    proveedor: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    proveedor_suscripcion_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    creado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    actualizado_en: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )

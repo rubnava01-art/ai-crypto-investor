@@ -91,7 +91,7 @@ export function IdeasBank({ isAdmin }: { isAdmin: boolean }) {
       setEditing(null);
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.contenido.errSaveIdea);
+      setFormError(t.contenido.errSaveIdea);
     } finally {
       setBusy(false);
     }
@@ -106,7 +106,7 @@ export function IdeasBank({ isAdmin }: { isAdmin: boolean }) {
       setMsg(t.contenido.msgIdeaDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.contenido.errDeleteIdea);
+      setActionError(t.contenido.errDeleteIdea);
     }
   };
 

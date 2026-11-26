@@ -1,5 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fase 3 mejoras-v1, tarea 5: miniaturas de YouTube (i.ytimg.com,
+  // host estable) servidas con next/image: el optimizador las pide en
+  // el servidor y las sirve desde /_next/image (mismo origen), con
+  // caché y tamaño adecuado. Sin esto, next/image rechaza el host.
+  images: {
+    // 2.4 (2026-11-26): formatos modernos explícitos — el optimizador
+    // sirve AVIF cuando el navegador lo soporta y WebP en caso
+    // contrario; sin esto el valor por defecto es solo WebP. Aplica a
+    // las miniaturas de YouTube (i.ytimg.com) servidas con next/image.
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+        pathname: "/vi/**",
+      },
+    ],
+  },
   // Fase 4 (FE11): headers mínimos. Caché larga solo para los MP3 de
   // meditación (contenido estable, servido con preload="none"); sin CSP
   // restrictiva: rompería scripts en línea del runtime de Next.

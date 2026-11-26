@@ -23,7 +23,7 @@ export default function ErrorPage({
         {t.misc.errorBody}
       </p>
       {error?.digest ? (
-        <p className="mt-3 font-mono text-xs text-zinc-500">
+        <p className="mt-3 font-mono text-xs text-zinc-400">
           {t.misc.errorDigest.replace("{digest}", error.digest)}
         </p>
       ) : null}

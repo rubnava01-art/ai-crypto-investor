@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "../lib/i18n";
 import { paymentUrlForPlan } from "../lib/pagos";
+import { PLAN_KEYS } from "../lib/planes";
 import { safeHttpHref } from "../lib/urls";
 
 /** Icono de verificación (sin emoji): marca de la lista de funciones. */
@@ -47,27 +48,16 @@ export const PLAN_FEATURE_KEYS = [
 /** Claves de plan para ?plan= (contrato A2, 2026-11-13): los valores
  * EXACTOS que viajan en /login?mode=register&plan=<clave> y en el
  * payload de registro; el admin los ve en la vista de pendientes.
- * Sufijos de las claves de t.planes (nameEsencial, priceEsencial…). */
-export const PLAN_KEYS = ["esencial", "crecimiento", "total"] as const;
-export type PlanKey = (typeof PLAN_KEYS)[number];
-
-export function isPlanKey(value: string | null | undefined): value is PlanKey {
-  return value === "esencial" || value === "crecimiento" || value === "total";
-}
+ * Sufijos de las claves de t.planes (nameEsencial, priceEsencial…).
+ * Definidos en lib/planes.ts (2.4, 2026-11-26): /login los importaba
+ * desde aquí y arrastraba todo este módulo al chunk de login. Se
+ * re-exportan para no romper a los importadores existentes. */
+export { PLAN_KEYS, isPlanKey, planNameForKey, type PlanKey } from "../lib/planes";
 
 /** Ids de ancla de cada tarjeta de plan (para la segmentación por etapa
  * de la landing: #plan-esencial, #plan-crecimiento, #plan-total). */
 export const PLAN_CARD_IDS = ["plan-esencial", "plan-crecimiento", "plan-total"] as const;
 
-/** Nombre visible de un plan por su clave (para el aviso post-registro). */
-export function planNameForKey(t: { planes: Record<string, string> }, key: PlanKey): string {
-  const map: Record<PlanKey, string> = {
-    esencial: t.planes.nameEsencial,
-    crecimiento: t.planes.nameCrecimiento,
-    total: t.planes.nameTotal,
-  };
-  return map[key];
-}
 
 export function PlanesPanel() {
   const { t } = useLanguage();
@@ -193,7 +183,13 @@ export function PlanesPanel() {
       <div className="space-y-1 text-sm text-zinc-400">
         <p>{p.trialNote}</p>
         <p>{p.activationNote}</p>
-        <p className="text-xs text-zinc-500">{p.currencyNote}</p>
+        <p className="text-xs text-zinc-400">{p.currencyNote}</p>
+        {/* Fase 2 mejoras-v1, tarea 3: reembolsos y cancelación. */}
+        <p className="pt-2">
+          <Link href="/legal/reembolsos" className="font-semibold text-emerald-400 underline underline-offset-2 hover:text-emerald-300">
+            {p.refundsLink}
+          </Link>
+        </p>
       </div>
 
       {/* M-1 (TBT-Herramientas, FASE 2, 2026-11-24): enlace cruzado al

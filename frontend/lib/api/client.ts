@@ -1,6 +1,7 @@
 import type { MeResponse } from "./types";
 import { catalogMemo } from "./memo";
 import { expiredLoginUrlFromLocation } from "../session";
+import { clearSessionCookie } from "../sessionCookie";
 
 // Cliente fetch del API (extraído de lib/api.ts en Fase 4, sin cambios
 // de comportamiento). Único punto de fetch con timeout: request() (JSON)
@@ -41,6 +42,10 @@ export function isGuest(): boolean {
 /** Guarda un token de invitado (contrato POST /api/auth/guest). */
 export function setGuestToken(token: string) {
   setToken(token);
+  // Corrección QA H2: el invitado NO marca sesión en el servidor; su
+  // flujo sigue siendo landing → /inicio (RootGate). Si había una marca
+  // de una sesión anterior con cuenta, se borra.
+  clearSessionCookie();
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(GUEST_KEY, "1");
@@ -93,6 +98,10 @@ export function setToken(token: string | null) {
 // (`aci_lang`) y las preferencias no son datos de sesión.
 export function logout() {
   if (typeof window === "undefined") return;
+  // Corrección QA H2: al cerrar sesión (o expirar vía
+  // handleUnauthorized, que llama aquí) se borra la marca para que el
+  // servidor vuelva a servir la landing.
+  clearSessionCookie();
   setToken(null);
   clearGuestFlag();
   try {

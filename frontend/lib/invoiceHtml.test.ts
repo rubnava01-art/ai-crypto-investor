@@ -58,3 +58,16 @@ test("nombre de cliente, notas y vendedor también se escapan", () => {
   assert.ok(!html.includes("<b>X</b>"), "sin etiqueta <b> inyectada");
   assert.ok(html.includes("a &amp; b &lt;c&gt;"));
 });
+
+test("el PDF lleva la marca de la plataforma, sobria y sin logo", () => {
+  const html = buildInvoiceHtml(base({}));
+  assert.ok(html.includes("Grow Business Platform"), "marca por defecto");
+  // Sin <img> ni logo inventado: solo texto.
+  assert.ok(!html.includes("<img"), "sin imagen de logo");
+});
+
+test("la marca personalizada se escapa como el resto de campos", () => {
+  const html = buildInvoiceHtml(base({ brand: `<b>Falsa</b>` }));
+  assert.ok(!html.includes("<b>Falsa</b>"));
+  assert.ok(html.includes("&lt;b&gt;Falsa&lt;/b&gt;"));
+});

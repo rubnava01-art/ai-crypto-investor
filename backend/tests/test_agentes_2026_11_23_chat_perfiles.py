@@ -261,7 +261,9 @@ def test_pregunta_sin_respuesta_queda_en_bandeja_y_se_descarta(
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["sin_respuesta"] is True
-    assert "No encontré información sobre eso" in body["respuesta"]
+    # Fase 6, tarea 2: el fallback es "No sé" explícito.
+    assert "No sé" in body["respuesta"]
+    assert "no tengo una fuente" in body["respuesta"]
     r = client.get("/api/asistente/preguntas", headers=admin_headers)
     assert r.status_code == 200, r.text
     fila = next(p for p in r.json() if p["pregunta"] == pregunta)

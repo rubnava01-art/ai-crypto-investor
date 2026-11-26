@@ -9,13 +9,15 @@
 // 2026-11-23: la base la elige lib/api/market.ts según el perfil):
 // un 503 es "sin datos" y nunca se muestra un precio viejo como actual.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, isMarketNoData, type MarketCandlesResponse, type MarketIndicatorsResponse, type MarketTickerResponse } from "../lib/api";
+import { api, ApiError, displaySourceName, isMarketNoData, type MarketCandlesResponse, type MarketIndicatorsResponse, type MarketTickerResponse } from "../lib/api";
+import { ageInMinutes, formatDateTimeTz } from "../lib/dates";
 import { Panel } from "./Panel";
 import { ApiErrorBanner } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { CompoundCalculator } from "./CompoundCalculator";
 import { RentabilidadCalculator } from "./RentabilidadCalculator";
+import { SimulacionAviso } from "./SimulacionAviso";
 
 type LoadStatus = "loading" | "ready" | "nodata" | "error";
 
@@ -23,8 +25,9 @@ const fmtUsd = (n: number, locale: string) =>
   n.toLocaleString(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtNum = (n: number, locale: string, digits = 2) =>
   n.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-const fmtTime = (iso: string, locale: string) =>
-  new Date(iso).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+// Fase 5a, tarea 1: las horas de mercado se muestran en hora de Los
+// Ángeles (zona de negocio), nunca en la zona del dispositivo.
+const fmtTime = (iso: string, locale: string) => formatDateTimeTz(iso, locale);
 
 /** SMA/EMA en frontend desde los cierres (el backend solo da el último
  * valor en /indicators; la serie de la gráfica se calcula aquí). */
@@ -55,13 +58,25 @@ function SectionTitle({ children }: { children: ReactNode }) {
 /** Tarjeta de una herramienta: número de orden + título a primera vista
  * (2026-11-12): las 6 herramientas vivían en un solo flujo sin
  * separación visual; cada una tiene ahora su propia tarjeta y el índice
- * de salto del panel enlaza a su ancla. */
-function ToolCard({ id, num, title, badge, children }: { id: string; num: string; title: string; badge?: ReactNode; children: ReactNode }) {
+ * de salto del panel enlaza a su ancla.
+ * Bento (2026-11-25): superficie estándar `.fintech-card`; `className`
+ * recibe el span de la rejilla (1 col en móvil, sin spans) y `access`
+ * marca la diferencia de acceso por rol sin ocultarla: "open" = sin
+ * registro (calculadora, educación), "auth" = con sesión y datos en
+ * vivo (conversor, gráfica, indicadores). Reutiliza las claves
+ * landing.ai7GroupOpen/Auth — no hay texto nuevo que traducir. */
+function ToolCard({ id, num, title, badge, access, className, children }: { id: string; num: string; title: string; badge?: ReactNode; access?: "open" | "auth"; className?: string; children: ReactNode }) {
+  const { t } = useLanguage();
   return (
-    <section id={id} aria-label={title} className="fintech-card scroll-mt-24 p-4 sm:p-5">
+    <section id={id} aria-label={title} className={`fintech-card scroll-mt-24 p-4 sm:p-5 ${className ?? ""}`}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-700 text-xs font-bold text-white">{num}</span>
         <h3 className="min-w-0 flex-1 text-sm font-semibold text-zinc-100">{title}</h3>
+        {access && (
+          <span className="inline-flex items-center rounded-full bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-300">
+            {access === "open" ? t.landing.ai7GroupOpen : t.landing.ai7GroupAuth}
+          </span>
+        )}
         {badge}
       </div>
       {children}
@@ -90,7 +105,7 @@ function LiveBadge({ live, liveLabel, staleLabel }: { live: boolean; liveLabel: 
 function ClasesCompoundCalculator() {
   const { t } = useLanguage();
   return (
-    <ToolCard id="herramienta-calculadora" num="1" title={t.clases.calcTitle}>
+    <ToolCard id="herramienta-calculadora" num="1" title={t.clases.calcTitle} access="open" className="sm:col-span-2 lg:col-span-2">
       <CompoundCalculator idPrefix="clases-calc" />
     </ToolCard>
   );
@@ -164,6 +179,17 @@ function BtcConverter() {
   const fresh =
     status === "ready" && ticker !== null && !ticker.stale &&
     now - new Date(ticker.updated_utc).getTime() <= 60_000;
+  // Fase 5a, tarea 1: si el precio es de caché, su antigüedad se muestra
+  // junto a la fecha/hora en hora de Los Ángeles.
+  const convAgeMin = ticker ? ageInMinutes(ticker.updated_utc, now) : null;
+  const convAge =
+    convAgeMin === null
+      ? ""
+      : convAgeMin < 1
+        ? t.market.ageNow
+        : convAgeMin < 60
+          ? t.market.ageMinutes.replace("{n}", String(convAgeMin))
+          : t.market.ageHours.replace("{n}", String(Math.floor(convAgeMin / 60)));
   const btcNum = Number(btc);
   const usdNum = Number(usd);
   const btcValid = btc.trim() !== "" && Number.isFinite(btcNum) && btcNum >= 0;
@@ -176,6 +202,8 @@ function BtcConverter() {
       id="herramienta-conversor"
       num="2"
       title={t.clases.convTitle}
+      access="auth"
+      className="sm:col-span-2 lg:col-span-1"
       badge={status === "ready" && ticker ? <LiveBadge live={fresh} liveLabel={t.clases.convLive} staleLabel={t.clases.convStale} /> : undefined}
     >
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.convLoading}</p>}
@@ -198,8 +226,8 @@ function BtcConverter() {
           </div>
           <p className={`mt-2 text-xs leading-relaxed ${fresh ? "text-zinc-400" : "text-amber-400"}`}>
             1 BTC = {fmtUsd(price, "en-US")} ·{" "}
-            {t.clases.convSource.replace("{source}", ticker.source).replace("{time}", new Date(ticker.updated_utc).toLocaleTimeString(locale, { hour12: false }))}
-            {!fresh && ` · ${t.clases.convStale}`}
+            {t.clases.convSource.replace("{source}", displaySourceName(ticker.source)).replace("{time}", formatDateTimeTz(ticker.updated_utc, locale))}
+            {!fresh && ` · ${t.clases.convStale} · ${convAge}`}
           </p>
         </>
       )}
@@ -290,6 +318,8 @@ function BtcChart() {
       id="herramienta-grafica"
       num="3"
       title={t.clases.chartTitle}
+      access="auth"
+      className="sm:col-span-2 lg:col-span-2"
       badge={
         status === "ready" && data?.stale ? (
           <span aria-live="polite" className="inline-flex items-center rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400">
@@ -298,6 +328,7 @@ function BtcChart() {
         ) : undefined
       }
     >
+      <SimulacionAviso />
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.chartLoading}</p>}
       {status === "nodata" && <p role="alert" className="text-sm text-amber-400">{t.clases.chartNoData}</p>}
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
@@ -391,7 +422,7 @@ function BtcChart() {
             </div>
           </details>
           <p className={`mt-1.5 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-400"}`}>
-            {t.clases.chartSource.replace("{source}", data.source)} ·{" "}
+            {t.clases.chartSource.replace("{source}", displaySourceName(data.source))} ·{" "}
             {t.clases.chartNewest.replace("{time}", fmtTime(data.newest_candle_utc, locale))}
           </p>
         </>
@@ -464,13 +495,16 @@ function IndicatorsStrip() {
     : [];
 
   return (
-    <ToolCard id="herramienta-indicadores" num="4" title={t.clases.indTitle}>
+    <ToolCard id="herramienta-indicadores" num="4" title={t.clases.indTitle} access="auth" className="sm:col-span-2 lg:col-span-1">
       {status === "loading" && <p className="text-sm text-zinc-400">{t.clases.indLoading}</p>}
       {status === "nodata" && <p role="alert" className="text-sm text-amber-400">{t.clases.indNoData}</p>}
       {status === "error" && <ApiErrorBanner error={error} t={t} onRetry={load} />}
       {status === "ready" && data && (
         <>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Bento 2026-11-25: la tarjeta es 1 col en lg, así que la tira
+              interna se queda en 2 cols como máximo (antes lg:3, que
+              dejaba mini-tarjetas de ~80 px). */}
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {cards.map((c) => (
               <li key={c.label} className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{c.label}</p>
@@ -480,7 +514,7 @@ function IndicatorsStrip() {
             ))}
           </ul>
           <p className={`mt-2 text-xs leading-relaxed ${data.stale ? "text-amber-400" : "text-zinc-400"}`}>
-            {t.clases.indSource.replace("{source}", data.source).replace("{time}", fmtTime(data.newest_candle_utc, locale))}
+            {t.clases.indSource.replace("{source}", displaySourceName(data.source)).replace("{time}", fmtTime(data.newest_candle_utc, locale))}
             {data.stale && ` · ${t.clases.convStale}`}
           </p>
         </>
@@ -503,7 +537,7 @@ function BitcoinEducation() {
     { term: t.clases.glossKill, def: t.clases.glossKillDef },
   ];
   return (
-    <ToolCard id="herramienta-bitcoin" num="5" title={t.clases.btcTitle}>
+    <ToolCard id="herramienta-bitcoin" num="5" title={t.clases.btcTitle} access="open" className="sm:col-span-2 lg:col-span-3">
       <h4 className="text-sm font-semibold text-zinc-200">{t.clases.btcWhatTitle}</h4>
       <p className="mt-1 text-sm leading-relaxed text-zinc-400">{t.clases.btcWhatBody}</p>
       <h4 className="mt-3 text-sm font-semibold text-zinc-200">{t.clases.btcMoveTitle}</h4>
@@ -556,10 +590,13 @@ function BitcoinEducation() {
 // renumera nada). El aviso honesto vive dentro del componente
 // (rentHypothetical + rentManual, patrón calcHypothetical de
 // CompoundCalculator): no se duplica la línea ámbar de límite aquí.
+// Píldora access="open" (fusión mejoras-todas): es solo-navegador, sin
+// fetch ni sesión — como la calculadora y Bitcoin (la marca free:false
+// del catálogo es sobre llegar a /estudiar, igual que la calculadora).
 function RentabilidadCalculatorCard() {
   const { t } = useLanguage();
   return (
-    <ToolCard id="herramienta-rentabilidad" num="6" title={t.clases.rentTitle}>
+    <ToolCard id="herramienta-rentabilidad" num="6" title={t.clases.rentTitle} access="open" className="sm:col-span-2 lg:col-span-3">
       <RentabilidadCalculator idPrefix="clases-rent" />
     </ToolCard>
   );
@@ -590,7 +627,17 @@ export function ClasesHerramientas() {
             </a>
           ))}
         </nav>
-        <div className="space-y-3">
+        {/* Bento (2026-11-25): 1 col en móvil (sin spans); en sm cada
+            tarjeta ocupa las 2 cols; en lg 3 cols — fila 1: calculadora
+            (2) + conversor (1); fila 2: gráfica (2) + indicadores (1);
+            fila 3: educación (3); fila 4: rentabilidad (3, añadida en
+            la fusión mejoras-todas: sin span quedaba 1/3 con 2 huecos).
+            Rectángulo sin huecos, orden del DOM = orden de lectura, sin
+            dense/order/posiciones explícitas.
+            Los id="herramienta-*" y scroll-mt-24 se conservan (salto por
+            píldoras) y el contenedor data-no-swipe no añade overflow ni
+            touch-action propios: el swipe de Estudiar queda intacto. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <ClasesCompoundCalculator />
           <BtcConverter />
           <BtcChart />

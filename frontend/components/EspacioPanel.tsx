@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, type EmotionEntry, type MeResponse, type Revelation } from "../lib/api";
+import { api, type EmotionEntry, type MeResponse, type Revelation } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { AmbientSound } from "./AmbientSound";
@@ -226,7 +226,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
       setText("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.espacio.saveError);
+      setError(t.espacio.saveError);
     } finally {
       setBusy(false);
     }
@@ -239,7 +239,7 @@ function RevelationsPanel({ isAdmin }: { isAdmin: boolean }) {
       await api.deleteRevelation(r.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.espacio.deleteError);
+      setError(t.espacio.deleteError);
     }
   };
 
@@ -381,7 +381,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.espacio.saveError);
+      setError(t.espacio.saveError);
     } finally {
       setBusy(false);
     }
@@ -394,7 +394,7 @@ function EmotionsPanel({ isAdmin }: { isAdmin: boolean }) {
       await api.deleteEmotion(r.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.espacio.deleteError);
+      setError(t.espacio.deleteError);
     }
   };
 

@@ -197,6 +197,9 @@ class RiesgoOut(BaseModel):
     mitigacion: str
     responsable: str
     estado: str
+    # Fecha de revisión (Fase 5b mejoras-v1, tarea 4): ISO AAAA-MM-DD o
+    # null cuando el riesgo no tiene fecha fijada.
+    fecha_revision: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -209,6 +212,7 @@ class RiesgoCreate(BaseModel):
     mitigacion: str = Field(default="", max_length=5000)
     responsable: str = Field(default="", max_length=200)
     estado: str = "abierto"
+    fecha_revision: dt.date | None = None
 
 
 class RiesgoUpdate(BaseModel):
@@ -219,6 +223,9 @@ class RiesgoUpdate(BaseModel):
     mitigacion: str | None = Field(default=None, max_length=5000)
     responsable: str | None = Field(default=None, max_length=200)
     estado: str | None = None
+    # Solo se aplica si el campo viaja en el payload (model_fields_set):
+    # así se puede BORRAR la fecha enviando fecha_revision=null.
+    fecha_revision: dt.date | None = Field(default=None)
 
 
 def _riesgo_out(r: Riesgo) -> RiesgoOut:
@@ -231,6 +238,7 @@ def _riesgo_out(r: Riesgo) -> RiesgoOut:
         mitigacion=r.mitigacion or "",
         responsable=r.responsable or "",
         estado=r.estado,
+        fecha_revision=r.fecha_revision.isoformat() if r.fecha_revision else None,
         created_at=r.created_at.isoformat() if r.created_at else None,
         updated_at=r.updated_at.isoformat() if r.updated_at else None,
     )
@@ -264,6 +272,7 @@ def create_riesgo(
         mitigacion=payload.mitigacion,
         responsable=payload.responsable.strip(),
         estado=_check_enum(payload.estado, RIESGO_ESTADOS, "El estado"),
+        fecha_revision=payload.fecha_revision,
     )
     db.add(row)
     db.commit()
@@ -297,6 +306,8 @@ def update_riesgo(
         row.responsable = payload.responsable.strip()
     if payload.estado is not None:
         row.estado = _check_enum(payload.estado, RIESGO_ESTADOS, "El estado")
+    if "fecha_revision" in payload.model_fields_set:
+        row.fecha_revision = payload.fecha_revision
     db.commit()
     db.refresh(row)
     return _riesgo_out(row)

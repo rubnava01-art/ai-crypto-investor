@@ -5,8 +5,11 @@ import type { AIAskResponse, AILessonsResponse, AIStatusResponse, BalancesRespon
 
 export const systemApi = {
   health: () => request<HealthResponse>("/api/health"),
-  login: (username: string, password: string) =>
-    request<TokenResponse>("/api/auth/login", { method: "POST", body: { username, password } }),
+  login: (username: string, password: string, totp_code?: string) =>
+    request<TokenResponse>("/api/auth/login", {
+      method: "POST",
+      body: totp_code ? { username, password, totp_code } : { username, password },
+    }),
   systemStatus: () => request<SystemStatus>("/api/system/status", { auth: true }),
   balances: () => request<BalancesResponse>("/api/portfolio/balances", { auth: true }),
   performance: () => request<PerformanceResponse>("/api/portfolio/performance", { auth: true }),

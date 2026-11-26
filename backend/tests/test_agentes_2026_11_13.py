@@ -143,6 +143,7 @@ def _register(client, username, plan=None):
         "password": "PlanPass12345",
         "challenge_id": cid,
         "answer": answer,
+        "terms_accepted": True,
     }
     if plan is not None:
         payload["plan"] = plan
@@ -218,6 +219,7 @@ def test_register_with_invalid_plan_is_422(client, admin_headers):
             "password": "PlanPass12345",
             "challenge_id": "dummy",
             "answer": 0,
+            "terms_accepted": True,
             "plan": "premium",
         },
     )

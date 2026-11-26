@@ -33,10 +33,15 @@ export function buildInvoiceHtml(opts: {
   taxRate: number;
   notes: string;
   txt: InvoicePrintText;
+  // Marca de la plataforma (Fase 5b, tarea 2): texto sobrio, sin logo
+  // inventado — el nombre real de la plataforma, escapado como el
+  // resto de campos. Por defecto "Grow Business Platform".
+  brand?: string;
 }): string {
   const esc = escapeHtml;
   const money = (n: number) => formatMoney(n, "USD", "en-US");
   const t = invoiceTotals(opts.items, opts.taxRate);
+  const brand = opts.brand ?? "Grow Business Platform";
   const rows = opts.items
     .map(
       (it) => `<tr><td>${esc(it.description)}</td><td style="text-align:center">${Number(it.qty) || 0}</td><td style="text-align:right">${money(it.unit_price)}</td><td style="text-align:right">${money(it.qty * it.unit_price)}</td></tr>`,
@@ -44,7 +49,7 @@ export function buildInvoiceHtml(opts: {
     .join("");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(opts.txt.title)} ${esc(opts.number)}</title>
   <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.tot{margin-top:20px;text-align:right;font-size:16px}.tot b{font-size:20px}.mut{color:#555}</style>
-  </head><body><h1>${esc(opts.txt.heading)} ${esc(opts.number)}</h1><p class="mut">${esc(opts.date)}</p>
+  </head><body><h1>${esc(opts.txt.heading)} ${esc(opts.number)}</h1><p class="mut">${esc(opts.date)} · ${esc(brand)}</p>
   <p><b>${esc(opts.sellerName)}</b><br>${esc(opts.sellerPhone)}<br>${esc(opts.sellerEmail)}</p>
   <p><b>${esc(opts.txt.client)}</b> ${esc(opts.clientName)}<br>${esc(opts.clientPhone)}<br>${esc(opts.clientEmail)}</p>
   <table><tr><th>${esc(opts.txt.concept)}</th><th style="text-align:center">${esc(opts.txt.qty)}</th><th style="text-align:right">${esc(opts.txt.price)}</th><th style="text-align:right">${esc(opts.txt.amount)}</th></tr>${rows}</table>

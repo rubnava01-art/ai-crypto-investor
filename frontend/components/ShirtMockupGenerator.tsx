@@ -239,7 +239,7 @@ export function ShirtMockupGenerator() {
             <div key={i} className="flex items-center gap-2">
               <input aria-label={`${def.title} ${t.mockup.tpPantoneCode}`} className={inputCls} placeholder={t.mockup.tpPantoneCode} value={pt.code} onChange={(e) => setPantone(def.key, i, "code", e.target.value)} maxLength={24} autoComplete="off" />
               <input aria-label={`${def.title} ${t.mockup.tpPantoneColor}`} type="color" className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-900" value={pt.color} onChange={(e) => setPantone(def.key, i, "color", e.target.value)} />
-              <button type="button" aria-label={`${t.mockup.tpRemovePantone} ${i + 1}`} onClick={() => removePantone(def.key, i)} className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+              <button type="button" aria-label={`${t.mockup.tpRemovePantone} ${i + 1}`} onClick={() => removePantone(def.key, i)} className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-zinc-700 px-2.5 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                 ×
               </button>
             </div>
@@ -248,7 +248,7 @@ export function ShirtMockupGenerator() {
             type="button"
             onClick={() => addPantone(def.key)}
             disabled={s.pantones.length >= MAX_PANTONES}
-            className="rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+            className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
           >
             {t.mockup.tpAddPantone}
           </button>

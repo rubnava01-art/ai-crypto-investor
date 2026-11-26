@@ -1,0 +1,726 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  api, getToken, isGuest, logout as logoutSession, setToken, ApiError,
+  type SystemStatus, type BalancesResponse, type PerformanceResponse,
+  type SignalsResponse, type StrategyOut, type SimulationModes,
+  type OperationsResponse, type RiskLimits, type LogEntry,
+} from "../lib/api";
+import { Panel } from "./Panel";
+import { ApiErrorBanner, LoadMore, PanelLoading, SkipLink, apiErrorText, newId } from "./ui";
+import { ModuleNav } from "./ModuleNav";
+import { accesoApi } from "../lib/api/acceso";
+import { MarketPanel } from "./MarketPanel";
+import { SimulacionAviso } from "./SimulacionAviso";
+import { ProfileMenu } from "./ProfileMenu";
+import type { MeResponse } from "../lib/api";
+import { DemoBadge, StatusDot, EmptyState } from "./badges";
+import { LanguageToggle, useLanguage } from "../lib/i18n";
+import { Footer } from "./Footer";
+import { ColdStartNotice } from "./ColdStartNotice";
+import { ultimaNovedadSistema } from "../lib/novedades";
+import { formatDateTimeTz } from "../lib/dates";
+import { OnboardingWizard } from "./OnboardingWizard";
+import { HoyPanel } from "./HoyPanel";
+import { CommandPalette } from "./CommandPalette";
+import dynamic from "next/dynamic";
+import { MetricCardSkeleton, Skeleton } from "./Skeleton";
+
+// Carga diferida (optimización): los paneles que NO son la vista inicial del
+// dashboard se descargan solo cuando se renderizan — Invertir es solo-admin
+// y el Asistente IA va al final de la página. MarketPanel (precios en vivo,
+// arriba) se queda en el bundle principal. El control de usuarios vive en
+// su propio módulo (/usuarios) desde 2026-10-30, no incrustado aquí.
+// B-7: el `panelLoading` local del dashboard era un duplicado del compartido
+// (ui.tsx, H-12) con otro aspecto (skeleton h-44 + texto sr-only); ahora los
+// tres dynamic() usan el compartido, con texto "Cargando…" visible.
+const InvestorPanel = dynamic(
+  () => import("./InvestorPanel").then((m) => m.InvestorPanel),
+  { ssr: false, loading: PanelLoading },
+);
+const AiAssistant = dynamic(
+  () => import("./AiAssistant").then((m) => m.AiAssistant),
+  { ssr: false, loading: PanelLoading },
+);
+// C4 (optimización 2026-11-14): la presentación de señales vive bajo el
+// pliegue (rejilla inferior) y solo presenta datos que ya trae
+// api.dashboard(); se descarga al renderizar, con el mismo skeleton.
+const SignalsPanel = dynamic(
+  () => import("./SignalsPanel").then((m) => m.SignalsPanel),
+  { ssr: false, loading: PanelLoading },
+);
+
+const money = (s: string | null) =>
+  s == null || s === "" ? "—" : `$${Number(s).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct = (s: string | null) => (s == null || s === "" ? "—" : `${Number(s).toFixed(2)}%`);
+// sideColor vivía aquí para la sección de señales; ahora está en
+// components/SignalsPanel.tsx (C4, optimización 2026-11-14).
+
+function OfflineBanner({ apiUrl }: { apiUrl: string }) {
+  const { t } = useLanguage();
+  return (
+    <div
+      role="alert"
+      className="mb-6 rounded-xl border border-amber-700/60 bg-amber-500/10 px-4 py-3.5 text-sm leading-relaxed text-amber-300"
+    >
+      <strong className="font-semibold">{t.dashboard.offlineTitle}</strong> {t.dashboard.offlineBefore}{" "}
+      <code className="text-amber-200">{apiUrl}</code>{t.dashboard.offlineAfter}
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
+  const time = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleString(locale, { timeZone: "UTC", hour12: false }) + " UTC" : "—";
+  // Fase 5a, tarea 1: los precios de las señales llevan su fecha/hora en
+  // hora de Los Ángeles (zona de negocio); el resto de marcas de tiempo
+  // del tablero siguen en UTC como antes.
+  const timeLA = (iso: string | null) =>
+    iso ? formatDateTimeTz(iso, locale) : "—";
+  const [offline, setOffline] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // M13: error de carga con reintento (ApiErrorBanner) y estado de carga
+  // del botón Actualizar. M10: un fallo de /me distinto de 401 se muestra
+  // aquí en vez de tragarse en silencio.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [confirmKill, setConfirmKill] = useState(false);
+
+  const [system, setSystem] = useState<SystemStatus | null>(null);
+  // 2026-11-05: estado de la BD según /api/health ("ok" | "error"), null
+  // mientras no llega la respuesta — se consulta sin auth, a mejor
+  // esfuerzo, sin marcar el dashboard como offline si falla.
+  const [dbStatus, setDbStatus] = useState<string | null>(null);
+  const [balances, setBalances] = useState<BalancesResponse | null>(null);
+  const [performance, setPerformance] = useState<PerformanceResponse | null>(null);
+  const [signals, setSignals] = useState<SignalsResponse | null>(null);
+  const [strategies, setStrategies] = useState<StrategyOut[] | null>(null);
+  const [sim, setSim] = useState<SimulationModes | null>(null);
+  const [operations, setOperations] = useState<OperationsResponse | null>(null);
+  const [risk, setRisk] = useState<RiskLimits | null>(null);
+  const [logs, setLogs] = useState<LogEntry[] | null>(null);
+  const [logsVisible, setLogsVisible] = useState(25);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const isAdmin = !!me?.is_admin;
+  // No renderizar el dashboard hasta confirmar sesión: antes, los paneles se
+  // montaban y disparaban llamadas sin token (flash de UI privada).
+  const [checked, setChecked] = useState(false);
+  // Sin sesión, la raíz muestra la presentación pública (<Landing />) en
+  // vez de redirigir a /login; RootGate (app/page.tsx) solo monta este
+  // dashboard cuando hay token de no-invitado, así que aquí `authed` ya
+  // no existe: si el token desapareció entre la puerta y el montaje, el
+  // efecto de abajo deja el skeleton y no dispara llamadas.
+
+  // Fase 4 (FE2): el reintento manual dormía 1,5s sin cancelación — al
+  // navegar fuera en esa ventana, el setState posterior escribía en un
+  // dashboard desmontado. La guarda se activa al desmontar el efecto.
+  const loadCancelledRef = useRef(false);
+  const load = useCallback(async () => {
+    setActionError(null);
+    setLoadError(null);
+    setRefreshing(true);
+    // Intento con un reintento: un fallo transitorio de red no debe tirar
+    // todo el dashboard al modo offline sin intentarlo de nuevo.
+    const attempts = [0, 1];
+    for (const i of attempts) {
+      try {
+        // F1-5 (chat-potencia): dashboard, perfil y /me van en paralelo
+        // con Promise.all (antes en serie: dashboard → perfil → me).
+        // Solo el dashboard puede fallar el intento; perfil y /me se
+        // toleran por separado, como antes.
+        const [d, perfil, meSettled] = await Promise.all([
+          api.dashboard(),
+          accesoApi.getPerfil().catch(() => null),
+          api.me().then(
+            (m) => ({ ok: true as const, value: m }),
+            (err: unknown) => ({ ok: false as const, error: err }),
+          ),
+        ]);
+        if (loadCancelledRef.current) return;
+        setSystem(d.system); setBalances(d.balances); setPerformance(d.performance);
+        setSignals(d.signals); setStrategies(d.strategies); setSim(d.modes);
+        setOperations(d.operations); setRisk(d.risk); setLogs(d.logs);
+        setOffline(false);
+        api.health()
+          .then((h) => { if (!loadCancelledRef.current) setDbStatus(h.database ?? null); })
+          .catch(() => { if (!loadCancelledRef.current) setDbStatus(null); });
+        // Tolerancia parcial del backend: una sección nula significa que esa
+        // sección falló, no que todo el dashboard esté caído. Avisar sin
+        // esconder el resto de los datos. PERO una sección nula también es
+        // el gating por perfil (corrida 2026-11-23): el backend devuelve
+        // null en lo que no le toca a este perfil (Invertir y logs para
+        // prueba/cliente), y eso NO es un fallo. Solo se avisa si falta
+        // una sección que este perfil sí debería ver (system/signals para
+        // todos; Invertir con el módulo; logs solo admin). Si el perfil no
+        // resuelve, se mantiene el aviso anterior (fail-closed).
+        if (loadCancelledRef.current) return;
+        const puedeInvertir = perfil == null || perfil.modulos.includes("invertir");
+        const puedeLogs = perfil == null || perfil.is_admin;
+        const faltaInesperada =
+          d.system == null ||
+          d.signals == null ||
+          (puedeInvertir &&
+            [d.balances, d.performance, d.strategies, d.modes, d.operations, d.risk].some((s) => s == null)) ||
+          (puedeLogs && d.logs == null);
+        if (faltaInesperada) {
+          setActionError(t.dashboard.partialError);
+        }
+        // M10: un fallo de /me distinto de 401 se muestra (antes se
+        // tragaba en silencio y el usuario perdía los paneles de admin
+        // sin ningún mensaje). Un 401 ya disparó el redirect central.
+        if (meSettled.ok) {
+          setMe(meSettled.value);
+        } else {
+          setMe(null);
+          if (!(meSettled.error instanceof ApiError && meSettled.error.status === 401)) setLoadError(meSettled.error);
+        }
+        setRefreshing(false);
+        return;
+      } catch (err) {
+        // C2: SIN redirect propio. Un 401 en una petición autenticada ya
+        // disparó handleUnauthorized (lib/api/client.ts), único dueño del
+        // redirect a /login?next=…&expired=1. Redirigir aquí con
+        // router.replace pisaba ese aviso de sesión expirada.
+        if (err instanceof ApiError && err.status === 401) {
+          setRefreshing(false);
+          return;
+        }
+        if (i === attempts.length - 1) {
+          if (!loadCancelledRef.current) setOffline(true);
+        } else {
+          await new Promise((r) => setTimeout(r, 1500));
+          if (loadCancelledRef.current) return;
+        }
+      }
+    }
+    setRefreshing(false);
+  }, [router, t]);
+
+  useEffect(() => {
+    // Sin token no hay redirect: la raíz es la landing pública y el
+    // visitante entra o se registra desde ahí. Con token, el dashboard
+    // de siempre (y si el token expiró, load() redirige a /login).
+    if (!getToken()) { setChecked(true); return; }
+    // Invitado (Fase 1): Invertir no está en sus módulos — su portada es
+    // /inicio, no el dashboard.
+    if (isGuest()) {
+      setChecked(true);
+      router.replace("/inicio");
+      return;
+    }
+    loadCancelledRef.current = false;
+    setChecked(true);
+    load();
+    return () => {
+      loadCancelledRef.current = true;
+    };
+  }, [load, router]);
+
+  async function scanner(action: "start" | "stop") {
+    try {
+      const state = action === "start" ? await api.scannerStart() : await api.scannerStop();
+      setSystem((prev) => (prev ? { ...prev, scanner_running: state.running } : prev));
+    } catch (err) {
+      // Fase 4 mejoras-v1, tarea 5: el {detail} es el texto mapeado a
+      // español (apiErrorText), nunca el detalle crudo del backend.
+      setActionError((action === "start" ? t.dashboard.scannerStartError : t.dashboard.scannerStopError).replace("{detail}", apiErrorText(err, t)));
+    }
+  }
+
+  async function changeMode(mode: string) {
+    try {
+      const res = await api.setSimulationMode(mode);
+      setSim(res);
+    } catch (err) {
+      setActionError(t.dashboard.modeError.replace("{detail}", apiErrorText(err, t)));
+    }
+  }
+
+  async function engageKillSwitch() {
+    try {
+      const res = await api.killSwitch(newId());
+      setRisk((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
+      setSystem((prev) => (prev ? { ...prev, kill_switch: res.kill_switch } : prev));
+    } catch (err) {
+      setActionError(t.dashboard.killError.replace("{detail}", apiErrorText(err, t)));
+    } finally {
+      setConfirmKill(false);
+    }
+  }
+
+  function logout() {
+    logoutSession();
+    router.replace("/login");
+  }
+
+  const scanning = system?.scanner_running ?? false;
+  // Última novedad del sistema (estática, viaja en el bundle): si no hay
+  // ninguna, la tira no se muestra. No es un post del administrador.
+  const novedad = ultimaNovedadSistema();
+
+  if (!checked) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <div role="status" aria-label={t.dashboard.loading} className="space-y-4">
+          <Skeleton className="h-8 w-48 rounded-lg" ariaLabel={t.misc.loadingAria} />
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <MetricCardSkeleton key={i} ariaLabel={t.misc.loadingAria} />
+            ))}
+          </div>
+          <Skeleton className="h-40 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
+          <Skeleton className="h-40 w-full rounded-xl" ariaLabel={t.misc.loadingAria} />
+        </div>
+      </main>
+    );
+  }
+
+  // Fase 3 mejoras-v1: la rama sin sesión vivía aquí (<Landing />); ahora
+  // la sirve RootGate desde app/page.tsx (servidor), y este componente
+  // solo se monta con sesión. Si se llega aquí sin token, el skeleton de
+  // arriba es lo único que se ve (sin llamadas ni flash de UI privada).
+
+  return (
+    <main className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <SkipLink label={t.shell.skipLink} />
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 sm:mb-8">
+        <div>
+          <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            {t.header.brand}
+          </p>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t.dashboard.title}</h1>
+          <p className="text-sm text-zinc-400">
+            Grow Business Platform — {system ? <>{t.dashboard.modeLabel} <span className="font-mono">{system.mode}</span></> : t.dashboard.loading}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <DemoBadge />
+          {/* Fase 4 mejoras-v1, tarea 4: buscador global Ctrl+K. */}
+          <CommandPalette />
+          {/* M13: estado de carga visible y sin doble envío mientras carga. */}
+          <button
+            onClick={load}
+            disabled={refreshing}
+            aria-busy={refreshing}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          >
+            {refreshing && (
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+                <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
+              </svg>
+            )}
+            {refreshing ? t.common.refreshing : t.dashboard.refresh}
+          </button>
+          <ProfileMenu onLogout={logout} />
+        </div>
+      </header>
+
+      <div className="mb-6 sm:mb-8">
+        <ModuleNav />
+      </div>
+
+      {/* Fase 4 mejoras-v1, tarea 3: guía inicial de 3 pasos para quien
+          aún no la completó (estado en localStorage por usuario; el
+          componente no renderiza nada si ya está hecha). */}
+      {me && (
+        <div className="mb-6 sm:mb-8">
+          <OnboardingWizard username={me.username} isAdmin={!!me.is_admin} />
+        </div>
+      )}
+
+      {/* Fase 4 mejoras-v1, tarea 7: lo urgente del día con datos
+          reales (o ejemplos etiquetados si no hay nada urgente). */}
+      {me && (
+        <div className="mb-6 sm:mb-8">
+          <HoyPanel username={me.username} />
+        </div>
+      )}
+
+      {novedad && (
+        <div className="mb-5 rounded-xl border border-emerald-900/60 bg-emerald-500/10 px-4 py-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+              {t.inicio.systemNews}
+            </span>
+            <span className="text-sm font-semibold text-zinc-100">{novedad.title}</span>
+            <a
+              href="/inicio"
+              className="ml-auto inline-flex min-h-[44px] items-center rounded-lg px-2 py-2 text-sm font-semibold text-emerald-400 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.inicio.viewInInicio}
+            </a>
+          </div>
+        </div>
+      )}
+
+      {offline && <OfflineBanner apiUrl={process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"} />}
+      <ColdStartNotice loading={refreshing && !balances && !offline} onRetry={load} />
+      {loadError ? <ApiErrorBanner error={loadError} t={t} onRetry={load} /> : null}
+      {actionError && (
+        <p role="alert" className="mb-5 rounded-lg bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-400">
+          {actionError}
+        </p>
+      )}
+
+      <section id="contenido" tabIndex={-1} aria-label={t.dashboard.heroHeading} className="mb-6 outline-none sm:mb-8">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.heroHeading}
+        </h2>
+      <div className="mb-5">
+        <MarketPanel />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
+        {/* Equity & balance */}
+        <Panel title={t.dashboard.capitalTitle} badge={<DemoBadge quiet />}>
+          {balances ? (
+            <div>
+              <p className="text-3xl font-bold tracking-tight tabular-nums sm:text-4xl">{money(balances.equity_usd)}</p>
+              <p className="mt-1 text-sm text-zinc-400">
+                {t.dashboard.available} <span className="text-zinc-200">{money(balances.available_usd)}</span>{" "}
+                <span className="font-mono text-xs">{balances.currency}</span>
+              </p>
+              <p className="mt-3 text-xs text-zinc-400">{t.dashboard.asOf} {time(balances.as_of_utc)}</p>
+            </div>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Invertir: entrar / salir / validar (solo admin). Para cuentas
+            prueba, una tarjeta informativa ocupa la segunda celda del
+            grid héroe: sin formulario, sin tocar simulación. */}
+        {isAdmin ? (
+          <InvestorPanel
+            mode={sim?.current ?? "simulation"}
+            realEnabled={sim?.real_enabled ?? false}
+            equityUsd={balances ? Number(balances.equity_usd) : null}
+            onExecuted={load}
+          />
+        ) : me ? (
+          <Panel title={t.dashboard.investInfoTitle}>
+            {/* Fase 2 mejoras-v1, tarea 2: la tarjeta informativa de
+                Invertir para cuentas Prueba también lleva el aviso. */}
+            <SimulacionAviso />
+            <p className="text-sm leading-relaxed text-zinc-400">{t.dashboard.investInfoBody}</p>
+            <Link
+              href="/estudiar"
+              className="mt-4 inline-flex min-h-[44px] items-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.dashboard.investInfoCta}
+            </Link>
+          </Panel>
+        ) : null}
+
+      </div>
+      </section>
+
+      {/* Aviso por perfil (prueba / cliente) lo lleva ModuleNav desde
+          2026-11-23, en todas las páginas; aquí ya no se duplica. */}
+
+      <section aria-label={t.dashboard.secondaryHeading} className="mb-6 sm:mb-8">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.secondaryHeading}
+        </h2>
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {/* System status */}
+        <Panel title={t.dashboard.systemTitle} badge={<DemoBadge quiet />}>
+          {system ? (
+            <dl className="space-y-2.5 text-sm">
+              {[
+                [t.dashboard.exchangeConnected, <StatusDot key="e" on={system.exchange_connected} srText={system.exchange_connected ? t.reliability.statusConnected : t.reliability.statusDisconnected} />],
+                [t.dashboard.scanner, <StatusDot key="s" on={system.scanner_running} srText={system.scanner_running ? t.dashboard.running : t.dashboard.stopped} />],
+                [t.dashboard.simulationMode, <span key="m" className="font-mono">{system.simulation_mode}</span>],
+                [t.dashboard.killSwitch, <span key="k" className={system.kill_switch ? "font-semibold text-red-400" : ""}>{system.kill_switch ? t.dashboard.killOn : t.dashboard.killOff}</span>],
+                [t.dashboard.dataSource, <span key="d" className="font-mono">{system.data_source}</span>],
+                [t.dashboard.database, dbStatus == null
+                  ? <span key="db" className="font-mono text-xs">—</span>
+                  : <StatusDot key="db" on={dbStatus === "ok"} />],
+                [t.dashboard.lastUpdate, <span key="u" className="font-mono text-xs">{time(system.last_update_utc)}</span>],
+              ].map(([label, value]) => (
+                <div key={label as string} className="flex items-center justify-between gap-2">
+                  <dt className="text-zinc-400">{label}</dt>
+                  <dd className="flex items-center gap-2">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Strategies */}
+        <Panel title={t.dashboard.strategiesTitle}>
+          {strategies ? (
+            strategies.length === 0 ? (
+              <EmptyState text={t.dashboard.noStrategies} />
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {strategies.map((s) => (
+                  <li key={s.id} className="rounded-lg border border-zinc-800 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{s.name}</span>
+                      <span className="shrink-0 text-xs text-zinc-400">v{s.version} · {s.status}</span>
+                    </div>
+                    {s.notes && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{s.notes}</p>}
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Logs feed */}
+        <Panel title={t.dashboard.logsTitle}>
+          {logs ? (
+            logs.length === 0 ? (
+              <EmptyState text={t.dashboard.noLogs} />
+            ) : (
+              <>
+              <ul className="max-h-64 space-y-1.5 overflow-auto text-xs">
+                {logs.slice(0, logsVisible).map((l) => (
+                  <li key={l.id} className="flex gap-2 font-mono">
+                    <span className="shrink-0 text-zinc-400">{time(l.created_utc)}</span>
+                    <span className={`shrink-0 font-semibold ${
+                      l.level === "ERROR" ? "text-red-400" : l.level === "WARNING" ? "text-amber-400" : "text-zinc-400"
+                    }`}>
+                      {l.level}
+                    </span>
+                    <span className="break-words text-zinc-400">
+                      <span className="text-zinc-400">[{l.category}]</span> {l.message}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <LoadMore visible={logsVisible} total={logs.length} t={t} onLoadMore={() => setLogsVisible((v) => v + 25)} />
+              </>
+            )
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
+          )}
+        </Panel>
+
+      </div>
+      </section>
+
+      <section aria-label={t.dashboard.controlTitle} className="mb-6 sm:mb-8">
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-zinc-100">
+          <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+          {t.dashboard.controlTitle}
+        </h2>
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {/* Scanner controls */}
+        <Panel title={t.dashboard.scannerControlsTitle}>
+          <div className="flex items-center gap-3">
+            <StatusDot on={scanning} srText={scanning ? t.dashboard.running : t.dashboard.stopped} />
+            <span className="text-sm text-zinc-300">{scanning ? t.dashboard.running : t.dashboard.stopped}</span>
+          </div>
+          {isAdmin ? (
+          <div className="mt-4 flex gap-2.5">
+            <button
+              onClick={() => scanner("start")}
+              disabled={scanning}
+              className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.dashboard.start}
+            </button>
+            <button
+              onClick={() => scanner("stop")}
+              disabled={!scanning}
+              className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.dashboard.stop}
+            </button>
+          </div>
+          ) : (
+            <p className="mt-3 text-xs text-zinc-400">{t.dashboard.controlsAdminOnly}</p>
+          )}
+        </Panel>
+
+        {/* Simulation mode */}
+        <Panel title={t.dashboard.simulationMode}>
+          {sim ? (
+            <div>
+              <select aria-label={t.dashboard.simModeAria}
+                value={sim.current}
+                disabled={!isAdmin}
+                onChange={(e) => changeMode(e.target.value)}
+                className="min-h-[44px] w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sim.modes.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <p className="mt-3 text-xs leading-relaxed text-zinc-400">
+                {t.dashboard.realModePrefix} {sim.real_enabled ? t.dashboard.realModeOn : t.dashboard.realModeOff} {t.dashboard.realModeSuffix}
+                {!isAdmin && <> {t.dashboard.changeModeAdminOnly}</>}
+              </p>
+            </div>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Risk limits + kill switch */}
+        <Panel title={t.dashboard.riskTitle} badge={<DemoBadge quiet />} accent>
+          {risk ? (
+            <div>
+              <dl className="space-y-2 text-sm">
+                {[
+                  [t.dashboard.maxRisk, pct(risk.max_risk_per_trade_pct)],
+                  [t.dashboard.maxDailyLoss, money(risk.max_daily_loss_usd)],
+                  [t.dashboard.maxTrades, String(risk.max_trades_per_day)],
+                  [t.dashboard.spotOnly, risk.spot_only ? t.dashboard.yes : t.dashboard.no],
+                  [t.dashboard.noLeverage, risk.no_leverage ? t.dashboard.yes : t.dashboard.no],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <dt className="text-zinc-400">{label}</dt>
+                    <dd className="font-mono">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {isAdmin && (
+              <button
+                onClick={() => setConfirmKill(true)}
+                disabled={risk.kill_switch}
+                className="mt-5 min-h-[44px] w-full rounded-lg bg-red-700 px-3 py-2.5 text-sm font-bold uppercase tracking-wider text-white hover:bg-red-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+              >
+                {risk.kill_switch ? t.dashboard.killActivated : t.dashboard.killSwitch}
+              </button>
+              )}
+              {confirmKill && (
+                <div className="mt-4 rounded-lg border border-red-800 bg-red-950/50 p-3.5 text-sm leading-relaxed">
+                  <p className="text-red-200">
+                    {t.dashboard.killConfirmQ}
+                  </p>
+                  <div className="mt-3 flex gap-2.5">
+                    <button
+                      onClick={engageKillSwitch}
+                      className="min-h-[44px] flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                    >
+                      {t.dashboard.confirm}
+                    </button>
+                    <button
+                      onClick={() => setConfirmKill(false)}
+                      className="min-h-[44px] flex-1 rounded-lg border border-zinc-700 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                    >
+                      {t.dashboard.cancel}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+      </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {/* P&L + drawdown */}
+        <Panel title={t.dashboard.pnlTitle} badge={<DemoBadge quiet />}>
+          {performance ? (
+            <dl className="space-y-2 text-sm">
+              {[
+                [t.dashboard.realized, money(performance.realized_pnl_usd)],
+                [t.dashboard.unrealized, money(performance.unrealized_pnl_usd)],
+                [t.dashboard.maxDrawdown, pct(performance.max_drawdown_pct)],
+                [t.dashboard.fees, money(performance.fees_paid_usd)],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between">
+                  <dt className="text-zinc-400">{label}</dt>
+                  <dd className="font-mono">{value}</dd>
+                </div>
+              ))}
+              <p className="pt-2 text-xs text-zinc-400">{t.dashboard.asOf} {time(performance.as_of_utc)}</p>
+            </dl>
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noDataDemo : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* Señales (C4: componente diferido, bajo el pliegue) */}
+        <SignalsPanel signals={signals} offline={offline} time={timeLA} />
+
+        {/* Operations */}
+        <Panel title={t.dashboard.operationsTitle}>
+          {operations ? (
+            operations.orders.length === 0 && operations.trades.length === 0 ? (
+              <EmptyState text={t.dashboard.noOrdersOrTrades} />
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">{t.dashboard.ordersTitle}</h3>
+                  {operations.orders.length === 0 ? (
+                    <p className="text-sm text-zinc-400">{t.dashboard.noOrders}</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {operations.orders.map((o, i) => (
+                        <li key={String(o["id"] ?? i)} className="rounded-lg border border-zinc-800 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold">{String(o["symbol"] ?? "—")}</span>
+                            <span className={`font-bold uppercase ${o["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
+                              {String(o["side"] ?? "—")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {t.dashboard.quantity} {String(o["quantity"] ?? "—")} · {String(o["status"] ?? "—")} · {String(o["mode"] ?? "—")}
+                          </p>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {time(typeof o["created_utc"] === "string" ? o["created_utc"] : null)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {operations.trades.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-400">{t.dashboard.operationsTitle}</h3>
+                    <ul className="space-y-2">
+                      {operations.trades.map((tr, i) => (
+                        <li key={i} className="rounded-lg border border-zinc-800 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold">{String(tr["symbol"] ?? "—")}</span>
+                            <span className={`font-bold uppercase ${tr["side"] === "sell" ? "text-red-400" : "text-emerald-400"}`}>
+                              {String(tr["side"] ?? "—")}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {t.dashboard.quantity} {String(tr["quantity"] ?? "—")} · {String(tr["status"] ?? "—")}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )
+          ) : (
+            <EmptyState text={offline ? t.dashboard.noData : t.dashboard.loading} />
+          )}
+        </Panel>
+
+        {/* AI assistant (read-only technical) */}
+        <AiAssistant />
+      </div>
+
+      <Footer />
+    </main>
+  );
+}

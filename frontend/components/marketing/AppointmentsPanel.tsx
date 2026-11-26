@@ -114,7 +114,7 @@ export function AppointmentsPanel({
       await api.updateAppointment(a.id, { status });
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.citas.errStatus);
+      setActionError(t.citas.errStatus);
     }
   };
 
@@ -127,7 +127,7 @@ export function AppointmentsPanel({
       setMsg(t.citas.msgDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.citas.errDelete);
+      setActionError(t.citas.errDelete);
     }
   };
 

@@ -10,6 +10,9 @@ Permissions follow the platform RBAC (same as CRM / Referidos):
   delete (Fase 0, 2026-11-23: prueba recibe 403 también en lectura;
   antes cualquier autenticado leía).
 """
+import datetime as dt
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -65,17 +68,24 @@ class TaskOut(BaseModel):
     area: str
     title: str
     done: bool
+    # Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): ISO AAAA-MM-DD o
+    # null cuando la tarea no tiene fecha.
+    due_date: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
 
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=256)
+    due_date: dt.date | None = None
 
 
 class TaskUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=256)
     done: bool | None = None
+    # Solo se aplica si el campo viaja en el payload (model_fields_set):
+    # así se puede BORRAR la fecha enviando due_date=null.
+    due_date: dt.date | None = Field(default=None)
 
 
 def _out_note(n: BusinessNote) -> NoteOut:
@@ -95,6 +105,7 @@ def _out_task(t: BusinessTask) -> TaskOut:
         area=t.area,
         title=t.title,
         done=bool(t.done),
+        due_date=t.due_date.isoformat() if t.due_date else None,
         created_at=t.created_at.isoformat() if t.created_at else None,
         updated_at=t.updated_at.isoformat() if t.updated_at else None,
     )
@@ -112,6 +123,61 @@ def _get_task_or_404(db: Session, task_id: int) -> BusinessTask:
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+class NotificacionTarea(BaseModel):
+    id: int
+    area: str
+    title: str
+    due_date: str | None = None
+
+
+class NotificacionesOut(BaseModel):
+    fecha: str
+    vencidas: list[NotificacionTarea]
+    de_hoy: list[NotificacionTarea]
+
+
+# ---------- Notificaciones en la app (Fase 5b mejoras-v1, tarea 5) ----------
+# Las tareas ya tenían due_date (Fase 4); este endpoint resume lo que
+# vence hoy o ya venció, en todas las áreas, para el aviso en la app
+# (banner en Business y sección de "Hoy", que ya las listaba).
+# NOTIFICACIONES POR CORREO: PENDIENTES del proveedor — la plataforma
+# no tiene servicio de correo configurado (no hay SMTP ni proveedor
+# contratado), así que no se envía nada por correo; el aviso vive solo
+# dentro de la app. No se promete envío por correo en ningún texto.
+@router.get("/notificaciones", response_model=NotificacionesOut)
+def list_notificaciones(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deny_linked_reader(db, user)
+    # "Hoy" es el día del negocio (America/Los_Angeles), igual que el
+    # panel "Hoy" (dashboard.py): una tarea que vence hoy en LA no debe
+    # marcarse vencida a las 00:30 UTC.
+    today = dt.datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    rows = (
+        db.query(BusinessTask)
+        .filter(
+            BusinessTask.done.is_(False),
+            BusinessTask.due_date.isnot(None),
+            BusinessTask.due_date <= today,
+        )
+        .order_by(BusinessTask.due_date.asc(), BusinessTask.id.asc())
+        .limit(100)
+        .all()
+    )
+    vencidas = [
+        NotificacionTarea(id=t.id, area=t.area, title=t.title, due_date=t.due_date.isoformat())
+        for t in rows
+        if t.due_date is not None and t.due_date < today
+    ]
+    de_hoy = [
+        NotificacionTarea(id=t.id, area=t.area, title=t.title, due_date=t.due_date.isoformat())
+        for t in rows
+        if t.due_date is not None and t.due_date == today
+    ]
+    return NotificacionesOut(fecha=today.isoformat(), vencidas=vencidas, de_hoy=de_hoy)
 
 
 # ---------- Notes ----------
@@ -211,7 +277,7 @@ def create_task(
     db: Session = Depends(get_db),
 ):
     area = _check_area(area)
-    task = BusinessTask(area=area, title=payload.title.strip(), done=False)
+    task = BusinessTask(area=area, title=payload.title.strip(), done=False, due_date=payload.due_date)
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -230,6 +296,8 @@ def update_task(
         task.title = payload.title.strip()
     if payload.done is not None:
         task.done = payload.done
+    if "due_date" in payload.model_fields_set:
+        task.due_date = payload.due_date
     db.commit()
     db.refresh(task)
     return _out_task(task)

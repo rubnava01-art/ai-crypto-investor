@@ -7,14 +7,18 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATE="${1:-$(date +%F)}"
 DEST="${2:-$HOME/workspace/ai-crypto-investor-backup-$DATE.tar.gz}"
+# Las exclusiones usan el nombre del checkout (en un worktree es
+# ai-crypto-investor-mejoras-v1, no ai-crypto-investor): con el nombre
+# fijo, el respaldo del worktree incluía frontend/node_modules (~500 MB).
+BASE="$(basename "$ROOT")"
 
 tar \
-  --exclude='ai-crypto-investor/frontend/node_modules' \
-  --exclude='ai-crypto-investor/backend/.venv' \
-  --exclude='ai-crypto-investor/.git' \
+  --exclude="$BASE/frontend/node_modules" \
+  --exclude="$BASE/backend/.venv" \
+  --exclude="$BASE/.git" \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
-  -czf "$DEST" -C "$(dirname "$ROOT")" "$(basename "$ROOT")"
+  -czf "$DEST" -C "$(dirname "$ROOT")" "$BASE"
 
 # 2026-11-09: un respaldo que no se verifica es solo un archivo con
 # buen nombre: si el tarball sale corrupto (disco lleno, corte a mitad

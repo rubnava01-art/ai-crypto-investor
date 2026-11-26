@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   api, ApiError,
-  type CrmContact, type CrmContactInput, type CrmSource, type CrmStatus, type MeResponse,
+  type CrmContact, type CrmContactInput, type CrmReminder, type CrmSource, type CrmStage, type CrmStageHistory, type CrmStatus, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { EmptyState } from "./badges";
@@ -54,6 +54,17 @@ export const CRM_STATUSES: { value: CrmStatus; label: string }[] = [
   { value: "inactivo", label: "Inactivo" },
 ];
 
+// Etapas de venta (Fase 5b mejoras-v1, tarea 1): embudo propio, distinto
+// del estado general. "ganado"/"perdido" cierran el embudo.
+export const CRM_STAGES: { value: CrmStage; label: string }[] = [
+  { value: "nuevo", label: "Nuevo" },
+  { value: "contactado", label: "Contactado" },
+  { value: "propuesta", label: "Propuesta" },
+  { value: "negociacion", label: "Negociación" },
+  { value: "ganado", label: "Ganado" },
+  { value: "perdido", label: "Perdido" },
+];
+
 
 const statusBadge: Record<string, string> = {
   nuevo: "bg-sky-500/15 text-sky-300",
@@ -69,6 +80,7 @@ interface FormState {
   phone: string;
   source: CrmSource;
   status: CrmStatus;
+  stage: CrmStage;
   tags: string; // comma-separated in the form
   notes: string;
 }
@@ -79,6 +91,7 @@ const emptyForm: FormState = {
   phone: "",
   source: "manual",
   status: "nuevo",
+  stage: "nuevo",
   tags: "",
   notes: "",
 };
@@ -111,6 +124,24 @@ export function CrmPanel({
   ];
   const sourceLabel = (s: string) => sources.find((x) => x.value === s)?.label ?? s;
   const statusLabel = (s: string) => statuses.find((x) => x.value === s)?.label ?? s;
+  // Etapas de venta (Fase 5b mejoras-v1, tarea 1).
+  const stages: { value: CrmStage; label: string }[] = [
+    { value: "nuevo", label: t.crm.stageNuevo },
+    { value: "contactado", label: t.crm.stageContactado },
+    { value: "propuesta", label: t.crm.stagePropuesta },
+    { value: "negociacion", label: t.crm.stageNegociacion },
+    { value: "ganado", label: t.crm.stageGanado },
+    { value: "perdido", label: t.crm.stagePerdido },
+  ];
+  const stageLabel = (s: string) => stages.find((x) => x.value === s)?.label ?? s;
+  const stageBadge: Record<string, string> = {
+    nuevo: "bg-sky-500/15 text-sky-300",
+    contactado: "bg-amber-500/15 text-amber-300",
+    propuesta: "bg-violet-500/15 text-violet-300",
+    negociacion: "bg-orange-500/15 text-orange-300",
+    ganado: "bg-emerald-500/15 text-emerald-300",
+    perdido: "bg-zinc-500/15 text-zinc-400",
+  };
   const [me, setMe] = useState<MeResponse | null>(null);
   const isAdmin = !!me?.is_admin;
 
@@ -119,6 +150,7 @@ export function CrmPanel({
   const query = controlledQuery ?? queryInternal;
   const setQuery = onQueryChange ?? setQueryInternal;
   const [statusFilter, setStatusFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
 
   // Filtro por etiqueta (2026-11-20): en cliente sobre la página cargada
@@ -150,6 +182,15 @@ export function CrmPanel({
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  // Recordatorios e historial de etapa del contacto en edición (Fase 5b,
+  // tarea 1): solo se cargan al abrir la edición, no con la lista.
+  const [reminders, setReminders] = useState<CrmReminder[] | null>(null);
+  const [stageHistory, setStageHistory] = useState<CrmStageHistory[] | null>(null);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderNote, setReminderNote] = useState("");
+  // Importación CSV: resultado de la última importación (null = ninguna).
+  const [csvResult, setCsvResult] = useState<{ creados: number; errores: { fila: number; error: string }[] } | null>(null);
+  const [csvBusy, setCsvBusy] = useState(false);
 
   useEffect(() => {
     api.me().then((m) => { if (!isCancelled()) setMe(m); }).catch(() => { if (!isCancelled()) setMe(null); });
@@ -157,7 +198,7 @@ export function CrmPanel({
 
   const load = useCallback(async () => {
     try {
-      const rows = await api.listContacts(query.trim() || undefined, statusFilter || undefined);
+      const rows = await api.listContacts(query.trim() || undefined, statusFilter || undefined, stageFilter || undefined);
       if (isCancelled()) return;
       setContacts(rows);
       setLoadError(null);
@@ -167,7 +208,7 @@ export function CrmPanel({
       // explica el fallo (antes un 403/timeout parecía "sin contactos").
       setLoadError(e);
     }
-  }, [query, statusFilter, isCancelled]);
+  }, [query, statusFilter, stageFilter, isCancelled]);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
@@ -185,16 +226,92 @@ export function CrmPanel({
       phone: c.phone,
       source: c.source,
       status: c.status,
+      stage: c.stage ?? "nuevo",
       tags: c.tags.join(", "),
       notes: c.notes,
     });
     setMsg(null);
     setError(null);
+    setReminders(null);
+    setStageHistory(null);
+    setReminderDate("");
+    setReminderNote("");
+    api.listReminders(c.id).then((r) => { if (!isCancelled()) setReminders(r); }).catch(() => { if (!isCancelled()) setReminders([]); });
+    api.getStageHistory(c.id).then((r) => { if (!isCancelled()) setStageHistory(r); }).catch(() => { if (!isCancelled()) setStageHistory([]); });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setReminders(null);
+    setStageHistory(null);
+  };
+
+  // Cambio rápido de etapa desde la fila (admin): el backend registra
+  // el cambio en el historial solo si la etapa realmente cambia.
+  const changeStage = async (c: CrmContact, stage: CrmStage) => {
+    if (stage === c.stage) return;
+    setError(null);
+    try {
+      await api.updateContactStage(c.id, stage);
+      await load();
+      window.dispatchEvent(new CustomEvent("crm:changed"));
+    } catch (err) {
+      setError(t.crm.errSave);
+    }
+  };
+
+  const addReminder = async () => {
+    if (editingId === null || !reminderDate) return;
+    setError(null);
+    try {
+      await api.createReminder(editingId, { remind_date: reminderDate, note: reminderNote });
+      setReminderDate("");
+      setReminderNote("");
+      setReminders(await api.listReminders(editingId));
+    } catch (err) {
+      setError(t.crm.reminderErr);
+    }
+  };
+
+  const toggleReminder = async (r: CrmReminder) => {
+    if (editingId === null) return;
+    try {
+      await api.updateReminder(r.id, { done: !r.done });
+      setReminders(await api.listReminders(editingId));
+    } catch (err) {
+      setError(t.crm.reminderErr);
+    }
+  };
+
+  const removeReminder = async (r: CrmReminder) => {
+    if (editingId === null) return;
+    try {
+      await api.deleteReminder(r.id);
+      setReminders(await api.listReminders(editingId));
+    } catch (err) {
+      setError(t.crm.reminderErr);
+    }
+  };
+
+  // Importación CSV: el archivo se lee en el navegador y se envía su
+  // texto (text/csv); el backend crea las filas válidas y reporta las
+  // inválidas por número de fila, sin romper nada.
+  const importCsv = async (file: File) => {
+    setCsvBusy(true);
+    setCsvResult(null);
+    setError(null);
+    try {
+      const text = await file.text();
+      const res = await api.importContacts(text);
+      setCsvResult(res);
+      await load();
+      window.dispatchEvent(new CustomEvent("crm:changed"));
+    } catch (err) {
+      setError(t.crm.csvImportError);
+    } finally {
+      setCsvBusy(false);
+    }
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -208,6 +325,7 @@ export function CrmPanel({
       phone: form.phone.trim(),
       source: form.source,
       status: form.status,
+      stage: form.stage,
       tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
       notes: form.notes,
     };
@@ -224,7 +342,7 @@ export function CrmPanel({
       // El dashboard superior (pasos/métricas) se actualiza con el cambio.
       window.dispatchEvent(new CustomEvent("crm:changed"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crm.errSave);
+      setError(t.crm.errSave);
     } finally {
       setBusy(false);
     }
@@ -241,7 +359,7 @@ export function CrmPanel({
       await load();
       window.dispatchEvent(new CustomEvent("crm:changed"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crm.errDelete);
+      setError(t.crm.errDelete);
     }
   };
 
@@ -265,7 +383,7 @@ export function CrmPanel({
         vinculado (cada tecla re-dispararía el 403); se ocultan con el
         estado amable. */}
       {!forbidden && (
-      <div className={`mb-4 grid grid-cols-1 gap-3 ${controlledQuery === undefined ? "sm:grid-cols-[1fr_200px_200px]" : "sm:grid-cols-[200px_200px]"}`}>
+      <div className={`mb-4 grid grid-cols-1 gap-3 ${controlledQuery === undefined ? "sm:grid-cols-[1fr_200px_200px_200px]" : "sm:grid-cols-[200px_200px_200px]"}`}>
         {controlledQuery === undefined && (
         <Field label={t.crm.searchAria}><input
           className={inputCls}
@@ -286,6 +404,17 @@ export function CrmPanel({
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </select></Field>
+        <Field label={t.crm.filterStageAria}><select
+          className={inputCls}
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value)}
+          aria-label={t.crm.filterStageAria}
+        >
+          <option value="">{t.crm.allStages}</option>
+          {stages.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select></Field>
         {allTags.length > 0 && (
         <Field label={t.crm.filterTagAria}><select
           className={inputCls}
@@ -300,6 +429,42 @@ export function CrmPanel({
         </select></Field>
         )}
       </div>
+      )}
+
+      {/* CSV (Fase 5b, tarea 1): exportar, plantilla e importar. Solo
+        admin: la importación crea contactos. */}
+      {isAdmin && !forbidden && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => api.exportContacts().catch(() => setError(t.crm.errSave))} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            {t.crm.csvExport}
+          </button>
+          <button type="button" onClick={() => api.downloadTemplate().catch(() => setError(t.crm.errSave))} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            {t.crm.csvTemplate}
+          </button>
+          <label className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            {csvBusy ? t.crm.saving : t.crm.csvImport}
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              aria-label={t.crm.csvImportAria}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void importCsv(f); e.target.value = ""; }}
+            />
+          </label>
+        </div>
+      )}
+      {csvResult && (
+        <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-300">
+          <p>{t.crm.csvImported.replace("{creados}", String(csvResult.creados)).replace("{errores}", String(csvResult.errores.length))}</p>
+          {csvResult.errores.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-300">
+              <li className="list-none pl-0 font-semibold text-zinc-200">{t.crm.csvErrorsTitle}</li>
+              {csvResult.errores.map((e) => (
+                <li key={e.fila}>Fila {e.fila}: {e.error}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* List */}
@@ -338,9 +503,14 @@ export function CrmPanel({
                   {statusLabel(c.status)}
                 </span>
               </div>
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${stageBadge[c.stage] ?? stageBadge.nuevo}`}>
+                  {stageLabel(c.stage ?? "nuevo")}
+                </span>
+                {sourceLabel(c.source)}
+              </p>
               {c.email && <p className="mt-1 break-all text-sm text-zinc-300">{c.email}</p>}
               {c.phone && <p className="text-xs text-zinc-400">{c.phone}</p>}
-              <p className="mt-1 text-xs text-zinc-400">{sourceLabel(c.source)}</p>
               {c.tags.length > 0 && (
                 <p className="mt-1 flex flex-wrap gap-1">
                   {c.tags.map((tg) => (
@@ -376,6 +546,7 @@ export function CrmPanel({
                 <th className="py-3 pr-3 font-semibold">{t.crm.thContact}</th>
                 <th className="py-3 pr-3 font-semibold">{t.crm.thSource}</th>
                 <th className="py-3 pr-3 font-semibold">{t.crm.thStatus}</th>
+                <th className="py-3 pr-3 font-semibold">{t.crm.thStage}</th>
                 <th className="py-3 pr-3 font-semibold">{t.crm.thTags}</th>
                 {isAdmin && <th className="py-3 font-semibold">{t.crm.thActions}</th>}
               </tr>
@@ -390,7 +561,7 @@ export function CrmPanel({
                   <td className="py-3 pr-3 text-zinc-300">
                     {c.email && <p className="break-all">{c.email}</p>}
                     {c.phone && <p className="text-xs text-zinc-400">{c.phone}</p>}
-                    {!c.email && !c.phone && <span className="text-zinc-500">—</span>}
+                    {!c.email && !c.phone && <span className="text-zinc-400">—</span>}
                   </td>
                   <td className="py-3 pr-3 text-zinc-300">{sourceLabel(c.source)}</td>
                   <td className="py-3 pr-3">
@@ -399,11 +570,29 @@ export function CrmPanel({
                     </span>
                   </td>
                   <td className="py-3 pr-3">
+                    {isAdmin ? (
+                      <Field label={t.crm.stageAria}><select
+                        className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                        value={c.stage ?? "nuevo"}
+                        onChange={(e) => void changeStage(c, e.target.value as CrmStage)}
+                        aria-label={t.crm.stageAria}
+                      >
+                        {stages.map((s) => (
+                          <option key={s.value} value={s.value}>{s.label}</option>
+                        ))}
+                      </select></Field>
+                    ) : (
+                      <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${stageBadge[c.stage] ?? stageBadge.nuevo}`}>
+                        {stageLabel(c.stage ?? "nuevo")}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-3">
                     <span className="flex flex-wrap gap-1">
                       {c.tags.map((t) => (
                         <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-200">{t}</span>
                       ))}
-                      {c.tags.length === 0 && <span className="text-zinc-500">—</span>}
+                      {c.tags.length === 0 && <span className="text-zinc-400">—</span>}
                     </span>
                   </td>
                   {isAdmin && (
@@ -453,6 +642,11 @@ export function CrmPanel({
                 <option key={s.value} value={s.value}>{t.crm.statusOption}{s.label}</option>
               ))}
             </select></Field>
+            <Field label={t.crm.stageAria}><select className={inputCls} value={form.stage} onChange={set("stage")} aria-label={t.crm.stageAria}>
+              {stages.map((s) => (
+                <option key={s.value} value={s.value}>{t.crm.stageOption}{s.label}</option>
+              ))}
+            </select></Field>
           </div>
           <Field label={t.crm.notesAria}><textarea aria-label={t.crm.notesAria}
             className={inputCls}
@@ -482,6 +676,68 @@ export function CrmPanel({
           {msg && <p className="text-sm text-emerald-400">{msg}</p>}
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         </form>
+      )}
+
+      {/* Recordatorios e historial de etapa del contacto en edición
+        (Fase 5b, tarea 1). Los recordatorios con fecha <= hoy aparecen
+        también en el panel "Hoy". */}
+      {isAdmin && editingId !== null && (
+        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-zinc-800 pt-5 sm:grid-cols-2">
+          <div>
+            <p className="text-sm font-semibold text-zinc-200">{t.crm.remindersTitle}</p>
+            {reminders === null ? (
+              <p className="py-2 text-sm text-zinc-400">{t.crm.loadingContacts}</p>
+            ) : reminders.length === 0 ? (
+              <p className="py-2 text-sm text-zinc-400">{t.crm.remindersEmpty}</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {reminders.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => void toggleReminder(r)}
+                      aria-label={t.crm.reminderDone}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${r.done ? "border-emerald-500 bg-emerald-500/20 text-emerald-300" : "border-zinc-600 text-zinc-400"}`}
+                    >
+                      {r.done ? "✓" : ""}
+                    </button>
+                    <span className={`min-w-0 flex-1 text-sm ${r.done ? "text-zinc-400 line-through" : "text-zinc-200"}`}>
+                      {r.note || "—"}
+                      <span className="block text-xs text-zinc-400">{r.remind_date}</span>
+                    </span>
+                    <button type="button" onClick={() => void removeReminder(r)} aria-label={t.crm.reminderDelete} className="min-h-[44px] rounded-lg px-2 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Field label={t.crm.reminderDateAria} className="shrink-0"><input aria-label={t.crm.reminderDateAria} type="date" className={inputCls} value={reminderDate} onChange={(e) => setReminderDate(e.target.value)} /></Field>
+              <Field label={t.crm.reminderNotePlaceholder} className="min-w-[180px] flex-1"><input aria-label={t.crm.reminderNotePlaceholder} className={inputCls} placeholder={t.crm.reminderNotePlaceholder} value={reminderNote} onChange={(e) => setReminderNote(e.target.value)} maxLength={200} /></Field>
+              <button type="button" onClick={() => void addReminder()} disabled={!reminderDate} className="min-h-[44px] shrink-0 self-end rounded-lg bg-emerald-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                {t.crm.reminderAdd}
+              </button>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-zinc-200">{t.crm.stageHistoryTitle}</p>
+            {stageHistory === null ? (
+              <p className="py-2 text-sm text-zinc-400">{t.crm.loadingContacts}</p>
+            ) : stageHistory.length === 0 ? (
+              <p className="py-2 text-sm text-zinc-400">{t.crm.remindersEmpty}</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+                {stageHistory.map((h) => (
+                  <li key={h.id} className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+                    {h.from_stage === null
+                      ? t.crm.stageHistoryInitial.replace("{etapa}", stageLabel(h.to_stage))
+                      : t.crm.stageHistoryChange.replace("{de}", stageLabel(h.from_stage)).replace("{a}", stageLabel(h.to_stage))}
+                    <span className="block text-xs text-zinc-400">{h.changed_at ? new Date(h.changed_at).toLocaleString() : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
       {!isAdmin && (msg || error) && (
         <div className="mt-3">

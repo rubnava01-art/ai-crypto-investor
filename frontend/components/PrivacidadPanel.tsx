@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, type ComplianceCategory, type ComplianceItem, type ComplianceStatus, type MeResponse } from "../lib/api";
+import { api, type ComplianceCategory, type ComplianceItem, type ComplianceStatus, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { Panel } from "./Panel";
@@ -118,7 +118,7 @@ export function PrivacidadPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.privacidad.saveError);
+      setError(t.privacidad.saveError);
     } finally {
       setBusy(false);
     }
@@ -130,7 +130,7 @@ export function PrivacidadPanel() {
       await api.updateComplianceItem(item.id, { status: s });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.privacidad.statusError);
+      setError(t.privacidad.statusError);
     }
   };
 
@@ -141,7 +141,7 @@ export function PrivacidadPanel() {
       await api.deleteComplianceItem(item.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.privacidad.deleteError);
+      setError(t.privacidad.deleteError);
     }
   };
 
@@ -168,6 +168,14 @@ export function PrivacidadPanel() {
       <p className="mb-4 text-sm leading-relaxed text-zinc-400">
         {t.privacidad.intro}
         {!isAdmin && t.privacidad.readOnly}
+      </p>
+      <p className="mb-4 text-sm leading-relaxed text-zinc-400">
+        {/* Fase 2 mejoras-v1, tarea 1: el texto público de privacidad
+            (borrador) vive en /legal/privacidad; esta sección sigue
+            siendo el centro interno de tareas y no publica textos. */}
+        <a href="/legal/privacidad" className="font-semibold text-emerald-400 underline underline-offset-2 hover:text-emerald-300">
+          {t.privacidad.publicLink}
+        </a>
       </p>
 
       {isAdmin && (

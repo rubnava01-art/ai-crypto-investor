@@ -67,7 +67,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       setContactId("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.academy.errRegister);
+      setError(t.academy.errRegister);
     } finally {
       setBusy(false);
     }
@@ -79,7 +79,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       await api.updateEnrollment(enr.id, { delivered: !enr.delivered });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.academy.errUpdateDelivery);
+      setError(t.academy.errUpdateDelivery);
     }
   };
 
@@ -90,7 +90,7 @@ function StudentsSection({ course, isAdmin, contacts }: { course: AcademyCourse;
       await api.deleteEnrollment(enr.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.academy.errRemove);
+      setError(t.academy.errRemove);
     }
   };
 
@@ -187,7 +187,7 @@ function DownloadButtons({ course }: { course: AcademyCourse }) {
     try {
       await api.downloadCoursePdf(d.course_id, d.filename);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.academy.errDownload);
+      setError(t.academy.errDownload);
     } finally {
       setBusyId(null);
     }

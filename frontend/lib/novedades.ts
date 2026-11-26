@@ -26,6 +26,11 @@ export type NovedadSistema = {
 
 export const novedadesSistema: NovedadSistema[] = [
   {
+    date: "2026-11-26",
+    title: "Seguridad, accesibilidad y mejoras de uso en toda la plataforma",
+    body: "Publicado el 26 de noviembre: un paquete grande de mejoras en toda la plataforma — en Inicio, Estudiar y Crear, la página principal ahora se genera en el servidor (carga más rápida y visible para buscadores), las herramientas de Clases se ven en una rejilla nueva y el buscador con Ctrl+K encuentra módulos y herramientas; en planes, la página de precios es pública y se puede consultar sin cuenta; en Invertir, las señales de demostración ahora dicen claramente que son datos simulados; en CRM, Facturas, Riesgos, Planillas y Talento humano, más orden y estados claros (etapas y recordatorios en CRM, numeración y PDF con marca en Facturas, matriz de riesgos); en Correos, avisos de fin de prueba y bandeja de contacto; en Control de usuarios, verificación de correo, doble factor para administradores y límites de inicio de sesión; en Terminal, el panel ya muestra el menú real de módulos sin desincronizarse; y en toda la plataforma, mejor contraste y navegación por teclado, botones táctiles de 44 px en móvil y mensajes claros cuando el servidor está despertando. Trading real sigue apagado y las etiquetas de simulación intactas.",
+  },
+  {
     date: "2026-11-25",
     title: "Mejora de interfaz: estados de carga, vacíos claros y mejor uso en móvil",
     body: "Publicado el 25 de noviembre: mejora visual y de uso en toda la plataforma — en Inicio, Estudiar y Crear, los estados de carga ahora muestran esqueletos con la forma real del contenido en vez de texto plano, y los estados vacíos explican qué falta y qué hacer; en Gestión (CRM, Facturas, Inventario, Riesgos, Planillas y Talento humano) y en Correos e Invertir, los botones y tarjetas se adaptan mejor al móvil (390 px), con áreas táctiles de 44 px y cabeceras que no se cortan; además, en Inventario se corrigió un error real: un fallo de carga se veía como 'sin artículos' y ahora muestra el error con botón de reintento. Solo presentación y estados, sin tocar permisos. Trading real sigue apagado y las etiquetas de simulación intactas.",

@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, type BrandBrief, type BrandBriefInput } from "../../lib/api";
+import { type BrandBrief, type BrandBriefInput } from "../../lib/api";
 import { BRIEF_QUESTIONS, briefAnswered, countWords } from "../../lib/brief";
 import { useLanguage } from "../../lib/i18n";
 import { Panel } from "../Panel";
@@ -48,7 +48,7 @@ export function BrandBriefForm({
       await onSave(answers);
       setMsg(t.brief.msgSaved);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.brief.errSave);
+      setFormError(t.brief.errSave);
     } finally {
       setBusy(false);
     }
@@ -123,7 +123,7 @@ export function BrandBriefForm({
                 {answer ? (
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">{answer}</p>
                 ) : (
-                  <p className="mt-1 text-sm italic text-zinc-500">—</p>
+                  <p className="mt-1 text-sm italic text-zinc-400">—</p>
                 )}
               </div>
             );
@@ -147,7 +147,7 @@ export function BrandBriefForm({
                   maxLength={5000}
                 />
               </Field>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-500">{questionHelp(n)}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">{questionHelp(n)}</p>
               {n === 2 && (
                 <p className="mt-1 text-xs text-zinc-400">
                   {t.brief.q2Hint} · {t.brief.q2Words.replace("{n}", String(q2Words))}

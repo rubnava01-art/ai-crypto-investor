@@ -23,6 +23,7 @@ import { ApiError, guestApi } from "../lib/api";
 import { guestNextFromSearch } from "../lib/session";
 import { useLanguage } from "../lib/i18n";
 import { ColdStartNotice } from "./ColdStartNotice";
+import { useDialogFocus } from "./ui";
 
 /** Respuesta de 3 cifras: se envía sola pasado este margen, para que
  * un dedo torpe pueda borrar y corregir antes del envío. */
@@ -39,6 +40,7 @@ export function GuestTrialButton() {
   // Una respuesta de 3 cifras está a punto de enviarse sola.
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const autoSubmitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Prefetch por intención (hover/foco): una sola vez por montaje del
   // botón — el reto tiene límite por IP y no se quema en cada hover.
@@ -80,6 +82,11 @@ export function GuestTrialButton() {
     clearAutoSubmit();
     setOpen(false);
   };
+
+  // 4.1: focus-trap + Escape + retorno de foco (antes no había Escape
+  // ni trap; el foco inicial al campo lo sigue dando el efecto de
+  // [open, challenge] de abajo, que cubre el reto que llega tarde).
+  useDialogFocus({ open, onEscape: closeTrial, dialogRef, initialFocusRef: inputRef });
 
   const openTrial = () => {
     prefetchIntent();
@@ -165,6 +172,7 @@ export function GuestTrialButton() {
       </button>
       {open && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={t.guest.challengeTitle}

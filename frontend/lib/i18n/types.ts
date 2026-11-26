@@ -112,11 +112,24 @@ export type Dictionary = {
   flujos: Record<string, string>;
   // Planes (precios de suscripción, aprobados por Rubén 2026-11-06).
   planes: Record<string, string>;
+  // Onboarding de 3 pasos + panel "Hoy" (Fase 4 mejoras-v1, tareas 3 y 7).
+  onboarding: Record<string, string>;
+  hoy: Record<string, string>;
+  // Buscador global Ctrl+K (Fase 4 mejoras-v1, tarea 4).
+  buscador: Record<string, string>;
+  // Textos legales públicos (Fase 2 mejoras-v1, tarea 1): cromo de las
+  // páginas /legal/* (títulos, sello de borrador, fecha y contacto).
+  legal: Record<string, string>;
+  // Aviso de simulación (Fase 2 mejoras-v1, tarea 2): banner visible en
+  // todas las pantallas de señales y precios.
+  simulacion: Record<string, string>;
   // Landing pública, menú público y página de contacto (2026-11-12).
   landing: Record<string, string>;
   guest: Record<string, string>;
   publicNav: Record<string, string>;
   contacto: Record<string, string>;
+  // Página pública /verificar-correo (Fase 1 mejoras-v1, corrección F1).
+  verifyEmail: Record<string, string>;
   // Gestos de Estudiar (swipe entre secciones y manuales): mismo patrón.
   estudiarGestos: Record<string, string>;
   // Herramientas vendibles (TBT-Herramientas, FASE 2, 2026-11-24): sección

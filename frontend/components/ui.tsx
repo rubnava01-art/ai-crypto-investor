@@ -14,7 +14,7 @@
 // - copyTextWithFallback / newId: fallbacks de portapapeles y UUID (FE14).
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ApiError } from "../lib/api";
 import { useLanguage, type Dictionary } from "../lib/i18n";
 import { formatDate, formatMoney } from "../lib/format";
@@ -130,8 +130,9 @@ export function DateText({ iso, locale }: { iso: string | null | undefined; loca
 // ---------- Errores mapeados a i18n ----------
 
 /** Texto de error para mostrar: la clave i18n calculada en la frontera del
- * cliente (ApiError.key) manda sobre el mensaje crudo; si no hay clave, el
- * mensaje tal cual (comportamiento anterior). */
+ * cliente (ApiError.key) manda sobre el mensaje crudo; un Error que no es
+ * ApiError (p. ej. un fallo de red del navegador) también se muestra con
+ * el texto genérico en español, nunca con el mensaje técnico en inglés. */
 export function apiErrorText(err: unknown, t: Dictionary): string {
   if (err instanceof ApiError && err.key) {
     const map: Record<string, string> = {
@@ -147,9 +148,8 @@ export function apiErrorText(err: unknown, t: Dictionary): string {
       tooManyRequests: t.reliability.errorTooManyRequests,
       unknown: t.reliability.errorUnknown,
     };
-    return map[err.key] ?? err.message;
+    return map[err.key] ?? t.reliability.errorUnknown;
   }
-  if (err instanceof Error) return err.message;
   return t.reliability.errorUnknown;
 }
 
@@ -197,6 +197,86 @@ export function ApiErrorBanner({
   );
 }
 
+// ---------- Gestión de foco en modales (4.1, 2026-11-26) ----------
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Focus-trap + Escape + retorno de foco para modales (4.1).
+ *
+ * Al abrir: guarda el elemento enfocado y mueve el foco al primer
+ * elemento enfocable del diálogo (o al `initialFocusRef` si se pasa
+ * y está habilitado y visible; si no, al primer enfocable). Tab y
+ * Shift+Tab quedan atrapados dentro del diálogo; Escape llama a
+ * `onEscape` (y no propaga, para no disparar otros cierres). Al
+ * cerrar o desmontar: el foco vuelve al elemento que lo tenía.
+ *
+ * `onEscape` se guarda en ref para que el llamador pueda pasar un
+ * callback en línea sin que el efecto se re-ejecute en cada render.
+ * El diálogo sin elementos enfocables debe llevar tabIndex={-1} para
+ * poder recibir el foco él mismo. */
+export function useDialogFocus({
+  open,
+  onEscape,
+  dialogRef,
+  initialFocusRef,
+}: {
+  open: boolean;
+  onEscape: () => void;
+  dialogRef: RefObject<HTMLElement | null>;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+}) {
+  const onEscapeRef = useRef(onEscape);
+  onEscapeRef.current = onEscape;
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusables = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (el) => el.getClientRects().length > 0,
+      );
+    const initial = initialFocusRef?.current;
+    const target =
+      initial && !initial.hasAttribute("disabled") && initial.getClientRects().length > 0
+        ? initial
+        : (focusables()[0] ?? dialog);
+    target.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onEscapeRef.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKey);
+    return () => {
+      dialog.removeEventListener("keydown", onKey);
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
+    // Solo se re-ejecuta al abrir/cerrar: onEscape va por ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, dialogRef, initialFocusRef]);
+}
+
 // ---------- ConfirmDialog ----------
 
 export function ConfirmDialog({
@@ -213,19 +293,15 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    cancelRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // 4.1: focus-trap + Escape + retorno de foco (antes solo Escape y
+  // foco inicial; Tab podía salir del diálogo y el foco no volvía).
+  useDialogFocus({ open, onEscape: onCancel, dialogRef, initialFocusRef: cancelRef });
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" role="presentation">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={t.reliability.confirmTitle}

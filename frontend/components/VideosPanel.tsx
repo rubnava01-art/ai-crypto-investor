@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { api, ApiError, type MeResponse } from "../lib/api";
 import { ajustadorApi, youtubeVideoId, type VideoEducativo } from "../lib/api/ajustador";
 import { Panel } from "./Panel";
@@ -154,7 +155,7 @@ export function VideosPanel() {
       setEditingId(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.videos.errSave);
+      setError(t.videos.errSave);
     } finally {
       setBusy(false);
     }
@@ -169,7 +170,7 @@ export function VideosPanel() {
       setMsg(t.videos.msgDeleted);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.videos.errDelete);
+      setError(t.videos.errDelete);
     }
   };
 
@@ -283,9 +284,16 @@ export function VideosPanel() {
                         className="block w-full text-left motion-safe:active:scale-[0.99]"
                       >
                         {thumb ? (
-                          <img
+                          <Image
                             src={thumb}
                             alt={t.videos.thumbnailAlt.replace("{titulo}", v.titulo)}
+                            width={480}
+                            height={360}
+                            // 2.4 (2026-11-26): sizes según la rejilla
+                            // (1 col en móvil, 2 en sm, 3 en lg) para que
+                            // el optimizador no sirva siempre el ancho
+                            // máximo a pantallas estrechas.
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             loading="lazy"
                             className="aspect-video w-full object-cover"
                           />

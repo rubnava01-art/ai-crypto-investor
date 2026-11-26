@@ -153,7 +153,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
       setBody("");
       resetList();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : tt.correos.errSave);
+      setError(tt.correos.errSave);
     } finally {
       setBusy(false);
     }
@@ -165,7 +165,7 @@ function TemplatesPanel({ isAdmin, onUse }: { isAdmin: boolean; onUse: (t: Email
       await api.deleteEmailTemplate(t.id);
       resetList();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : tt.correos.errDelete);
+      setError(tt.correos.errDelete);
     }
   };
 
@@ -286,7 +286,7 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
   // cuando ya hay un contacto elegido. Todo con useAsyncLoad + signal.
   const [contactsRequested, setContactsRequested] = useState(false);
   const contactsLoad = useAsyncLoad<CrmContact[]>(
-    (signal) => (contactsRequested ? api.listContacts(undefined, undefined, { signal }) : Promise.resolve([])),
+    (signal) => (contactsRequested ? api.listContacts(undefined, undefined, undefined, { signal }) : Promise.resolve([])),
     [contactsRequested],
   );
   const contacts = contactsLoad.data ?? [];
@@ -437,7 +437,7 @@ function Composer({ isAdmin, owner, onSaved, templateToUse, onTemplateApplied }:
       setTemplateName("");
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.correos.errSave);
+      setError(t.correos.errSave);
     } finally {
       setBusy(false);
     }
@@ -623,7 +623,7 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
       await api.updateEmailLogStatus(r.id, st);
       resetList();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.correos.errChangeStatus);
+      setError(t.correos.errChangeStatus);
     }
   };
 
@@ -633,7 +633,7 @@ function LogsPanel({ isAdmin, refreshKey }: { isAdmin: boolean; refreshKey: numb
       await api.deleteEmailLog(r.id);
       resetList();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.correos.errDelete);
+      setError(t.correos.errDelete);
     }
   };
 

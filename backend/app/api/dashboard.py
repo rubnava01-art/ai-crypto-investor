@@ -22,16 +22,19 @@ caída). Reglas:
 - system y signals: para cualquier autenticado — la landing (/) los
   usa y el chat demo (M1) permite señales a prueba.
 """
+import datetime as dt
 import logging
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import misc, portfolio, signals, system
 from app.core.perfiles import modulos_para
 from app.core.security import get_current_user
 from app.database import get_db
-from app.models.tables import User
+from app.models.tables import Appointment, BusinessTask, CrmReminder, Contact, InventoryItem, Invoice, User
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +77,230 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
         "risk": _safe("risk", lambda: _dump(misc.risk_limits(user))) if tiene_invertir else None,
         "logs": _safe("logs", lambda: [_dump(e) for e in misc.logs(user, db)]) if es_admin else None,
     }
+
+
+# ---------- "Hoy": lo urgente del día (Fase 4 mejoras-v1, tarea 7) ----------
+# Una sola petición con lo urgente REAL del usuario, sacado de sus datos:
+# tareas pendientes con fecha vencida o de hoy, facturas enviadas
+# (vencidas / por vencer en 7 días / por cobrar sin fecha), stock bajo
+# (mínimo > 0 y cantidad <= mínimo, la misma regla del módulo
+# Inventario) y citas de hoy (pendientes o confirmadas). "Hoy" es el día
+# en la zona horaria del negocio (America/Los_Angeles; lib/dates.ts en
+# el frontend).
+# Sin nada urgente, todas las listas llegan vacías y el frontend muestra
+# el mensaje honesto "Nada urgente hoy" — nunca se inventa urgencia.
+# Gating por perfil (igual que el dashboard): sin el módulo, la sección
+# llega como [] (sin acceso), NO como null; null solo significa que esa
+# sección falló (el frontend lo distingue del vacío).
+
+LA_TZ = ZoneInfo("America/Los_Angeles")
+POR_VENCER_DIAS = 7
+
+
+class HoyTarea(BaseModel):
+    id: int
+    area: str
+    title: str
+    due_date: str | None = None
+    href: str = "/business"
+
+
+class HoyFactura(BaseModel):
+    id: int
+    number: str
+    client_name: str
+    due_date: str | None = None
+    total: float
+    href: str = "/facturas"
+
+
+class HoyStock(BaseModel):
+    id: int
+    name: str
+    quantity: int
+    min_stock: int
+    href: str = "/inventario"
+
+
+class HoyCita(BaseModel):
+    id: int
+    client_name: str
+    service_type: str
+    starts_at: str
+    href: str = "/business"
+
+
+class HoyRecordatorio(BaseModel):
+    id: int
+    contact_name: str
+    note: str
+    remind_date: str | None = None
+    href: str = "/crm"
+
+
+class HoyOut(BaseModel):
+    fecha: str
+    tareas: list[HoyTarea] | None
+    facturas_vencidas: list[HoyFactura] | None
+    facturas_por_vencer: list[HoyFactura] | None
+    facturas_por_cobrar: list[HoyFactura] | None
+    stock_bajo: list[HoyStock] | None
+    citas: list[HoyCita] | None
+    # Recordatorios del CRM (Fase 5b mejoras-v1, tarea 1): no hechos
+    # con fecha <= hoy (vencidos o de hoy). None solo si la sección
+    # falló; [] es "ninguno", como el resto de secciones.
+    recordatorios: list[HoyRecordatorio] | None = None
+
+
+def _invoice_total(inv: Invoice) -> float:
+    subtotal = 0.0
+    for it in inv.items or []:
+        try:
+            subtotal += float(it.get("qty", 0)) * float(it.get("unit_price", 0))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return round(subtotal * (1 + float(inv.tax_rate or 0) / 100), 2)
+
+
+def _hoy_factura(inv: Invoice) -> HoyFactura:
+    return HoyFactura(
+        id=inv.id,
+        number=inv.number,
+        client_name=inv.client_name,
+        due_date=inv.due_date.isoformat() if inv.due_date else None,
+        total=_invoice_total(inv),
+    )
+
+
+@router.get("/hoy", response_model=HoyOut)
+def hoy(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    modulos = modulos_para(user, db)
+    today = dt.datetime.now(LA_TZ).date()
+    day_start = dt.datetime.combine(today, dt.time.min, tzinfo=LA_TZ).astimezone(dt.timezone.utc)
+    day_end = dt.datetime.combine(today, dt.time.max, tzinfo=LA_TZ).astimezone(dt.timezone.utc)
+
+    def tareas():
+        if "business" not in modulos:
+            return []
+        rows = (
+            db.query(BusinessTask)
+            .filter(
+                BusinessTask.done.is_(False),
+                BusinessTask.due_date.isnot(None),
+                BusinessTask.due_date <= today,
+            )
+            .order_by(BusinessTask.due_date.asc(), BusinessTask.id.asc())
+            .limit(50)
+            .all()
+        )
+        return [
+            HoyTarea(
+                id=t.id,
+                area=t.area,
+                title=t.title,
+                due_date=t.due_date.isoformat() if t.due_date else None,
+            )
+            for t in rows
+        ]
+
+    def facturas():
+        if "facturas" not in modulos:
+            return [], [], []
+        rows = (
+            db.query(Invoice)
+            .filter(Invoice.status == "enviada")
+            .order_by(Invoice.id.desc())
+            .limit(100)
+            .all()
+        )
+        vencidas, por_vencer, por_cobrar = [], [], []
+        limite = today + dt.timedelta(days=POR_VENCER_DIAS)
+        for inv in rows:
+            out = _hoy_factura(inv)
+            if inv.due_date is None:
+                por_cobrar.append(out)
+            elif inv.due_date <= today:
+                vencidas.append(out)
+            elif inv.due_date <= limite:
+                por_vencer.append(out)
+        return vencidas, por_vencer, por_cobrar
+
+    def stock_bajo():
+        if "inventario" not in modulos:
+            return []
+        # Misma regla que el módulo Inventario (_out): sin mínimo definido
+        # (0) no hay alerta; con mínimo, cantidad <= mínimo es stock bajo.
+        rows = (
+            db.query(InventoryItem)
+            .filter(InventoryItem.min_stock > 0, InventoryItem.quantity <= InventoryItem.min_stock)
+            .order_by(InventoryItem.quantity.asc(), InventoryItem.id.asc())
+            .limit(50)
+            .all()
+        )
+        return [
+            HoyStock(id=r.id, name=r.name, quantity=r.quantity, min_stock=r.min_stock)
+            for r in rows
+        ]
+
+    def citas():
+        if "business" not in modulos:
+            return []
+        rows = (
+            db.query(Appointment)
+            .filter(
+                Appointment.status.in_(["pendiente", "confirmada"]),
+                Appointment.starts_at >= day_start,
+                Appointment.starts_at <= day_end,
+            )
+            .order_by(Appointment.starts_at.asc())
+            .limit(50)
+            .all()
+        )
+        return [
+            HoyCita(
+                id=c.id,
+                client_name=c.client_name,
+                service_type=c.service_type,
+                starts_at=c.starts_at.isoformat() if c.starts_at else "",
+            )
+            for c in rows
+        ]
+
+    def recordatorios():
+        if "crm" not in modulos:
+            return []
+        rows = (
+            db.query(CrmReminder, Contact.name)
+            .join(Contact, Contact.id == CrmReminder.contact_id)
+            .filter(
+                CrmReminder.done.is_(False),
+                CrmReminder.remind_date <= today,
+            )
+            .order_by(CrmReminder.remind_date.asc(), CrmReminder.id.asc())
+            .limit(50)
+            .all()
+        )
+        return [
+            HoyRecordatorio(
+                id=r.id,
+                contact_name=name or "",
+                note=r.note or "",
+                remind_date=r.remind_date.isoformat() if r.remind_date else None,
+            )
+            for r, name in rows
+        ]
+
+    # None (fallo) no se confunde con [] (vacío): el `or` enmascararía
+    # un fallo como "sin facturas", y el frontend no podría avisar.
+    fact = _safe("hoy-facturas", facturas)
+    vencidas, por_vencer, por_cobrar = fact if fact is not None else (None, None, None)
+    return HoyOut(
+        fecha=today.isoformat(),
+        tareas=_safe("hoy-tareas", tareas),
+        facturas_vencidas=vencidas,
+        facturas_por_vencer=por_vencer,
+        facturas_por_cobrar=por_cobrar,
+        stock_bajo=_safe("hoy-stock", stock_bajo),
+        citas=_safe("hoy-citas", citas),
+        recordatorios=_safe("hoy-recordatorios", recordatorios),
+    )

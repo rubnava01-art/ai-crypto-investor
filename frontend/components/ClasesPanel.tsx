@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   api, ApiError, isGuest,
-  type EduClass, type EduClassKind, type MeResponse,
+  type EduClass, type EduClassKind, type EduProgress, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { Skeleton } from "./Skeleton";
 import { ClasesHerramientas } from "./ClasesHerramientas";
+import { ClassQuiz } from "./ClassQuiz";
 import { useConfirm, Field, ApiErrorBanner, apiErrorText } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
@@ -23,7 +25,14 @@ const fmtDateTime = (iso: string | null, locale: string) =>
       })
     : null;
 
-function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean }) {
+function ClassSection({ kind, isAdmin, progress, onToggleComplete }: {
+  kind: EduClassKind;
+  isAdmin: boolean;
+  // Fase 5a, tarea 4: progreso propio (null para el invitado, que no
+  // tiene fila de usuario y no marca clases).
+  progress: EduProgress | null;
+  onToggleComplete: (classId: number, completed: boolean) => Promise<void>;
+}) {
   const isCancelled = useCancelled();
   const { t, lang } = useLanguage();
   const { confirm, dialog } = useConfirm(t);
@@ -44,6 +53,23 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
   const [showForm, setShowForm] = useState(false);
   // E8: borrar con estado por fila (doble clic ya no dispara dos borrados).
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  // Fase 5a, tarea 4: marcado de clase completada, con estado por fila.
+  const [progressBusyId, setProgressBusyId] = useState<number | null>(null);
+  const [progressErrorId, setProgressErrorId] = useState<number | null>(null);
+
+  const toggleComplete = async (c: EduClass) => {
+    if (progress === null) return;
+    const done = progress.completed_class_ids.includes(c.id);
+    setProgressBusyId(c.id);
+    setProgressErrorId(null);
+    try {
+      await onToggleComplete(c.id, !done);
+    } catch {
+      setProgressErrorId(c.id);
+    } finally {
+      setProgressBusyId((prev) => (prev === c.id ? null : prev));
+    }
+  };
   // Búsqueda por título/descripción (2026-11-22): mismo patrón que
   // VideosPanel — solo filtra en cliente, sin cambios de endpoints ni
   // de datos. Clases no tenía búsqueda; con la lista creciendo, el
@@ -131,9 +157,7 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
       setError(
         err instanceof ApiError
           ? apiErrorText(err, t)
-          : err instanceof Error
-            ? err.message
-            : t.clases.errSave
+          : t.clases.errSave
       );
     } finally {
       setBusy(false);
@@ -249,6 +273,32 @@ function ClassSection({ kind, isAdmin }: { kind: EduClassKind; isAdmin: boolean 
                   </span>
                 </div>
                 {c.description && <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">{c.description}</p>}
+                {progress !== null && (
+                  <div className="mt-2">
+                    <button
+                      data-no-swipe
+                      type="button"
+                      onClick={() => toggleComplete(c)}
+                      disabled={progressBusyId === c.id}
+                      aria-pressed={progress.completed_class_ids.includes(c.id)}
+                      className={`min-h-[44px] rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 disabled:opacity-50 ${
+                        progress.completed_class_ids.includes(c.id)
+                          ? "border-emerald-700 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                          : "border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                      }`}
+                    >
+                      {progressBusyId === c.id
+                        ? t.clases.progressMarkBusy
+                        : progress.completed_class_ids.includes(c.id)
+                          ? t.clases.progressUnmark
+                          : t.clases.progressMark}
+                    </button>
+                    {progressErrorId === c.id && (
+                      <p role="alert" className="mt-1 text-xs text-red-400">{t.clases.progressErr}</p>
+                    )}
+                  </div>
+                )}
+                {progress !== null && <ClassQuiz classId={c.id} isAdmin={isAdmin} />}
               </li>
             ))}
           </ul>
@@ -294,6 +344,40 @@ export function ClasesPanel() {
   // E4: el fallo de api.me() también se muestra (antes se tragaba en silencio).
   const [meError, setMeError] = useState<unknown>(null);
   const isAdmin = !!me?.is_admin;
+  // Fase 5a, tarea 4: progreso propio (null para el invitado).
+  const [progress, setProgress] = useState<EduProgress | null>(null);
+  const [progressError, setProgressError] = useState<unknown>(null);
+
+  const loadProgress = useCallback(async () => {
+    // Invitado: sin fila de usuario no hay progreso que cargar (el
+    // endpoint responde 401); no se pide para no disparar el redirect.
+    if (isGuest()) {
+      setProgress(null);
+      setProgressError(null);
+      return;
+    }
+    try {
+      const p = await api.getProgress();
+      if (isCancelled()) return;
+      setProgress(p);
+      setProgressError(null);
+    } catch (err) {
+      if (isCancelled()) return;
+      setProgress(null);
+      setProgressError(err);
+    }
+  }, [isCancelled]);
+
+  useEffect(() => {
+    loadProgress();
+  }, [loadProgress]);
+
+  const handleToggleComplete = useCallback(async (classId: number, completed: boolean) => {
+    const next = completed
+      ? await api.completeClass(classId)
+      : await api.uncompleteClass(classId);
+    setProgress(next);
+  }, []);
 
   const loadMe = useCallback(async () => {
     // Invitado (Fase 1): nunca es admin y /me no tiene fila de usuario —
@@ -322,8 +406,63 @@ export function ClasesPanel() {
   return (
     <div className="space-y-4">
       {meError !== null ? <ApiErrorBanner error={meError} t={t} onRetry={loadMe} /> : null}
-      <ClassSection kind="grabada" isAdmin={isAdmin} />
-      <ClassSection kind="envivo" isAdmin={isAdmin} />
+      {progressError !== null ? <ApiErrorBanner error={progressError} t={t} onRetry={loadProgress} /> : null}
+      {progress !== null && (
+        <Panel title={t.clases.progressTitle}>
+          {progress.total === 0 ? (
+            <p className="text-sm text-zinc-400">{t.clases.progressEmpty}</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-zinc-100">
+                {t.clases.progressOverall
+                  .replace("{completed}", String(progress.completed))
+                  .replace("{total}", String(progress.total))
+                  .replace("{pct}", String(progress.pct))}
+              </p>
+              <div
+                className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-zinc-800"
+                role="progressbar"
+                aria-valuenow={progress.pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={t.clases.progressTitle}
+              >
+                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${progress.pct}%` }} />
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                {t.clases.progressRecorded
+                  .replace("{completed}", String(progress.by_kind.grabada.completed))
+                  .replace("{total}", String(progress.by_kind.grabada.total))
+                  .replace("{pct}", String(progress.by_kind.grabada.pct))}
+                {progress.by_kind.grabada.total > 0 && progress.by_kind.grabada.pct === 100 && (
+                  <>
+                    {" · "}
+                    <Link href="/estudiar/certificado/grabada" className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60">
+                      {t.clases.certView}
+                    </Link>
+                  </>
+                )}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                {t.clases.progressLive
+                  .replace("{completed}", String(progress.by_kind.envivo.completed))
+                  .replace("{total}", String(progress.by_kind.envivo.total))
+                  .replace("{pct}", String(progress.by_kind.envivo.pct))}
+                {progress.by_kind.envivo.total > 0 && progress.by_kind.envivo.pct === 100 && (
+                  <>
+                    {" · "}
+                    <Link href="/estudiar/certificado/envivo" className="font-semibold text-indigo-300 underline underline-offset-2 hover:text-indigo-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60">
+                      {t.clases.certView}
+                    </Link>
+                  </>
+                )}
+              </p>
+            </>
+          )}
+        </Panel>
+      )}
+      <ClassSection kind="grabada" isAdmin={isAdmin} progress={progress} onToggleComplete={handleToggleComplete} />
+      <ClassSection kind="envivo" isAdmin={isAdmin} progress={progress} onToggleComplete={handleToggleComplete} />
       {/* Herramientas montadas UNA vez (no dentro de ClassSection, que se duplica). */}
       <ClasesHerramientas />
     </div>

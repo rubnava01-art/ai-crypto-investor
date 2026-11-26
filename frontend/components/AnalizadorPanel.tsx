@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api, ApiError, type AnalizarResponse } from "../lib/api";
+import { api, type AnalizarResponse } from "../lib/api";
 import { EmptyState } from "./badges";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
@@ -42,7 +42,7 @@ export function AnalizadorPanel() {
     try {
       setResultado(await api.analizarUrl(limpia));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.analizador.errAnalyze);
+      setError(t.analizador.errAnalyze);
     } finally {
       setBusy(false);
     }

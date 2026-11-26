@@ -12,10 +12,11 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.core.perfiles import require_modulo
 from app.database import get_db
-from app.models.tables import InventoryItem, User
+from app.models.tables import InventoryItem, InventoryMovement, User
 
 router = APIRouter(prefix="/api/inventario", tags=["inventario"], dependencies=[Depends(require_modulo("inventario"))])
 
@@ -54,6 +55,53 @@ class ItemUpdate(BaseModel):
     unit: str | None = None
     unit_price: float | None = None
     min_stock: int | None = None
+    # Motivo del cambio de cantidad (Fase 5b, tarea 3): solo alimenta
+    # el historial de movimientos; no se guarda en el producto.
+    motivo: str | None = Field(default=None, max_length=500)
+
+
+class MovementOut(BaseModel):
+    id: int
+    item_id: int
+    tipo: str
+    cantidad_delta: int
+    cantidad_final: int
+    motivo: str
+    created_at: str | None = None
+
+
+class MovementCreate(BaseModel):
+    # Delta con signo: positivo en entradas, negativo en ventas/salidas.
+    tipo: str = "ajuste"
+    cantidad: int
+    motivo: str = Field(default="", max_length=500)
+
+
+MOVEMENT_TYPES = ("entrada", "venta", "ajuste")
+
+
+def _movement_out(m: InventoryMovement) -> MovementOut:
+    return MovementOut(
+        id=m.id,
+        item_id=m.item_id,
+        tipo=m.tipo,
+        cantidad_delta=m.cantidad_delta,
+        cantidad_final=m.cantidad_final,
+        motivo=m.motivo or "",
+        created_at=m.created_at.isoformat() if m.created_at else None,
+    )
+
+
+def _record_movement(db: Session, item: InventoryItem, tipo: str, delta: int, motivo: str) -> None:
+    db.add(
+        InventoryMovement(
+            item_id=item.id,
+            tipo=tipo,
+            cantidad_delta=delta,
+            cantidad_final=item.quantity,
+            motivo=motivo,
+        )
+    )
 
 
 def _out(r: InventoryItem) -> ItemOut:
@@ -118,6 +166,11 @@ def list_items(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # S1 (Fase 1 mejoras-v1, tarea 5): cliente vinculado -> 403, como
+    # en CRM/facturas/correos. El gate require_modulo del router ya lo
+    # bloquea; esto es defensa en profundidad, igual que en el resto
+    # de routers de negocio.
+    deny_linked_reader(db, user)
     rows = db.query(InventoryItem).order_by(InventoryItem.name.asc(), InventoryItem.id.asc()).offset(offset).limit(limit).all()
     return [_out(r) for r in rows]
 
@@ -145,6 +198,12 @@ def create_item(
     db.add(row)
     db.commit()
     db.refresh(row)
+    # Stock inicial: queda registrado como entrada (sin él, un producto
+    # creado con 10 unidades no tendría ningún movimiento en su historial).
+    if row.quantity > 0:
+        _record_movement(db, row, "entrada", row.quantity, "Stock inicial")
+        db.commit()
+        db.refresh(row)
     return _out(row)
 
 
@@ -169,7 +228,12 @@ def update_item(
         row.sku = payload.sku.strip()
     if payload.quantity is not None:
         _validate_non_negative(payload.quantity, "La cantidad")
-        row.quantity = payload.quantity
+        if payload.quantity != row.quantity:
+            delta = payload.quantity - row.quantity
+            row.quantity = payload.quantity
+            _record_movement(
+                db, row, "ajuste", delta, (payload.motivo or "").strip() or "Ajuste manual"
+            )
     if payload.unit is not None:
         row.unit = _validate_unit(payload.unit)
     if payload.unit_price is not None:
@@ -182,6 +246,72 @@ def update_item(
     return _out(row)
 
 
+@router.get("/items/{item_id}/movimientos", response_model=list[MovementOut])
+def list_movements(
+    item_id: int,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deny_linked_reader(db, user)
+    row = db.get(InventoryItem, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    rows = (
+        db.query(InventoryMovement)
+        .filter(InventoryMovement.item_id == item_id)
+        .order_by(InventoryMovement.created_at.desc(), InventoryMovement.id.desc())
+        .offset(offset).limit(limit).all()
+    )
+    return [_movement_out(m) for m in rows]
+
+
+@router.post("/items/{item_id}/movimientos", response_model=MovementOut, status_code=status.HTTP_201_CREATED)
+def add_movement(
+    item_id: int,
+    payload: MovementCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Movimiento explícito: aplica el delta al stock y lo registra.
+
+    Una venta es un delta negativo; el stock resultante nunca baja de
+    0 (vender más de lo que hay es 422, no un negativo silencioso).
+    El tipo debe ser coherente con el signo: venta con delta positivo
+    o entrada con delta negativo son 422.
+    """
+    row = db.get(InventoryItem, item_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    tipo = (payload.tipo or "").strip().lower()
+    if tipo not in MOVEMENT_TYPES:
+        raise HTTPException(
+            status_code=422, detail="El tipo debe ser uno de: " + ", ".join(MOVEMENT_TYPES) + "."
+        )
+    if payload.cantidad == 0:
+        raise HTTPException(status_code=422, detail="La cantidad no puede ser 0.")
+    if tipo == "venta" and payload.cantidad > 0:
+        raise HTTPException(status_code=422, detail="Una venta resta stock: la cantidad debe ser negativa.")
+    if tipo == "entrada" and payload.cantidad < 0:
+        raise HTTPException(status_code=422, detail="Una entrada suma stock: la cantidad debe ser positiva.")
+    nuevo = row.quantity + payload.cantidad
+    if nuevo < 0:
+        raise HTTPException(status_code=422, detail="No hay suficiente stock para ese movimiento.")
+    row.quantity = nuevo
+    _record_movement(db, row, tipo, payload.cantidad, payload.motivo.strip() or "Movimiento manual")
+    db.commit()
+    db.refresh(row)
+    mov = (
+        db.query(InventoryMovement)
+        .filter(InventoryMovement.item_id == item_id)
+        .order_by(InventoryMovement.id.desc())
+        .first()
+    )
+    assert mov is not None
+    return _movement_out(mov)
+
+
 @router.delete("/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(
     item_id: int,
@@ -191,6 +321,11 @@ def delete_item(
     row = db.get(InventoryItem, item_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Item not found")
+    # El historial se borra con el producto: la FK CASCADE lo cubre en
+    # Postgres, pero en SQLite el pragma de FK no está activado, así que
+    # se borra explícito para no dejar movimientos huérfanos que un
+    # futuro producto reutilizando el id heredaría.
+    db.query(InventoryMovement).filter(InventoryMovement.item_id == item_id).delete()
     db.delete(row)
     db.commit()
     return None

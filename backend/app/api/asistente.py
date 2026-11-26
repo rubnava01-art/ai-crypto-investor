@@ -84,6 +84,7 @@ from app.core.security import (
     get_current_principal,
     get_current_user,
     guest_read_guard,
+    is_super_admin,
     require_admin,
 )
 from app.data import ingest
@@ -92,6 +93,8 @@ from app.indicators import technical as ind
 from app.internet import buscar_en_internet
 from app.models.tables import (
     Appointment,
+    AsistenteFeedback,
+    AsistenteUsoDiario,
     BusinessNote,
     BusinessTask,
     Contact,
@@ -119,6 +122,142 @@ TZ_LA = ZoneInfo("America/Los_Angeles")
 # (20/min, como ai_ask). Clave solo por usuario: sobrevive al proxy
 # de Render, donde la IP colapsa (ver rate_limit.py).
 asistente_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+# ------------------------------------------------- límites por plan (Fase 6) --
+# PROPUESTA PENDIENTE DE CONFIRMACIÓN DEL DUEÑO (Fase 6, tarea 1):
+# estos límites NO están aprobados por Rubén; son valores
+# conservadores de partida. El dueño debe confirmarlos o cambiarlos
+# antes de publicar la Fase 6. UN SOLO SITIO: cambiar un número aquí
+# cambia el límite en el chat y en GET /api/asistente/uso.
+# Día = día natural UTC (toda la BD guarda en UTC); al cambiar de día
+# el contador vuelve a cero porque la fila es otra (ver
+# AsistenteUsoDiario). La subida de plan hoy la hace el administrador
+# (no hay pago en línea: la Fase 7 la prepara); el 429 lo dice así,
+# sin prometer nada que no exista.
+LIMITES_MENSAJES_POR_DIA: dict[str, int] = {
+    "prueba": 10,        # rol prueba / sin plan elegido
+    "esencial": 50,      # Esencial $19/mes
+    "crecimiento": 200,  # Crecimiento $49/mes
+    "total": 1000,       # Negocio Total $99/mes
+}
+NOMBRES_PLAN: dict[str, str] = {
+    "prueba": "Prueba",
+    "esencial": "Esencial ($19/mes)",
+    "crecimiento": "Crecimiento ($49/mes)",
+    "total": "Negocio Total ($99/mes)",
+}
+_PLANES_VALIDOS = frozenset(LIMITES_MENSAJES_POR_DIA)
+
+
+def _plan_usuario(user: User, db: Session) -> tuple[str, int | None]:
+    """(clave de plan, límite diario o None si no tiene límite).
+
+    admin/super_admin: SIN límite (operan la plataforma; documentado,
+    no es un olvido). El resto: la SUSCRIPCIÓN vigente manda si la
+    hay con acceso (Fase 7: plan de la suscripción, no solo el
+    elegido al registrarse); si hay fila de suscripción SIN acceso
+    (en_pausa, vencida o fin de periodo pasado), el plan es
+    "prueba" — User.requested_plan NO se usa en ese caso
+    (corrección QA H2-1 Fase 7, 2026-11-25); si no hay fila,
+    User.requested_plan ("esencial"|"crecimiento"|"total", elegido
+    al registrarse); sin plan o con un valor desconocido ->
+    "prueba". Una suscripción vencida o en pausa NO sube el límite:
+    se cae a prueba, no al plan elegido."""
+    if user.is_admin or is_super_admin(user, db):
+        return "admin", None
+    from app.api.suscripciones import clave_plan_asistente_para_usuario
+
+    clave_sub = clave_plan_asistente_para_usuario(db, user)
+    clave = clave_sub or (user.requested_plan or "").strip().lower()
+    if clave not in _PLANES_VALIDOS:
+        clave = "prueba"
+    return clave, LIMITES_MENSAJES_POR_DIA[clave]
+
+
+def _hoy_utc() -> dt.date:
+    return dt.datetime.now(dt.timezone.utc).date()
+
+
+def _mensajes_hoy(db: Session, user_id: int) -> int:
+    row = (
+        db.query(AsistenteUsoDiario)
+        .filter(AsistenteUsoDiario.user_id == user_id,
+                AsistenteUsoDiario.fecha == _hoy_utc())
+        .first()
+    )
+    return int(row.mensajes) if row is not None else 0
+
+
+def _incrementar_cupo(db: Session, user_id: int, limite: int | None) -> int | None:
+    """Suma 1 al contador de hoy y devuelve el total nuevo, o None
+    si el límite ya estaba alcanzado (el mensaje rechazado NO se
+    cuenta).
+
+    Corrección QA H3 (condición de carrera): antes se leía el total
+    y luego se escribía en dos pasos; dos peticiones concurrentes
+    junto al límite podían pasar el chequeo a la vez y sobrepasarlo
+    en 1–2 mensajes. Ahora el chequeo y el incremento son UNA sola
+    sentencia atómica (INSERT ... ON CONFLICT DO UPDATE ... WHERE
+    mensajes < limite RETURNING mensajes), posible porque
+    `asistente_uso_diario` tiene la restricción única (user_id,
+    fecha). El mismo SQL vale en SQLite (tests) y en Postgres
+    (producción): mismo precedente que `app/data/ingest.py`
+    (upsert con `on_conflict_do_update` por dialecto). Con limite
+    None (admin, sin límite) el incremento es incondicional."""
+    hoy = _hoy_utc()
+    dialect = db.bind.dialect.name if db.bind else "sqlite"
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        stmt = pg_insert(AsistenteUsoDiario)
+    else:
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        stmt = sqlite_insert(AsistenteUsoDiario)
+    stmt = stmt.values(user_id=user_id, fecha=hoy, mensajes=1)
+    if limite is None:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "fecha"],
+            set_={"mensajes": AsistenteUsoDiario.mensajes + 1},
+        )
+    else:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["user_id", "fecha"],
+            set_={"mensajes": AsistenteUsoDiario.mensajes + 1},
+            where=AsistenteUsoDiario.mensajes < limite,
+        )
+    row = db.execute(stmt.returning(AsistenteUsoDiario.mensajes)).fetchone()
+    db.commit()
+    return int(row[0]) if row is not None else None
+
+
+def _segundos_hasta_manana_utc() -> int:
+    ahora = dt.datetime.now(dt.timezone.utc)
+    manana = (ahora + dt.timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    return max(60, int((manana - ahora).total_seconds()))
+
+
+def _verificar_limite(db: Session, user: User) -> tuple[str, int | None, int]:
+    """Comprueba el límite diario ANTES de responder: si hay cupo,
+    cuenta el mensaje y devuelve (plan, límite, mensajes_hoy).
+    Si no hay cupo, lanza 429 en español con el límite, el plan
+    actual y la vía de subida (el administrador). El 429 NO se
+    cuenta como mensaje. El invitado no pasa por aquí (sin user_id:
+    su tope es el limiter por minuto). El chequeo y el conteo son
+    una sola sentencia atómica (ver _incrementar_cupo)."""
+    clave, limite = _plan_usuario(user, db)
+    hoy = _incrementar_cupo(db, user.id, limite)
+    if hoy is None:
+        raise too_many_requests(
+            f"Has llegado a tu límite diario del Asistente: {limite} "
+            f"mensajes al día en tu plan {NOMBRES_PLAN[clave]}. Vuelve "
+            "mañana o pídele al administrador que suba tu plan "
+            "(Esencial, Crecimiento o Negocio Total); la subida la "
+            "hace el administrador.",
+            _segundos_hasta_manana_utc(),
+        )
+    return clave, limite, hoy
 
 # ------------------------------------------------------------------ catálogo --
 
@@ -355,6 +494,86 @@ def _contiene_prohibido(norm: str) -> bool:
     ):
         return True
     return False
+
+
+# --------------------------------------- consejo financiero (Fase 6, tarea 4) --
+# Patrones de CONSEJO PERSONALIZADO (texto ya normalizado: minúsculas,
+# sin acentos). Se comprueban DESPUÉS de _PROHIBIDO (una orden explícita
+# "compra bitcoin" ya cae en ese bloqueo) y ANTES de las reglas enseñadas
+# (una regla nunca puede reabrir el consejo personalizado, igual que
+# F2-4 con lo prohibido). Solo cubren preguntas que piden una decisión
+# sobre EL DINERO DEL USUARIO ("¿debo comprar?", "¿cuánto invierto?",
+# "¿qué hago con mi cartera?"); NO cubren consultas educativas
+# ("¿qué es el RSI?", "analiza el mercado", "¿cuánto vale el bitcoin?",
+# "recomiéndame un curso").
+_PATRONES_CONSEJO: tuple[str, ...] = (
+    r"\bdebo (comprar|vender|invertir|mantener)\b",
+    r"\bdeberia (comprar|vender|invertir|mantener)\b",
+    r"\bconviene (comprar|vender|invertir)\b",
+    r"\bcuanto (invierto|meto|pongo)\b",
+    r"\bcuanto\b.{0,20}\binvertir\b",
+    r"\ben que (invierto|inviert|debo invertir)\b",
+    r"\bdonde (invierto|inviert|debo invertir)\b",
+    r"\brecomiend\w*\b.{0,50}\b(invertir|inversion|btc|bitcoin|eth|ethereum|cripto|cartera|acciones?|fondos?)\b",
+    r"\bque hago con mi (cartera|dinero|inversion|ahorros|plata)\b",
+    r"\bmi cartera\b.{0,40}\b(vendo|compro|invierto|hago|mantengo)\b",
+    r"\bes buen momento para (comprar|vender|invertir)\b",
+    r"\bshould i (buy|sell|invest)\b",
+    r"\bhow much should i invest\b",
+)
+
+
+# Productos propios (corrección QA H2, Fase 6): "¿debo comprar el
+# manual de WhatsApp?" o "¿debo comprar un curso?" NO son consejo
+# de inversión: preguntan por un producto de la plataforma
+# (manual $19.99, academia $400) y deben llegar a la
+# biblioteca/Estudiar, no a la negativa de asesoría. Vía elegida:
+# exclusión explícita del objeto — el chequeo de consejo se salta
+# solo cuando el verbo (debo/debería/conviene + comprar/vender/
+# invertir/mantener) lleva como objeto un producto propio
+# (curso/manual/academia/libro/guía/pack/ebook) a menos de 40
+# caracteres. Es deliberadamente amplia hacia el producto: una
+# pregunta mixta ("¿debo comprar bitcoin o el manual?") va a la
+# biblioteca en vez de a la negativa. Lo que NO es producto propio
+# sigue bloqueado: "¿debo comprar bitcoin?", "¿debo vender mis
+# ETH?" y "¿debo vender mi casa?" (la casa es una decisión
+# patrimonial, no un producto de la plataforma).
+_PRODUCTOS_PROPIOS: tuple[str, ...] = (
+    "manual", "manuales", "curso", "cursos", "academia",
+    "libro", "libros", "guia", "guias", "pack", "ebook", "ebooks",
+)
+_RE_PRODUCTO_PROPIO = re.compile(
+    r"\b(debo|deberia|conviene)\s+(comprar|vender|invertir|mantener)\b"
+    r".{0,40}\b(" + "|".join(_PRODUCTOS_PROPIOS) + r")\b"
+)
+
+
+def _es_consejo_personalizado(norm: str) -> bool:
+    """True si el mensaje pide consejo financiero personalizado."""
+    if _RE_PRODUCTO_PROPIO.search(norm):
+        return False
+    return any(re.search(p, norm) for p in _PATRONES_CONSEJO)
+
+
+def _h_consejo_personalizado() -> dict:
+    """Negativa a dar consejo personalizado (Fase 6, tarea 4): en
+    español, con recordatorio de simulación/no asesoría y sugerencia
+    de contenido educativo (Estudiar) o herramientas. No es
+    sin_respuesta (la pregunta SÍ se responde, con la negativa) y no
+    va a la bandeja: el admin no puede "enseñar" una respuesta de
+    consejo personalizado."""
+    return _respuesta(
+        "No puedo darte consejos financieros personalizados: no sé tu "
+        "situación, tus objetivos ni tu tolerancia al riesgo, y este "
+        "asistente no es asesoría financiera. Todo lo que ves aquí es "
+        "simulación y datos reales de la plataforma, nunca una "
+        "recomendación de inversión. Si quieres aprender, en Estudiar "
+        "(/estudiar) tienes los cursos y manuales, y en Clases las "
+        "herramientas: calculadora de interés compuesto, conversor "
+        "BTC/USD, gráfica e indicadores. También puedes pedirme un "
+        "análisis con datos reales: «Analiza el mercado».",
+        sugerencias=["Analiza el mercado", "¿Qué clases hay?", "¿Cuánto vale el bitcoin?"],
+    )
 
 
 def _sugerencia_obj(s) -> dict:
@@ -1522,16 +1741,24 @@ def _sin_respuesta_rapida(norm: str) -> bool:
 def _h_sin_respuesta(motivo: str | None = None) -> dict:
     """Respuesta estándar cuando nada respondió (va a la bandeja).
 
+    Fase 6, tarea 2: el fallback es explícito — "No sé" + "no tengo
+    una fuente para responder eso" — y sugiere qué preguntar o dónde
+    buscar en la plataforma. NUNCA se inventa una respuesta: si
+    ninguna fuente (reglas, intenciones, ayuda, biblioteca, Internet)
+    cubre la pregunta, se declara la ausencia.
+
     F3-5: `motivo` dice por qué no hubo respuesta: "via_rapida"
     (saludo/sinsentido, sin viajar a Internet),
     "internet_sin_resultado" (Internet no devolvió nada útil) o
     "biblioteca_sin_resultado" (se buscó en Estudiar y no había nada)."""
     return _respuesta(
-        "No encontré información sobre eso. Puedo consultar precios, "
-        "señales y análisis del mercado, listar clases y novedades, y "
-        "(si eres admin) crear notas, tareas, borradores y citas. Tu "
-        "pregunta quedó registrada para que el administrador le enseñe "
-        "una respuesta al asistente.",
+        "No sé — no tengo una fuente para responder eso. Puedo "
+        "consultar precios, señales y análisis del mercado, listar "
+        "clases y novedades, y (si eres admin) crear notas, tareas, "
+        "borradores y citas; o busca el tema en Estudiar (/estudiar) "
+        "o pregúntame «¿Qué puedes hacer?» para ver todo lo que sé "
+        "hacer. Tu pregunta quedó registrada para que el "
+        "administrador le enseñe una respuesta al asistente.",
         sin_respuesta=True,
         motivo=motivo,
         sugerencias=_SUGERENCIAS_LECTURA,
@@ -1746,11 +1973,13 @@ def _h_biblioteca_sin_resultado(mensaje: str) -> dict:
     """Respuesta F4-07: sin_respuesta con motivo
     "biblioteca_sin_resultado" y texto explícito de "sin resultados
     en la biblioteca". No se listan recursos relacionados como si
-    fueran la respuesta."""
+    fueran la respuesta. Fase 6, tarea 2: mismo "No sé" explícito
+    que el fallback general."""
     return _respuesta(
-        "No encontré ese recurso en la biblioteca: sin resultados en "
-        f"la biblioteca para «{mensaje}». Prueba con otro título o "
-        "pregunta «¿Qué manuales hay?» para ver los disponibles.",
+        "No sé — no tengo una fuente para responder eso: sin "
+        f"resultados en la biblioteca para «{mensaje}». Prueba con "
+        "otro título o pregunta «¿Qué manuales hay?» para ver los "
+        "disponibles.",
         sin_respuesta=True,
         motivo="biblioteca_sin_resultado",
         sugerencias=_SUGERENCIAS_LECTURA,
@@ -2002,6 +2231,107 @@ def capacidades(principal: Principal = Depends(guest_read_guard),
     return {"comandos": COMANDOS}
 
 
+@router.get("/uso")
+def uso_asistente(user: User = Depends(get_current_user),
+                  db: Session = Depends(get_db)):
+    """Uso diario del Asistente del usuario actual (Fase 6, tarea 1):
+    plan, límite, mensajes de hoy y restantes. Admin/super_admin:
+    límite null (sin límite); mensajes_hoy es su conteo real,
+    informativo. El invitado no tiene fila: 401 (usa get_current_user)."""
+    clave, limite = _plan_usuario(user, db)
+    hoy = _mensajes_hoy(db, user.id)
+    return {
+        "plan": clave,
+        "plan_nombre": (
+            "Administrador (sin límite)" if limite is None
+            else NOMBRES_PLAN[clave]
+        ),
+        "limite_diario": limite,
+        "mensajes_hoy": hoy,
+        "restantes": None if limite is None else max(0, limite - hoy),
+        "fecha": _hoy_utc().isoformat(),
+    }
+
+
+# ------------------------------------------------- feedback (Fase 6, tarea 3) --
+
+class FeedbackIn(BaseModel):
+    pregunta: str = Field("", max_length=1000)
+    voto: str = Field("", max_length=8)
+
+
+@router.post("/feedback", status_code=status.HTTP_201_CREATED)
+def dar_feedback(payload: FeedbackIn,
+                 principal: Principal = Depends(get_current_principal),
+                 db: Session = Depends(get_db)):
+    """Voto útil / no útil sobre una respuesta del Asistente.
+
+    Se guarda SOLO pregunta + voto + usuario + fecha (nunca la
+    respuesta del asistente ni la conversación completa: ver
+    AsistenteFeedback). Un "no_util" re-registra la pregunta en la
+    bandeja del admin (GET /preguntas) para enseñarle una respuesta;
+    el invitado vota pero no entra en la bandeja (misma regla que
+    las preguntas "no sé": un anónimo podría llenarla de spam)."""
+    pregunta = (payload.pregunta or "").strip()
+    voto = (payload.voto or "").strip().lower()
+    if not pregunta:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La pregunta no puede estar vacía.",
+        )
+    if voto not in ("util", "no_util"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El voto debe ser 'util' o 'no_util'.",
+        )
+    user_id = None if isinstance(principal, Guest) else principal.id
+    fila = AsistenteFeedback(user_id=user_id, pregunta=pregunta[:1000], voto=voto)
+    db.add(fila)
+    db.commit()
+    db.refresh(fila)
+    if voto == "no_util" and not isinstance(principal, Guest):
+        _registrar_pregunta(db, pregunta[:1000])
+    return {"id": fila.id, "voto": fila.voto, "creado_en": _iso(fila.creado_en)}
+
+
+@router.get("/feedback")
+def listar_feedback(
+    voto: str | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Registro de votos del Asistente (solo admin). Las preguntas
+    marcadas "no útil" son preguntas sin respuesta que el admin debe
+    enseñar (las "no sé" ya están en GET /preguntas, y cada "no útil"
+    de un usuario también re-entra ahí). Filtro opcional por voto."""
+    q = db.query(AsistenteFeedback)
+    if voto:
+        q = q.filter(AsistenteFeedback.voto == voto)
+    rows = (
+        q.order_by(AsistenteFeedback.creado_en.desc(),
+                   AsistenteFeedback.id.desc())
+        .offset(offset).limit(limit).all()
+    )
+    ids = [r.user_id for r in rows if r.user_id is not None]
+    nombres = (
+        {u.id: u.username for u in
+         db.query(User).filter(User.id.in_(ids)).all()}
+        if ids else {}
+    )
+    return [
+        {
+            "id": f.id,
+            "pregunta": f.pregunta,
+            "voto": f.voto,
+            "usuario": nombres.get(f.user_id) if f.user_id is not None else "invitado",
+            "creado_en": _iso(f.creado_en),
+        }
+        for f in rows
+    ]
+
+
 @router.post("/chat")
 def chat(payload: ChatIn, request: Request,
          principal: Principal = Depends(get_current_principal),
@@ -2048,6 +2378,21 @@ def chat(payload: ChatIn, request: Request,
         if replay is not None:
             _status, stored = replay
             return {**stored, "idempotent_replay": True}
+    # Fase 6, tarea 1: límite diario por plan (solo usuarios con
+    # fila; el invitado no se cuenta: su tope es el limiter por
+    # minuto). Después del replay idempotente (un reintento no es un
+    # mensaje nuevo) y antes de despachar: cada mensaje aceptado
+    # cuenta, responda lo que responda (incluidos "no sé", consejo
+    # personalizado y solo-lectura); el 429 por límite no se cuenta.
+    if not isinstance(principal, Guest):
+        _verificar_limite(db, user)
+        # Fase 8 mejoras-v1, tarea 3: el mensaje quedó aceptado (el
+        # replay idempotente y el 429 ya pasaron por encima): registra
+        # "primera_herramienta" (solo la primera vez) y "uso_semanal"
+        # (una vez por semana ISO). Nunca se guarda la pregunta.
+        from app.core import analitica
+
+        analitica.registrar_uso_asistente(db, user.id)
     # (0) Pregunta de ayuda "¿cómo...?": ANTES que prohibidos, para
     # que "¿cómo cambio mi clave?" reciba los pasos (test 2026-11-23)
     # y la ORDEN imperativa ("cambia mi clave a X") caiga en el
@@ -2061,6 +2406,10 @@ def chat(payload: ChatIn, request: Request,
         return _completar(
             _respuesta(_RESPUESTA_PROHIBIDO, sugerencias=_SUGERENCIAS_LECTURA),
             confianza=95)
+    # (a0.5) Fase 6, tarea 4: consejo financiero personalizado,
+    # ANTES que las reglas enseñadas (una regla nunca puede reabrirlo).
+    if _es_consejo_personalizado(norm):
+        return _completar(_h_consejo_personalizado(), confianza=95)
     # (a) Reglas enseñadas por el admin (caché de activas, F2-10).
     regla = _regla_activa(db, norm)
     if regla is not None:

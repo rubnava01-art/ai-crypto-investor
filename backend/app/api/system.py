@@ -9,9 +9,10 @@ network call), and health carries the build git_sha + timestamp so a
 stale Render deploy is visible instead of guessed.
 """
 import datetime as dt
+import os
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app import database
@@ -40,8 +41,52 @@ def _database_status() -> str:
         return "error"
 
 
+def _alembic_head() -> str:
+    """Revisión cabeza de Alembic según los archivos de migración
+    (sin tocar la BD). "unknown" si no hay una única cabeza."""
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        backend_dir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        cfg = Config()
+        cfg.set_main_option(
+            "script_location", os.path.join(backend_dir, "alembic")
+        )
+        heads = ScriptDirectory.from_config(cfg).get_heads()
+        return heads[0] if len(heads) == 1 else "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _estado_migraciones(head: str) -> str:
+    """Compara la revisión aplicada en la BD con la cabeza.
+
+    "al_dia" si coinciden, "pendientes" si la BD va por detrás (o
+    por delante), "desconocido" si no hay tabla alembic_version (BD
+    creada con create_all, como en tests) o no se pudo consultar.
+    """
+    if head == "unknown":
+        return "desconocido"
+    try:
+        with database.engine.connect() as conn:
+            if "alembic_version" not in inspect(conn).get_table_names():
+                return "desconocido"
+            row = conn.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).fetchone()
+        if row is None:
+            return "desconocido"
+        return "al_dia" if row[0] == head else "pendientes"
+    except Exception:
+        return "desconocido"
+
+
 @router.get("/api/health", response_model=HealthResponse)
 def health():
+    head = _alembic_head()
     return HealthResponse(
         version=settings.app_version,
         mode="live" if settings.real_trading_enabled else "demo",
@@ -49,6 +94,8 @@ def health():
         git_sha=build_git_sha(),
         built_utc=build_timestamp_utc(),
         database=_database_status(),
+        alembic_head=head,
+        migraciones=_estado_migraciones(head),
     )
 
 

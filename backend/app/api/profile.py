@@ -18,6 +18,8 @@ import binascii
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import effective_role, get_current_user, require_admin
@@ -46,6 +48,8 @@ class ProfileOut(BaseModel):
     business_handle: str | None = None
     business_description: str | None = None
     skills: list[str] | None = None
+    # Fase 1 mejoras-v1, tarea 1: verificación de correo.
+    email_verified: bool = False
 
 
 class ProfileUpdate(BaseModel):
@@ -120,6 +124,7 @@ def _out(u: User, db: Session) -> ProfileOut:
         business_handle=u.business_handle,
         business_description=u.business_description,
         skills=list(u.skills) if u.skills else None,
+        email_verified=bool(u.email_verified),
     )
 
 
@@ -194,7 +199,42 @@ def update_my_profile(
     if payload.display_name is not None:
         user.display_name = payload.display_name.strip() or None
     if payload.email is not None:
-        user.email = _validate_email(payload.email) or None
+        new_email = _validate_email(payload.email) or None
+        if new_email != user.email:
+            # F2 (corrección Fase 1 mejoras-v1): el correo es único
+            # entre cuentas (uq_users_email). Sin este chequeo, cambiar
+            # el correo en el perfil podía duplicar el de otra cuenta.
+            if new_email and (
+                db.query(User)
+                .filter(
+                    func.lower(User.email) == new_email.lower(),
+                    User.id != user.id,
+                )
+                .first()
+                is not None
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe una cuenta con ese correo electrónico.",
+                )
+            # Fase 1 mejoras-v1, tarea 1: cambiar el correo invalida la
+            # verificación anterior. Un no-admin queda sin verificar y
+            # recibe un token nuevo (encolado, stub sin envío real);
+            # el admin es operador de confianza y queda verificado.
+            user.email = new_email
+            if new_email:
+                if user.is_admin:
+                    user.email_verified = True
+                else:
+                    user.email_verified = False
+                    db.flush()
+                    from app.core.email_verification import (
+                        issue_verification_token,
+                    )
+
+                    issue_verification_token(db, user)
+            else:
+                user.email_verified = False
     if payload.address is not None:
         user.address = payload.address.strip() or None
     if payload.avatar_data_url is not None:
@@ -211,7 +251,16 @@ def update_my_profile(
     if payload.skills is not None:
         cleaned_skills = _clean_skills(payload.skills)
         user.skills = cleaned_skills if cleaned_skills else None
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Carrera en el correo (uq_users_email): otra petición lo tomó
+        # entre el chequeo y el commit.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta con ese correo electrónico.",
+        ) from None
     db.refresh(user)
     return _out(user, db)
 

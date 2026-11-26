@@ -3,9 +3,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ageInMinutes,
   buildMonthGrid,
   combineDateTimeToIso,
   dateKeyInTz,
+  formatDateOnly,
   toDateInputValue,
   toTimeInputValue,
   tzParts,
@@ -64,4 +66,21 @@ test("buildMonthGrid: febrero 2026 (28 días, 1 feb domingo) ocupa 5 semanas", (
   assert.equal(weeks.length, 5);
   assert.equal(weeks[0][0].key, "2026-01-26");
   assert.equal(weeks.flat().filter((d) => d.inMonth).length, 28);
+});
+
+test("formatDateOnly no corre el día por zona horaria", () => {
+  assert.equal(formatDateOnly("2026-11-25", "es-MX"), "25 nov");
+  assert.equal(formatDateOnly("2026-01-05", "es-MX"), "5 ene");
+  assert.equal(formatDateOnly(null), "");
+  assert.equal(formatDateOnly(""), "");
+});
+
+test("ageInMinutes: antigüedad de un precio en caché (Fase 5a, tarea 1)", () => {
+  const now = new Date("2026-11-25T20:00:00Z").getTime();
+  assert.equal(ageInMinutes("2026-11-25T19:55:30Z", now), 4);
+  assert.equal(ageInMinutes("2026-11-25T20:00:00Z", now), 0);
+  // Un instante futuro no da negativo: se muestra como recién llegado.
+  assert.equal(ageInMinutes("2026-11-25T20:05:00Z", now), 0);
+  assert.equal(ageInMinutes(null, now), null);
+  assert.equal(ageInMinutes("no-es-fecha", now), null);
 });

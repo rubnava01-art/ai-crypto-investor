@@ -25,7 +25,17 @@ export function PlanesCompare() {
     <div className="mt-8">
       <h3 className="text-lg font-bold text-slate-50">{l.compareTitle}</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-400">{l.compareIntro}</p>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur">
+      {/* 3.3 (2026-11-26): scroll horizontal con indicador visual
+          (.fintech-scroll-x desvanece el borde derecho) y región
+          enfocable por teclado (tabIndex 0 + role region): en móvil
+          la tabla (min-w 560 px) no cabe y se desplaza; el resto de
+          tablas de la plataforma colapsa a tarjetas en móvil. */}
+      <div
+        className="fintech-scroll-x mt-4 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur"
+        tabIndex={0}
+        role="region"
+        aria-label={l.compareTitle}
+      >
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <caption className="sr-only">{l.compareTitle}</caption>
           <thead>
@@ -63,7 +73,7 @@ export function PlanesCompare() {
                       </span>
                     ) : (
                       <span>
-                        <span aria-hidden="true" className="text-slate-600">—</span>
+                        <span aria-hidden="true" className="text-zinc-400">—</span>
                         <span className="sr-only">{l.compareNo}</span>
                       </span>
                     )}

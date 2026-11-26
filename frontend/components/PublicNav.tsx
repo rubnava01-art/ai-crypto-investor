@@ -7,12 +7,13 @@ import { LanguageToggle, useLanguage } from "../lib/i18n";
 import { getToken } from "../lib/api";
 
 /** Menú público (2026-11-12): lo que ve un visitante sin sesión.
- * Ítems — Inicio, Herramientas, Planes, Contacto, Registrarse, Login —
- * y nada más (TBT-Herramientas, FASE 2, A-3, 2026-11-24: se añaden
- * Herramientas y Planes; antes eran cuatro). Inicio va a la landing (/),
- * Herramientas a /herramientas, Planes a /planes, Contacto a /contacto,
- * Registrarse a /login?mode=register (la página de login preselecciona
- * el modo registro con ese parámetro) y Login a /login. Sin props
+ * Seis ítems — Inicio, Herramientas, Planes, Contacto, Registrarse,
+ * Login — y nada más (TBT-Herramientas, FASE 2, A-3, 2026-11-24: se
+ * añaden Herramientas y Planes; antes eran cuatro). Inicio va a la
+ * landing (/), Herramientas a /herramientas, Planes a /planes (pública
+ * desde Fase 4 mejoras-v1, tarea 2), Contacto a /contacto, Registrarse
+ * a /login?mode=register (la página de login preselecciona el modo
+ * registro con ese parámetro) y Login a /login. Sin props
  * obligatorias: la landing lo usa y la página de login lo reutiliza
  * después (export nombrado estable). En móvil los ítems van en una fila
  * con desplazamiento horizontal si no caben; cada objetivo táctil mide

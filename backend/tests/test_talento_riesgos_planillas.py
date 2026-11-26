@@ -284,10 +284,35 @@ def test_migration_single_head_and_new_tables(tmp_path):
     heads = script.get_heads()
     assert len(heads) == 1, heads
     head_rev = script.get_revision(heads[0])
-    # 2026-11-25 (mensajes de contacto): la tabla contact_messages es
-    # la nueva cabeza.
-    assert head_rev.revision == "ef98abd287f8"
-    assert head_rev.down_revision == "b7c3e91a4f02"
+    # 2026-11-21 (borrado de usuarios): la migración de ondelete en
+    # las FK a users es la nueva cabeza.
+    # 2026-11-25 (Fase 1 mejoras-v1, tarea 3): la cabeza es la
+    # migración del 2FA TOTP.
+    # 2026-11-25 (Fase 1 mejoras-v1, corrección F2): la cabeza es la
+    # migración de users.email UNIQUE.
+    # 2026-11-25 (Fase 2 mejoras-v1, tarea 1): la cabeza es la
+    # migración de users.terms_accepted_at.
+    # 2026-11-25 (Fase 5a mejoras-v1, tarea 4): la cabeza es la
+    # migración de edu_progress (progreso por usuario y clase).
+    # 2026-11-25 (Fase 5a mejoras-v1, tarea 5): la cabeza es la
+    # migración de edu_quiz_questions y edu_quiz_attempts (quizzes).
+    # 2026-11-25 (Fase 5b mejoras-v1, tareas 1-4): la cabeza es la
+    # migración de riesgos.fecha_revision (la última de la cadena
+    # a51b00000001 CRM -> a51b00000002 movimientos -> a51b00000003).
+    # 2026-11-25 (Fase 6 mejoras-v1, tareas 1 y 3): la cabeza es la
+    # migración de asistente_feedback (cadena a51b00000004 uso diario
+    # del Asistente -> a51b00000005 feedback).
+    # 2026-11-25 (Fase 7 mejoras-v1, tarea 1): la cabeza es la
+    # migración de suscripciones (a51b00000006).
+    # 2026-11-25 (Fase 8 mejoras-v1, tareas 3 y 4): la cabeza es la
+    # migración de eventos de analítica, email_envios y
+    # users.last_login_at (a51b00000007).
+    # 2026-11-26 (fusión mejoras-todas): la rama remota sync #72
+    # terminaba en ef98abd287f8 (contact_messages), segunda cabeza
+    # tras el merge; la revisión de fusión a51b00000008 une ambas
+    # cabezas y es la única cabeza.
+    assert head_rev.revision == "a51b00000008"
+    assert set(head_rev.down_revision) == {"a51b00000007", "ef98abd287f8"}
 
     # Fresh DB: upgrade head creates the three tables with model columns.
     db_file = tmp_path / "fresh.db"
@@ -302,15 +327,24 @@ def test_migration_single_head_and_new_tables(tmp_path):
         assert "planillas" in insp.get_table_names()
         assert "ajustes" in insp.get_table_names()
         assert "videos_educativos" in insp.get_table_names()
+        assert "edu_progress" in insp.get_table_names()
+        assert "edu_quiz_questions" in insp.get_table_names()
+        assert "edu_quiz_attempts" in insp.get_table_names()
+        assert "crm_stage_history" in insp.get_table_names()
+        assert "crm_reminders" in insp.get_table_names()
+        assert "inventory_movements" in insp.get_table_names()
+        assert "asistente_uso_diario" in insp.get_table_names()
+        assert "asistente_feedback" in insp.get_table_names()
+        assert "suscripciones" in insp.get_table_names()
         from app.models.tables import Base
 
-        for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos"):
+        for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos", "edu_progress", "edu_quiz_questions", "edu_quiz_attempts", "asistente_uso_diario", "asistente_feedback", "suscripciones"):
             got = {c["name"] for c in insp.get_columns(name)}
             want = set(Base.metadata.tables[name].columns.keys())
             assert got == want, name
         # New tables start EMPTY (no seed rows).
         with engine.connect() as conn:
-            for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos"):
+            for name in ("empleados", "riesgos", "planillas", "ajustes", "videos_educativos", "edu_progress", "edu_quiz_questions", "edu_quiz_attempts", "crm_stage_history", "crm_reminders", "inventory_movements", "asistente_uso_diario", "asistente_feedback", "suscripciones"):
                 assert conn.execute(sa.text(f"SELECT COUNT(*) FROM {name}")).scalar() == 0
         # Existing tables untouched: CRM contacts still have their columns.
         contact_cols = {c["name"] for c in insp.get_columns("crm_contacts")}
@@ -348,3 +382,45 @@ def test_migration_single_head_and_new_tables(tmp_path):
         assert [r[0] for r in rows] == ["Contacto Preexistente"]
     finally:
         engine2.dispose()
+
+
+# ---------- Fase 5b mejoras-v1, tarea 4: fecha de revisión ----------
+
+def test_riesgo_fecha_revision_crud(client, admin_headers):
+    h = admin_headers
+    r = client.post(
+        "/api/riesgos",
+        json={
+            "riesgo": "Revisión Test",
+            "probabilidad": "alta",
+            "impacto": "alto",
+            "responsable": "Rubén",
+            "fecha_revision": "2026-12-15",
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    riesgo = r.json()
+    assert riesgo["fecha_revision"] == "2026-12-15"
+    rid = riesgo["id"]
+
+    # Sin fecha en el alta: null, no una fecha inventada.
+    r = client.post("/api/riesgos", json={"riesgo": "Sin Fecha"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["fecha_revision"] is None
+    sin_fecha_id = r.json()["id"]
+
+    # Cambiar la fecha y borrarla con null (model_fields_set).
+    r = client.put(f"/api/riesgos/{rid}", json={"fecha_revision": "2027-01-10"}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["fecha_revision"] == "2027-01-10"
+    r = client.put(f"/api/riesgos/{rid}", json={"fecha_revision": None}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["fecha_revision"] is None
+    # Un PUT sin el campo no toca la fecha.
+    client.put(f"/api/riesgos/{rid}", json={"fecha_revision": "2027-02-01"}, headers=h)
+    r = client.put(f"/api/riesgos/{rid}", json={"estado": "mitigado"}, headers=h)
+    assert r.json()["fecha_revision"] == "2027-02-01"
+
+    client.delete(f"/api/riesgos/{rid}", headers=h)
+    client.delete(f"/api/riesgos/{sin_fecha_id}", headers=h)

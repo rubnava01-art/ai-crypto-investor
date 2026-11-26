@@ -117,7 +117,7 @@ def test_registro_duplicado_y_nuevo_cuerpo_identico(client, app):
         a, b = q.split(" + ")
         r = client.post("/api/auth/register", json={
             "username": username, "password": password,
-            "challenge_id": ch["challenge_id"], "answer": int(a) + int(b),
+            "challenge_id": ch["challenge_id"], "answer": int(a) + int(b), "terms_accepted": True,
         })
         assert r.status_code == 201, r.text
         bodies.append(r.json())
@@ -141,18 +141,22 @@ def test_registro_strip_422_y_login_strip(client, admin_headers):
     from pydantic import ValidationError
     from app.api.auth import RegisterRequest
     # Validador directo (sin gastar el límite de registro).
+    # H1 (corrección QA Fase 2, 2026-11-25): terms_accepted es
+    # obligatorio desde entonces; el flujo válido lo envía explícito.
     assert RegisterRequest(
-        username=" ruben ", password="x" * 12, challenge_id="c", answer=1
+        username=" ruben ", password="x" * 12, challenge_id="c", answer=1,
+        terms_accepted=True,
     ).username == "ruben"
     with pytest.raises(ValidationError):
-        RegisterRequest(username="   ", password="x" * 12, challenge_id="c", answer=1)
+        RegisterRequest(username="   ", password="x" * 12, challenge_id="c", answer=1,
+                        terms_accepted=True)
     assert LoginRequest(username=" ruben ", password="x").username == "ruben"
     with pytest.raises(ValidationError):
         LoginRequest(username="   ", password="x")
     # Por HTTP: el 422 de Pydantic llega antes que el challenge.
     r = client.post("/api/auth/register", json={
         "username": "   ", "password": "x" * 12,
-        "challenge_id": "cualquiera", "answer": 1,
+        "challenge_id": "cualquiera", "answer": 1, "terms_accepted": True,
     })
     assert r.status_code == 422, r.text
     # Login con espacios alrededor del admin: entra como "admin".

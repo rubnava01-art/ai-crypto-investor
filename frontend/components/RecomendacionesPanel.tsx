@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type MeResponse, type Recommendation, type RecommendationCategory } from "../lib/api";
+import { api, type MeResponse, type Recommendation, type RecommendationCategory } from "../lib/api";
 import { Panel } from "./Panel";
 import { useConfirm, Field } from "./ui";
 import { useLanguage } from "../lib/i18n";
@@ -70,7 +70,7 @@ export function RecomendacionesPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.recomendaciones.errSave);
+      setError(t.recomendaciones.errSave);
     } finally {
       setBusy(false);
     }
@@ -83,7 +83,7 @@ export function RecomendacionesPanel() {
       await api.deleteRecommendation(r.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.recomendaciones.errDelete);
+      setError(t.recomendaciones.errDelete);
     }
   };
 

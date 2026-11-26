@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PAYMENT_LINKS, paymentUrlForPlan } from "./pagos";
-import type { PlanKey } from "../components/PlanesPanel";
+import type { PlanKey } from "./planes";
 
 const PLANS: PlanKey[] = ["esencial", "crecimiento", "total"];
 

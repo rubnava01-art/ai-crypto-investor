@@ -114,7 +114,7 @@ export function TalentoPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.talento.errSave);
+      setError(t.talento.errSave);
     } finally {
       setBusy(false);
     }
@@ -130,7 +130,7 @@ export function TalentoPanel() {
       setMsg(t.talento.msgDeleted.replace("{nombre}", r.nombre));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.talento.errDelete);
+      setError(t.talento.errDelete);
     }
   };
 

@@ -139,7 +139,7 @@ export function PlanillasPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.planillas.errSave);
+      setError(t.planillas.errSave);
     } finally {
       setBusy(false);
     }
@@ -155,7 +155,7 @@ export function PlanillasPanel() {
       setMsg(t.planillas.msgDeleted.replace("{periodo}", r.periodo));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.planillas.errDelete);
+      setError(t.planillas.errDelete);
     }
   };
 

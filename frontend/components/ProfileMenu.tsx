@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, ApiError, isGuest, type MeResponse, type UserProfile } from "../lib/api";
+import { api, isGuest, type MeResponse, type UserProfile } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { isSafeAvatarSrc } from "../lib/urls";
+import { useDialogFocus } from "./ui";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 transition-colors hover:border-zinc-600 focus:border-emerald-500 focus:outline-none";
@@ -38,14 +39,11 @@ export function ProfileEditor({
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Cerrar con Escape (antes solo se podía con clic fuera o el botón).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // 4.1: focus-trap + Escape + retorno de foco (antes solo Escape,
+  // sin trap ni retorno; ProfileEditor solo se monta abierto).
+  useDialogFocus({ open: true, onEscape: onClose, dialogRef });
 
   const onPhoto = (file: File | undefined) => {
     setError(null);
@@ -89,7 +87,7 @@ export function ProfileEditor({
       setMsg(t.perfil.saved);
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.perfil.saveFailed);
+      setError(t.perfil.saveFailed);
     } finally {
       setBusy(false);
     }
@@ -97,6 +95,7 @@ export function ProfileEditor({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={t.perfil.editProfile}
@@ -187,7 +186,7 @@ export function ProfileEditor({
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-zinc-400">{t.perfil.skills}</span>
           <input className={inputCls} value={skillsText} onChange={(e) => setSkillsText(e.target.value)} placeholder={t.perfil.skillsPlaceholder} autoComplete="off" />
-          <span className="mt-1 block text-xs text-zinc-500">{t.perfil.skillsHint}</span>
+          <span className="mt-1 block text-xs text-zinc-400">{t.perfil.skillsHint}</span>
         </label>
 
         {msg && <p role="status" className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm leading-relaxed text-emerald-400">{msg}</p>}
@@ -222,6 +221,16 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const loadFailedRef = useRef<HTMLDivElement>(null);
+
+  // 4.1: el diálogo de error al cargar el editor no tenía Escape ni
+  // foco (tampoco elementos enfocables: el foco va al propio diálogo,
+  // con tabIndex -1) y el foco vuelve al menú al cerrar.
+  useDialogFocus({
+    open: editing && !profile,
+    onEscape: () => setEditing(false),
+    dialogRef: loadFailedRef,
+  });
   // Invitado (Fase 1): sin /me ni perfil — no hay fila de usuario y un
   // 401 expulsaría la prueba. Menú mínimo: crear cuenta o salir.
   const guest = isGuest();
@@ -326,6 +335,8 @@ export function ProfileMenu({ onLogout }: { onLogout: () => void }) {
       )}
       {editing && !profile && (
         <div
+          ref={loadFailedRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label={t.perfil.editorLoadFailedAria}

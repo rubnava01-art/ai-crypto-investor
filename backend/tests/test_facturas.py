@@ -68,3 +68,76 @@ def test_facturas_viewer_readonly(client, viewer_headers):
         json={"client_name": "X", "items": ITEMS},
         headers=viewer_headers,
     ).status_code == 403
+
+
+# ---------- Fase 5b mejoras-v1, tarea 2: numeración automática y estado de cobro ----------
+
+def test_invoice_autonumber_sequence_no_reuse(client, admin_headers):
+    h = admin_headers
+    a = client.post("/api/facturas/invoices", json={"client_name": "Auto Uno", "items": ITEMS}, headers=h)
+    assert a.status_code == 201, a.text
+    b = client.post("/api/facturas/invoices", json={"client_name": "Auto Dos", "items": ITEMS}, headers=h)
+    assert b.status_code == 201, b.text
+    # Secuencia INV-001, INV-002...: números distintos, sin huecos entre
+    # los creados, y sin reutilizar un número que sigue existiendo.
+    na, nb = a.json()["number"], b.json()["number"]
+    assert na.startswith("INV-") and nb.startswith("INV-") and na != nb
+    assert int(nb.split("-")[1]) == int(na.split("-")[1]) + 1
+    # Número explícito se respeta y no se puede duplicar.
+    c = client.post(
+        "/api/facturas/invoices",
+        json={"client_name": "Explicita", "number": "FAC-2026-001", "items": ITEMS},
+        headers=h,
+    )
+    assert c.status_code == 201, c.text
+    assert c.json()["number"] == "FAC-2026-001"
+    assert client.post(
+        "/api/facturas/invoices",
+        json={"client_name": "Duplicada", "number": "FAC-2026-001", "items": ITEMS},
+        headers=h,
+    ).status_code == 409
+    # Borrar la primera y crear otra: el número borrado no se reutiliza
+    # mientras el segundo sigue existiendo (no hay dos facturas con el
+    # mismo número); la nueva no choca con ninguna existente.
+    client.delete(f"/api/facturas/invoices/{a.json()['id']}", headers=h)
+    d = client.post("/api/facturas/invoices", json={"client_name": "Auto Tres", "items": ITEMS}, headers=h)
+    assert d.status_code == 201, d.text
+    assert d.json()["number"] not in (nb, "FAC-2026-001")
+    for row in (b.json(), c.json(), d.json()):
+        client.delete(f"/api/facturas/invoices/{row['id']}", headers=h)
+
+
+def test_invoice_estado_cobro_por_vencimiento(client, admin_headers):
+    import datetime as dt
+
+    h = admin_headers
+    hoy = dt.date.today()
+    ayer = (hoy - dt.timedelta(days=1)).isoformat()
+    futuro = (hoy + dt.timedelta(days=30)).isoformat()
+
+    def _mk(name, **kw):
+        body = {"client_name": name, "items": ITEMS}
+        body.update(kw)
+        r = client.post("/api/facturas/invoices", json=body, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    # Borrador sin fecha: pendiente.
+    borrador = _mk("Cobro Borrador")
+    assert borrador["estado_cobro"] == "pendiente"
+    # Enviada vencida (ayer): vencida. Enviada futura: pendiente.
+    vencida = _mk("Cobro Vencida", due_date=ayer)
+    client.patch(f"/api/facturas/invoices/{vencida['id']}", json={"status": "enviada"}, headers=h)
+    futura = _mk("Cobro Futura", due_date=futuro)
+    client.patch(f"/api/facturas/invoices/{futura['id']}", json={"status": "enviada"}, headers=h)
+    r = client.get("/api/facturas/invoices", headers=h)
+    by_id = {x["id"]: x for x in r.json()}
+    assert by_id[vencida["id"]]["estado_cobro"] == "vencida"
+    assert by_id[futura["id"]]["estado_cobro"] == "pendiente"
+    # Pagada (aunque su fecha ya pasó): pagada, nunca vencida.
+    client.patch(f"/api/facturas/invoices/{vencida['id']}", json={"status": "pagada"}, headers=h)
+    r = client.get("/api/facturas/invoices", headers=h)
+    by_id = {x["id"]: x for x in r.json()}
+    assert by_id[vencida["id"]]["estado_cobro"] == "pagada"
+    for row in (borrador, vencida, futura):
+        client.delete(f"/api/facturas/invoices/{row['id']}", headers=h)

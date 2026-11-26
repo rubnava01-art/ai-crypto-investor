@@ -153,7 +153,7 @@ export function ReferidosPanel() {
     setReferralForm((f) => ({ ...f, [k]: e.target.value }));
 
   const fail = (err: unknown) =>
-    setError(err instanceof ApiError ? `${err.message} (${err.status})` : t.referidos.errUnexpected);
+    setError(t.referidos.errUnexpected);
 
   const submitCampaign = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, type InventoryItem, type InventoryUnit, type MeResponse } from "../lib/api";
+import { api, type InventoryItem, type InventoryMovement, type InventoryUnit, type MeResponse } from "../lib/api";
 import { useLanguage } from "../lib/i18n";
 import { formatMoney } from "../lib/format";
 import { useCancelled } from "../lib/useLoad";
@@ -35,6 +35,12 @@ export function InventarioPanel() {
   const [unitPrice, setUnitPrice] = useState("0");
   const [minStock, setMinStock] = useState("0");
   const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [motivo, setMotivo] = useState("");
+  // Historial de movimientos por producto (Fase 5b, tarea 3): solo se
+  // carga al abrirlo, no con la lista.
+  const [historyItemId, setHistoryItemId] = useState<number | null>(null);
+  const [movements, setMovements] = useState<InventoryMovement[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +105,7 @@ export function InventarioPanel() {
     setUnit("pieza");
     setUnitPrice("0");
     setMinStock("0");
+    setMotivo("");
     setEditing(null);
   };
 
@@ -116,6 +123,9 @@ export function InventarioPanel() {
         unit,
         unit_price: Math.max(0, parseFloat(unitPrice) || 0),
         min_stock: Math.max(0, parseInt(minStock, 10) || 0),
+        // Motivo del cambio de cantidad: solo alimenta el historial de
+        // movimientos (el backend lo registra si la cantidad cambia).
+        motivo: motivo.trim() || undefined,
       };
       if (editing) {
         await api.updateInventoryItem(editing.id, body);
@@ -127,7 +137,7 @@ export function InventarioPanel() {
       resetForm();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inventario.saveError);
+      setError(t.inventario.saveError);
     } finally {
       setBusy(false);
     }
@@ -140,7 +150,7 @@ export function InventarioPanel() {
       await api.deleteInventoryItem(it.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inventario.deleteError);
+      setError(t.inventario.deleteError);
     }
   };
 
@@ -149,12 +159,36 @@ export function InventarioPanel() {
     if (next === it.quantity) return;
     setError(null);
     try {
-      await api.updateInventoryItem(it.id, { quantity: next });
+      // Movimiento explícito (Fase 5b, tarea 3): el +/-1 queda
+      // registrado en el historial con su motivo, en vez de un PUT
+      // de cantidad sin rastro.
+      await api.addMovement(it.id, { tipo: "ajuste", cantidad: delta, motivo: t.inventario.movQuick });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inventario.adjustError);
+      setError(t.inventario.adjustError);
     }
   };
+
+  const toggleHistory = async (it: InventoryItem) => {
+    if (historyItemId === it.id) {
+      setHistoryItemId(null);
+      setMovements(null);
+      return;
+    }
+    setHistoryItemId(it.id);
+    setMovements(null);
+    setHistoryError(false);
+    try {
+      const rows = await api.listMovements(it.id);
+      if (isCancelled()) return;
+      setMovements(rows);
+    } catch {
+      if (!isCancelled()) setHistoryError(true);
+    }
+  };
+
+  const movLabel = (tipo: string) =>
+    tipo === "entrada" ? t.inventario.movEntrada : tipo === "venta" ? t.inventario.movVenta : t.inventario.movAjuste;
 
   const startEdit = (it: InventoryItem) => {
     setEditing(it);
@@ -188,6 +222,18 @@ export function InventarioPanel() {
         {!isAdmin && t.inventario.readOnly}
       </p>
 
+      {/* Aviso de stock bajo (Fase 5b, tarea 3): el distintivo por
+        producto ya existía; este aviso resume cuántos hay y enlaza al
+        filtro. La sección de "Hoy" ya cubre el stock bajo desde Fase 4. */}
+      {items !== null && totals.low > 0 && (
+        <p role="alert" className="mb-4 rounded-lg border border-red-700/60 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
+          {t.inventario.lowStockAlert.replace("{n}", String(totals.low))}{" "}
+          <button type="button" onClick={() => setOnlyLowStock(true)} className="font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">
+            {t.inventario.onlyLowStock}
+          </button>
+        </p>
+      )}
+
       {isAdmin && (
         <form onSubmit={save} className="space-y-3">
           <Field label={t.inventario.nameAria}><input aria-label={t.inventario.nameAria} className={inputCls} placeholder={t.inventario.namePlaceholder} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} autoComplete="off" /></Field>
@@ -214,6 +260,9 @@ export function InventarioPanel() {
               <span className="mb-1 block text-xs font-medium text-zinc-300">{t.inventario.minLabel}</span>
               <input className={inputCls} type="number" min={0} step={1} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
             </label>
+            {editing && (
+              <Field label={t.inventario.movReasonAria}><input aria-label={t.inventario.movReasonAria} className={inputCls} placeholder={t.inventario.movReasonPlaceholder} value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} autoComplete="off" /></Field>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -302,6 +351,40 @@ export function InventarioPanel() {
                   {it.quantity} {unitLabel(it.unit)} · {fmtMoney(it.unit_price)} {t.inventario.perUnit} · {t.inventario.valueWord} {fmtMoney(it.quantity * it.unit_price)}
                   {it.min_stock > 0 && ` · ${t.inventario.minimum} ${it.min_stock}`}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => void toggleHistory(it)}
+                  aria-expanded={historyItemId === it.id}
+                  className="mt-2 min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+                >
+                  {historyItemId === it.id ? t.inventario.historyHide : t.inventario.historyShow}
+                </button>
+                {historyItemId === it.id && (
+                  <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{t.inventario.historyTitle}</p>
+                    {historyError ? (
+                      <p role="alert" className="mt-1 text-sm text-red-400">{t.inventario.historyErr}</p>
+                    ) : movements === null ? (
+                      <p className="mt-1 text-sm text-zinc-400">{t.inventario.loadingItems}</p>
+                    ) : movements.length === 0 ? (
+                      <p className="mt-1 text-sm text-zinc-400">{t.inventario.historyEmpty}</p>
+                    ) : (
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {movements.map((m) => (
+                          <li key={m.id} className="flex flex-wrap items-baseline gap-x-2 text-zinc-300">
+                            <span className="font-semibold text-zinc-100">{movLabel(m.tipo)}</span>
+                            <span className={m.cantidad_delta >= 0 ? "text-emerald-400" : "text-red-400"}>
+                              {m.cantidad_delta >= 0 ? `+${m.cantidad_delta}` : m.cantidad_delta}
+                            </span>
+                            <span className="text-zinc-400">→ {m.cantidad_final}</span>
+                            {m.motivo && <span className="text-zinc-400">{m.motivo}</span>}
+                            <span className="ml-auto text-xs text-zinc-400">{m.created_at ? new Date(m.created_at).toLocaleString(locale) : ""}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

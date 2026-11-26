@@ -372,6 +372,40 @@ input[type="file"]::file-selector-button:hover {
     line-height: 1.5;
     color: var(--fintech-text-muted);
   }
+
+  /* ---- Indicador visual de scroll horizontal (3.3, 2026-11-26) ----
+   * Contenedor con scroll horizontal: el borde derecho se desvanece
+   * (máscara) para indicar que hay más contenido a la derecha. Solo
+   * presentación: no cambia el contenido ni el desplazamiento. Se usa
+   * en la tabla comparativa de planes, la única tabla que en móvil
+   * sigue siendo scroll horizontal (el resto colapsa a tarjetas). */
+  .fintech-scroll-x {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+}
+
+@media (pointer: coarse) {
+  /* ---- 3.3 (2026-11-26): ergonomía táctil en iPhone / pantallas táctiles ----
+   * Todo botón mide al menos 44 px de alto en táctil (Apple HIG /
+   * WCAG 2.5.8): la mayoría ya lleva min-h-[44px] en su clase; esta
+   * red cubre los que faltan (chips de 36 px del Asistente, botones de
+   * fila sin min-h, celdas de calendario) sin tocar el escritorio.
+   * Los campos de texto van a 16 px en táctil: Safari iOS amplía la
+   * vista (auto-zoom) cuando el input enfocado es menor de 16 px. En
+   * escritorio se mantiene el 14 px del diseño. Se excluyen los
+   * controles que no son de texto (checkbox, radio, color, file,
+   * range, hidden). */
+  button,
+  [role="button"] {
+    min-height: 44px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 1rem;
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

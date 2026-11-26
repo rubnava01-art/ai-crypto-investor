@@ -9,6 +9,8 @@ Permissions: any authenticated user reads; only admins write/delete
 v1 tracks invoices only; it does not charge cards or move money.
 """
 from decimal import Decimal
+import datetime as dt
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
@@ -19,6 +21,11 @@ from app.core.security import get_current_user, require_admin
 from app.core.perfiles import require_modulo
 from app.database import get_db
 from app.models.tables import Contact, Invoice, User
+
+# Zona horaria del negocio (America/Los_Angeles): "vencida" se decide
+# contra el hoy del negocio, igual que el panel "Hoy" (dashboard.py).
+LA_TZ = ZoneInfo("America/Los_Angeles")
+POR_VENCER_DIAS = 7
 
 router = APIRouter(prefix="/api/facturas", tags=["facturas"], dependencies=[Depends(require_modulo("facturas"))])
 
@@ -49,6 +56,17 @@ class InvoiceOut(BaseModel):
     items: list[InvoiceItem]
     tax_rate: float
     status: str
+    # Estado de cobro (Fase 5b mejoras-v1, tarea 2): DERIVADO, no
+    # almacenado — "vencida" no es un estado del flujo (la máquina de
+    # estados sigue siendo borrador -> enviada -> pagada, solo hacia
+    # adelante). pagada: status pagada; vencida: enviada con
+    # due_date <= hoy (hora de Los Ángeles, igual que "Hoy"); pendiente:
+    # el resto (borrador, o enviada sin vencer). Coherente con la
+    # clasificación de "Hoy" (vencidas / por vencer / por cobrar).
+    estado_cobro: str
+    # Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): ISO AAAA-MM-DD
+    # o null cuando la factura no tiene fecha.
+    due_date: str | None = None
     notes: str
     created_at: str | None = None
 
@@ -61,11 +79,28 @@ class InvoiceCreate(BaseModel):
     client_phone: str = Field(default="", max_length=64)
     items: list[InvoiceItem] = Field(min_length=1, max_length=MAX_INVOICE_ITEMS)
     tax_rate: float = Field(default=0, ge=0, le=100)
+    due_date: dt.date | None = None
     notes: str = Field(default="", max_length=5000)
 
 
 class InvoiceStatusUpdate(BaseModel):
-    status: str
+    # status es opcional desde el fix H1 (Fase 4 mejoras-v1): el PATCH
+    # también acepta due_date solo, para fijar o borrar la fecha de una
+    # factura existente sin tocar su estado.
+    status: str | None = None
+    # Fecha de vencimiento opcional: solo se aplica si el campo viaja en
+    # el payload (model_fields_set); así se puede BORRAR la fecha
+    # enviando due_date=null, igual que en las tareas (business.py).
+    due_date: dt.date | None = Field(default=None)
+
+
+def _estado_cobro(inv: Invoice) -> str:
+    if inv.status == "pagada":
+        return "pagada"
+    if inv.status == "enviada" and inv.due_date is not None:
+        if inv.due_date <= dt.datetime.now(LA_TZ).date():
+            return "vencida"
+    return "pendiente"
 
 
 def _inv_out(inv: Invoice) -> InvoiceOut:
@@ -79,6 +114,8 @@ def _inv_out(inv: Invoice) -> InvoiceOut:
         items=[InvoiceItem(**it) for it in (inv.items or [])],
         tax_rate=float(inv.tax_rate),
         status=inv.status,
+        estado_cobro=_estado_cobro(inv),
+        due_date=inv.due_date.isoformat() if inv.due_date else None,
         notes=inv.notes or "",
         created_at=inv.created_at.isoformat() if inv.created_at else None,
     )
@@ -134,6 +171,7 @@ def create_invoice(
         items=[it.model_dump() for it in payload.items],
         tax_rate=Decimal(str(payload.tax_rate)),
         status="borrador",
+        due_date=payload.due_date,
         notes=payload.notes,
     )
     db.add(row)
@@ -149,17 +187,20 @@ def update_invoice_status(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    if payload.status not in STATUSES:
+    if payload.status is not None and payload.status not in STATUSES:
         raise HTTPException(status_code=422, detail=f"status must be one of: {', '.join(STATUSES)}")
     row = db.get(Invoice, inv_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if _STATUS_ORDER[payload.status] < _STATUS_ORDER[row.status]:
-        raise HTTPException(
-            status_code=422,
-            detail=f"cannot move invoice from {row.status} to {payload.status}",
-        )
-    row.status = payload.status
+    if payload.status is not None:
+        if _STATUS_ORDER[payload.status] < _STATUS_ORDER[row.status]:
+            raise HTTPException(
+                status_code=422,
+                detail=f"cannot move invoice from {row.status} to {payload.status}",
+            )
+        row.status = payload.status
+    if "due_date" in payload.model_fields_set:
+        row.due_date = payload.due_date
     db.commit()
     db.refresh(row)
     return _inv_out(row)

@@ -12,9 +12,11 @@ import {
   getCapacidades,
   normalizeSugerencias,
   postChat,
+  postFeedback,
   type AsistenteAccion,
   type AsistenteAclaracion,
   type AsistenteComando,
+  type AsistenteFeedbackVoto,
   type AsistenteFuente,
   type AsistenteRecurso,
   type AsistenteSugerencia,
@@ -22,6 +24,7 @@ import {
 import { splitLinks } from "../lib/linkify";
 import { useLanguage } from "../lib/i18n";
 import { PreguntasEnsenar } from "./PreguntasEnsenar";
+import { SimulacionAviso } from "./SimulacionAviso";
 import { catalogMemo } from "../lib/api/memo";
 
 /**
@@ -121,6 +124,11 @@ type ChatBubbleLabels = {
   retryMaybeExecuted: string;
   cancel: string;
   send: string;
+  // Fase 6, tarea 3: voto útil / no útil por respuesta.
+  feedbackTitle: string;
+  feedbackUtil: string;
+  feedbackNoUtil: string;
+  feedbackGracias: string;
 };
 
 const ChatBubble = memo(function ChatBubble({
@@ -130,6 +138,8 @@ const ChatBubble = memo(function ChatBubble({
   fmtTime,
   onRetry,
   onSend,
+  pregunta,
+  onFeedback,
 }: {
   m: ChatMsg;
   labels: ChatBubbleLabels;
@@ -137,11 +147,23 @@ const ChatBubble = memo(function ChatBubble({
   fmtTime: (ts: number) => string;
   onRetry: (msg: ChatMsg) => void;
   onSend: (text: string) => void;
+  /** Pregunta del usuario que originó esta respuesta (para el voto);
+   * ausente en el saludo inicial, que no lleva botones. */
+  pregunta?: string;
+  onFeedback?: (pregunta: string, voto: AsistenteFeedbackVoto) => void;
 }) {
   // F2-7: si el fallo fue de red/timeout no se sabe si el mensaje llegó;
   // el primer toque del reintento pide confirmación en línea (puede
   // duplicar una orden de creación). Otros errores reenvían directo.
   const [confirmingRetry, setConfirmingRetry] = useState(false);
+  // Fase 6, tarea 3: voto ya enviado para esta respuesta (un voto por
+  // burbuja y por sesión; el backend guarda pregunta + voto + fecha).
+  const [voted, setVoted] = useState<AsistenteFeedbackVoto | null>(null);
+  const onVote = (voto: AsistenteFeedbackVoto) => {
+    if (voted || !pregunta || !onFeedback) return;
+    setVoted(voto);
+    onFeedback(pregunta, voto);
+  };
   const retryNeedsConfirm = m.failedKey === "network" || m.failedKey === "timeout";
   const onRetryClick = () => {
     if (retryNeedsConfirm && !confirmingRetry) {
@@ -189,6 +211,36 @@ const ChatBubble = memo(function ChatBubble({
           <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
             {labels.noAnswer}
           </p>
+        )}
+        {/* Fase 6, tarea 3: voto útil / no útil por respuesta (solo
+            cuando hay pregunta que la originó; el saludo no vota).
+            Un voto por burbuja; tras votar se muestra el gracias. */}
+        {m.role === "assistant" && pregunta && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {voted ? (
+              <span className="text-xs font-semibold text-emerald-300">
+                {labels.feedbackGracias}
+              </span>
+            ) : (
+              <>
+                <span className="text-xs text-zinc-300">{labels.feedbackTitle}</span>
+                <button
+                  type="button"
+                  onClick={() => onVote("util")}
+                  className="min-h-[30px] rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-zinc-200 hover:border-emerald-600 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                >
+                  {labels.feedbackUtil}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onVote("no_util")}
+                  className="min-h-[30px] rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-zinc-200 hover:border-red-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                >
+                  {labels.feedbackNoUtil}
+                </button>
+              </>
+            )}
+          </div>
         )}
         {/* F3-3: pregunta aclaratoria con botones de opción que envían
             la respuesta; sin opciones, el usuario responde escribiendo. */}
@@ -410,6 +462,10 @@ function AsistenteChatBody() {
       retryMaybeExecuted: t.asistente.retryMaybeExecuted,
       cancel: t.common.cancel,
       send: t.asistente.send,
+      feedbackTitle: t.asistente.feedbackTitle,
+      feedbackUtil: t.asistente.feedbackUtil,
+      feedbackNoUtil: t.asistente.feedbackNoUtil,
+      feedbackGracias: t.asistente.feedbackGracias,
     }),
     [t],
   );
@@ -525,6 +581,16 @@ function AsistenteChatBody() {
     [send],
   );
 
+  // Fase 6, tarea 3: voto útil / no útil. Si el envío falla (red),
+  // la burbuja ya quedó marcada como votada; el chat sigue
+  // funcionando y el voto simplemente no llega.
+  const onFeedback = useCallback(
+    (pregunta: string, voto: AsistenteFeedbackVoto) => {
+      void postFeedback(pregunta, voto).catch(() => {});
+    },
+    [],
+  );
+
   // Chips: tras cada respuesta mandan las sugerencias del backend; al
   // inicio, los ejemplos de las capacidades. Un chip rellena el input y
   // pone el foco (no envía solo: evita ejecutar una acción por un toque).
@@ -545,6 +611,13 @@ function AsistenteChatBody() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* Fase 6, tarea 4: el aviso de simulación ("Simulación, no es
+          asesoría financiera", Fase 2) faltaba en las pantallas del
+          asistente: va fijo arriba del historial, sin scroll, en el
+          panel flotante y en /asistente (cuerpo compartido). */}
+      <div className="border-b border-zinc-800 px-4 pt-3">
+        <SimulacionAviso />
+      </div>
       <div
         ref={listRef}
         role="log"
@@ -552,17 +625,32 @@ function AsistenteChatBody() {
         aria-label={t.asistente.title}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
       >
-        {messages.map((m) => (
-          <ChatBubble
-            key={m.id}
-            m={m}
-            labels={bubbleLabels}
-            fmtConsultado={fmtConsultado}
-            fmtTime={fmtTime}
-            onRetry={retry}
-            onSend={(text) => void send(text)}
-          />
-        ))}
+        {messages.map((m, i) => {
+          // Fase 6, tarea 3: la pregunta que originó esta respuesta
+          // es el último mensaje del usuario antes de ella.
+          let pregunta: string | undefined;
+          if (m.role === "assistant") {
+            for (let j = i - 1; j >= 0; j--) {
+              if (messages[j].role === "user") {
+                pregunta = messages[j].text;
+                break;
+              }
+            }
+          }
+          return (
+            <ChatBubble
+              key={m.id}
+              m={m}
+              labels={bubbleLabels}
+              fmtConsultado={fmtConsultado}
+              fmtTime={fmtTime}
+              onRetry={retry}
+              onSend={(text) => void send(text)}
+              pregunta={pregunta}
+              onFeedback={onFeedback}
+            />
+          );
+        })}
         {typing && (
           <div className="flex justify-start">
             <div

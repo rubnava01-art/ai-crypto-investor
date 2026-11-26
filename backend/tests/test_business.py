@@ -111,3 +111,43 @@ def test_business_viewer_read_only(client, viewer_headers, admin_headers):
     # cleanup as admin
     r = client.delete(f"/api/business/tasks/{tid}", headers=admin_headers)
     assert r.status_code == 204
+
+
+# ---------- Fase 5b mejoras-v1, tarea 5: notificaciones en la app ----------
+
+def test_business_notificaciones_vencidas_y_hoy(client, admin_headers):
+    import datetime as dt
+
+    h = admin_headers
+    # "Hoy" en LA puede diferir del UTC del sistema: se calcula igual
+    # que el backend (America/Los_Angeles) para no depender de la hora.
+    from zoneinfo import ZoneInfo
+
+    hoy = dt.datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    ayer = (hoy - dt.timedelta(days=1)).isoformat()
+    manana = (hoy + dt.timedelta(days=1)).isoformat()
+
+    def _mk(area, title, due):
+        r = client.post(f"/api/business/{area}/tasks", json={"title": title, "due_date": due}, headers=h)
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    vencida = _mk("ventas", "Notificacion Vencida", ayer)
+    de_hoy = _mk("legal", "Notificacion Hoy", hoy.isoformat())
+    futura = _mk("ventas", "Notificacion Futura", manana)
+    sin_fecha = _mk("ventas", "Notificacion Sin Fecha", None)
+    hecha = _mk("ventas", "Notificacion Hecha Vencida", ayer)
+    client.patch(f"/api/business/tasks/{hecha['id']}", json={"done": True}, headers=h)
+
+    r = client.get("/api/business/notificaciones", headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["fecha"] == hoy.isoformat()
+    assert [t["id"] for t in body["vencidas"]] == [vencida["id"]]
+    assert [t["id"] for t in body["de_hoy"]] == [de_hoy["id"]]
+    # La futura, la sin fecha y la hecha no aparecen en ningún grupo.
+    ids = {t["id"] for t in body["vencidas"] + body["de_hoy"]}
+    assert futura["id"] not in ids and sin_fecha["id"] not in ids and hecha["id"] not in ids
+
+    for row in (vencida, de_hoy, futura, sin_fecha, hecha):
+        client.delete(f"/api/business/tasks/{row['id']}", headers=h)

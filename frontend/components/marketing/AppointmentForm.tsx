@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import { api, ApiError, type Appointment, type CrmContact } from "../../lib/api";
+import { api, type Appointment, type CrmContact } from "../../lib/api";
 import { useLanguage } from "../../lib/i18n";
 import { Field } from "../ui";
 import { combineDateTimeToIso, toDateInputValue, toTimeInputValue } from "../../lib/dates";
@@ -91,7 +91,7 @@ export function AppointmentForm({
         onSaved(t.citas.msgCreated);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.citas.errSave);
+      setError(t.citas.errSave);
     } finally {
       setBusy(false);
     }

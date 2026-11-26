@@ -19,6 +19,13 @@
 // tabla anual accesible como alternativa textual. En el héroe
 // (`compact`) la gráfica va colapsada tras un botón, para no duplicar
 // peso en la landing; en Clases se muestra por defecto.
+//
+// Copiar/compartir (Fase 5b, tarea 6): la calculadora es pública (héroe
+// de la landing, sin login) y no guarda lo que se escribe: el resultado
+// se copia o se comparte desde el navegador, y guardar pasa por crear
+// cuenta. El enlace de guardar solo se muestra en `compact` (el héroe
+// público): en Clases el usuario ya tiene cuenta.
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useLanguage } from "../lib/i18n";
 
@@ -57,6 +64,8 @@ export function CompoundCalculator({ idPrefix = "calc", compact = false }: { idP
   const [monthly, setMonthly] = useState("");
   const [showChart, setShowChart] = useState(!compact);
   const [hoverYear, setHoverYear] = useState<number | null>(null);
+  // Aviso de copiado (Fase 5b, tarea 6): null = nada que decir.
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const p = Number(principal);
   const r = Number(rate);
@@ -196,6 +205,74 @@ export function CompoundCalculator({ idPrefix = "calc", compact = false }: { idP
         <p className="mt-2 text-sm text-slate-400">{principal.trim() === "" && rate.trim() === "" ? t.clases.calcEnterAll : t.clases.calcInvalid}</p>
       )}
       <p className="mt-1.5 text-xs font-medium text-amber-400">{t.clases.calcHypothetical}</p>
+
+      {/* Copiar / compartir el resultado (Fase 5b, tarea 6): todo en el
+        navegador, sin guardar nada en la plataforma. Compartir usa el
+        diálogo del sistema cuando existe; si no, copia el texto. */}
+      {result !== null && (
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const text = t.clases.calcShareText
+                  .replace("{inicial}", fmtUsd(p, locale))
+                  .replace("{tasa}", String(r))
+                  .replace("{anos}", String(n))
+                  .replace("{aporte}", fmtUsd(m, locale))
+                  .replace("{resultado}", fmtUsd(resultWith ?? result, locale));
+                try {
+                  await navigator.clipboard.writeText(text);
+                  setCopyMsg(t.clases.calcCopied);
+                } catch {
+                  setCopyMsg(t.clases.calcCopyError);
+                }
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-emerald-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.clases.calcCopy}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const text = t.clases.calcShareText
+                  .replace("{inicial}", fmtUsd(p, locale))
+                  .replace("{tasa}", String(r))
+                  .replace("{anos}", String(n))
+                  .replace("{aporte}", fmtUsd(m, locale))
+                  .replace("{resultado}", fmtUsd(resultWith ?? result, locale));
+                if (typeof navigator.share === "function") {
+                  try {
+                    await navigator.share({ title: t.clases.calcTitle, text });
+                    return;
+                  } catch {
+                    // El usuario canceló el diálogo: no es un error.
+                    return;
+                  }
+                }
+                try {
+                  await navigator.clipboard.writeText(text);
+                  setCopyMsg(t.clases.calcCopied);
+                } catch {
+                  setCopyMsg(t.clases.calcCopyError);
+                }
+              }}
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-emerald-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            >
+              {t.clases.calcShare}
+            </button>
+          </div>
+          {copyMsg && <p role="status" className="mt-1.5 text-xs text-emerald-400">{copyMsg}</p>}
+          <p className="mt-1.5 text-xs text-slate-400">
+            {t.clases.calcNoSaveNote}{" "}
+            {compact && (
+              <Link href="/login?mode=register" className="font-semibold text-amber-200 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60">
+                {t.clases.calcSaveAccount}
+              </Link>
+            )}
+          </p>
+        </div>
+      )}
 
       {result !== null && seriesNo && (
         <div className="mt-4">

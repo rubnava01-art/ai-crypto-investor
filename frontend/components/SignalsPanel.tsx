@@ -4,6 +4,7 @@ import { Panel } from "../components/Panel";
 import { DemoBadge, EmptyState } from "../components/badges";
 import { ListSkeleton } from "../components/Skeleton";
 import { useLanguage } from "../lib/i18n";
+import { SimulacionAviso } from "./SimulacionAviso";
 import type { SignalsResponse, SignalSide } from "../lib/api";
 
 const money = (s: string | null) =>
@@ -44,8 +45,16 @@ export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
     expired: t.dashboard.signalStatusExpired,
     demo: t.dashboard.signalStatusDemo,
   };
+  // 2026-11-25 (arreglos rápidos): las señales de la Fase 1 son
+  // sembradas (demo=True en /api/signals); el título lo dice
+  // explícito en vez de "Señales" + píldora DEMO discreta, para no
+  // presentar datos simulados como reales.
   return (
-    <Panel title={t.dashboard.signalsTitle} badge={<DemoBadge quiet />}>
+    <Panel
+      title={signals?.demo ? t.dashboard.signalsTitleDemo : t.dashboard.signalsTitle}
+      badge={<DemoBadge quiet />}
+    >
+      <SimulacionAviso />
       {signals ? (
         signals.signals.length === 0 ? (
           <EmptyState text={t.dashboard.noSignals} />
@@ -64,7 +73,20 @@ export function SignalsPanel({ signals, offline, time }: SignalsPanelProps) {
                 </div>
                 <p className="mt-2 text-xs leading-relaxed text-zinc-400">{sig.reason}</p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  {statusLabel[sig.status] ?? sig.status} · {time(sig.created_utc)}
+                  {sig.confidence_pct != null
+                    ? t.dashboard.signalConfidence.replace("{pct}", String(sig.confidence_pct))
+                    : t.dashboard.signalConfidenceNone}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {sig.history
+                    ? t.dashboard.signalHistory
+                        .replace("{wins}", String(sig.history.wins))
+                        .replace("{total}", String(sig.history.total))
+                        .replace("{rate}", sig.history.win_rate_pct == null ? "—" : String(sig.history.win_rate_pct))
+                    : t.dashboard.signalNoHistory}
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {statusLabel[sig.status] ?? sig.status} · {t.dashboard.signalAsOf.replace("{time}", time(sig.created_utc))}
                 </p>
               </li>
             ))}

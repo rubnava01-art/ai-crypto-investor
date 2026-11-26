@@ -126,7 +126,7 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
       setEditing(null);
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.contenido.errSaveTemplate);
+      setFormError(t.contenido.errSaveTemplate);
     } finally {
       setBusy(false);
     }
@@ -141,7 +141,7 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
       setMsg(t.contenido.msgTemplateDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.contenido.errDeleteTemplate);
+      setActionError(t.contenido.errDeleteTemplate);
     }
   };
 
@@ -161,7 +161,7 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
       });
       setResult(out);
     } catch (err) {
-      setGenError(err instanceof ApiError ? err.message : t.contenido.errGenerate);
+      setGenError(t.contenido.errGenerate);
     } finally {
       setGenerating(false);
     }
@@ -210,7 +210,7 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
                       {platformLabel(tpl.platform)} · {toneLabel(tpl.tone)} · {tpl.max_chars} max
                     </p>
                     <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{tpl.body}</p>
-                    <p className="mt-1 text-xs text-zinc-500">{t.contenido.templateVars}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{t.contenido.templateVars}</p>
                   </div>
                 </div>
                 {isAdmin && (
@@ -265,7 +265,7 @@ export function CopyTemplatePicker({ isAdmin }: { isAdmin: boolean }) {
                 <Field label={t.contenido.maxCharsAria}>
                   <input aria-label={t.contenido.maxCharsAria} type="number" min={1} className={inputCls} value={maxChars} onChange={(e) => setMaxChars(e.target.value)} required />
                 </Field>
-                <p className="text-xs text-zinc-500">{t.contenido.templateVars}</p>
+                <p className="text-xs text-zinc-400">{t.contenido.templateVars}</p>
                 {formError && <p role="alert" className="text-sm text-red-400">{formError}</p>}
                 <div className="flex gap-2">
                   <button type="submit" disabled={busy} className="min-h-[44px] flex-1 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-50">

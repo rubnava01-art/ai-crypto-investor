@@ -80,3 +80,28 @@ def test_backtest_run_timeframe_is_normalized_to_lowercase(client, auth_headers)
     assert r.status_code == 200, r.text
     assert r.json()["timeframe"] == "1h"
     assert r.json()["run_id"].startswith("BTTFUSD-1h-")
+
+
+def test_backtest_run_accepts_fee_and_slippage_params(client, auth_headers):
+    # Símbolo propio para no contaminar los conteos de otros tests.
+    _seed(client, auth_headers, "BTFE/USD")
+    r = client.post(
+        "/api/backtest/run?symbol=BTFE/USD&timeframe=1h&fee_rate=0&slippage_rate=0",
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["metrics"]["total_fees_usd"] == 0
+    assert body["metrics"]["total_slippage_usd"] == 0
+    assert body["metrics"]["gross_return_pct"] == body["metrics"]["net_return_pct"]
+    assert body["strategy"]["config"]["fee_rate"] == "0.0"
+    assert body["strategy"]["config"]["slippage_rate"] == "0.0"
+
+
+def test_backtest_run_rejects_invalid_fee_or_slippage(client, auth_headers):
+    for q in ("fee_rate=-0.01", "fee_rate=0.5", "slippage_rate=-0.01", "slippage_rate=0.5"):
+        r = client.post(
+            f"/api/backtest/run?symbol=BTC/USD&timeframe=1h&{q}",
+            headers=auth_headers,
+        )
+        assert r.status_code == 422, (q, r.text)

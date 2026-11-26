@@ -4,7 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type TrendNote } from "../../lib/api";
+import { api, type TrendNote } from "../../lib/api";
 import { Panel } from "../Panel";
 import { useConfirm, Field } from "../ui";
 import { useLanguage } from "../../lib/i18n";
@@ -48,7 +48,7 @@ export function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       setSummary("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crear.errSaveTrend);
+      setError(t.crear.errSaveTrend);
     } finally {
       setBusy(false);
     }
@@ -61,7 +61,7 @@ export function TrendsPanel({ isAdmin }: { isAdmin: boolean }) {
       await api.deleteTrend(tr.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crear.errDeleteTrend);
+      setError(t.crear.errDeleteTrend);
     }
   };
 

@@ -13,7 +13,7 @@ function Kpi({ label, value, source }: { label: string; value: string; source: s
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
       <p className="text-xs text-zinc-400">{label}</p>
       <p className="mt-1 text-lg font-semibold text-zinc-100">{value}</p>
-      <p className="mt-1 text-xs text-zinc-500">{source}</p>
+      <p className="mt-1 text-xs text-zinc-400">{source}</p>
     </div>
   );
 }

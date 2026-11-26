@@ -70,7 +70,7 @@ function VinculosManager() {
       setContactId("");
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.portal.errLink);
+      setFormError(t.portal.errLink);
     } finally {
       setBusy(false);
     }
@@ -85,7 +85,7 @@ function VinculosManager() {
       setMsg(t.portal.msgUnlinked);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.portal.errUnlink);
+      setActionError(t.portal.errUnlink);
     }
   };
 

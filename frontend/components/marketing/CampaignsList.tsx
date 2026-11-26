@@ -135,7 +135,7 @@ export function CampaignsList({ isAdmin }: { isAdmin: boolean }) {
       setEditing(null);
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.citas.errSaveCampaign);
+      setFormError(t.citas.errSaveCampaign);
     } finally {
       setBusy(false);
     }
@@ -150,7 +150,7 @@ export function CampaignsList({ isAdmin }: { isAdmin: boolean }) {
       setMsg(t.citas.msgCampaignDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.citas.errDeleteCampaign);
+      setActionError(t.citas.errDeleteCampaign);
     }
   };
 

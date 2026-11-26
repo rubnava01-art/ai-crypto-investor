@@ -86,7 +86,7 @@ export function CostsPanel({ isAdmin, range }: { isAdmin: boolean; range: { from
       setEditing(null);
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.bi.errSaveCost);
+      setFormError(t.bi.errSaveCost);
     } finally {
       setBusy(false);
     }
@@ -101,7 +101,7 @@ export function CostsPanel({ isAdmin, range }: { isAdmin: boolean; range: { from
       setMsg(t.bi.msgCostDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.bi.errDeleteCost);
+      setActionError(t.bi.errDeleteCost);
     }
   };
 

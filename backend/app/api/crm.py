@@ -8,11 +8,14 @@ Permissions follow the platform RBAC:
 - any authenticated user (admin or "prueba") can READ contacts;
 - only admins can create, update or delete (require_admin -> 403 for prueba).
 """
+import csv
 import datetime as dt
+import io
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -21,7 +24,7 @@ from app.api.portal import deny_linked_reader
 from app.core.security import get_current_user, require_admin
 from app.core.perfiles import require_modulo
 from app.database import get_db
-from app.models.tables import Appointment, Contact, Invoice, User
+from app.models.tables import Appointment, Contact, CrmReminder, CrmStageHistory, Invoice, User
 
 # Zona horaria del usuario (America/Los_Angeles): "hoy" y "esta semana" se
 # calculan aquí; la foto de referencia usa Miami como ejemplo y NO se copia.
@@ -31,6 +34,10 @@ router = APIRouter(prefix="/api/crm/contacts", tags=["crm"], dependencies=[Depen
 
 SOURCES = ("manual", "academia", "cohley", "rivgoods", "otro")
 STATUSES = ("nuevo", "contactado", "interesado", "cliente", "inactivo")
+# Etapas de venta (Fase 5b mejoras-v1, tarea 1): embudo propio, distinto
+# del `status` general. "ganado"/"perdido" cierran el embudo; el resto
+# son etapas abiertas.
+STAGES = ("nuevo", "contactado", "propuesta", "negociacion", "ganado", "perdido")
 
 
 class ContactOut(BaseModel):
@@ -41,6 +48,7 @@ class ContactOut(BaseModel):
     source: str
     tags: list[str]
     status: str
+    stage: str
     notes: str
     created_at: str | None = None
     updated_at: str | None = None
@@ -53,6 +61,7 @@ class ContactCreate(BaseModel):
     source: str = "manual"
     tags: list[str] = Field(default_factory=list)
     status: str = "nuevo"
+    stage: str = "nuevo"
     notes: str = Field(default="", max_length=5000)
 
 
@@ -63,7 +72,36 @@ class ContactUpdate(BaseModel):
     source: str | None = None
     tags: list[str] | None = None
     status: str | None = None
+    stage: str | None = None
     notes: str | None = Field(default=None, max_length=5000)
+
+
+class StageHistoryOut(BaseModel):
+    id: int
+    contact_id: int
+    from_stage: str | None = None
+    to_stage: str
+    changed_at: str | None = None
+
+
+class ReminderOut(BaseModel):
+    id: int
+    contact_id: int
+    remind_date: str
+    note: str
+    done: bool
+    created_at: str | None = None
+
+
+class ReminderCreate(BaseModel):
+    remind_date: dt.date
+    note: str = Field(default="", max_length=2000)
+
+
+class ReminderUpdate(BaseModel):
+    remind_date: dt.date | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    done: bool | None = None
 
 
 def _check_source(value: str) -> str:
@@ -84,6 +122,15 @@ def _check_status(value: str) -> str:
     return v
 
 
+def _check_stage(value: str) -> str:
+    v = (value or "").strip().lower()
+    if v not in STAGES:
+        raise HTTPException(
+            status_code=422, detail=f"stage must be one of: {', '.join(STAGES)}"
+        )
+    return v
+
+
 def _out(c: Contact) -> ContactOut:
     return ContactOut(
         id=c.id,
@@ -93,6 +140,7 @@ def _out(c: Contact) -> ContactOut:
         source=c.source,
         tags=list(c.tags or []),
         status=c.status,
+        stage=c.stage or "nuevo",
         notes=c.notes or "",
         created_at=c.created_at.isoformat() if c.created_at else None,
         updated_at=c.updated_at.isoformat() if c.updated_at else None,
@@ -349,6 +397,7 @@ def crm_resumen(
 def list_contacts(
     q: str | None = Query(default=None, description="Search by name or email"),
     status_filter: str | None = Query(default=None, alias="status"),
+    stage_filter: str | None = Query(default=None, alias="stage"),
     user: User = Depends(get_current_user),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -371,7 +420,35 @@ def list_contacts(
         )
     if status_filter:
         query = query.filter(Contact.status == _check_status(status_filter))
+    if stage_filter:
+        query = query.filter(Contact.stage == _check_stage(stage_filter))
     return [_out(c) for c in query.order_by(Contact.id.desc()).offset(offset).limit(limit).all()]
+
+
+# ---------------------------------------------------------------------------
+# Etapas, historial, recordatorios y CSV (Fase 5b mejoras-v1, tarea 1).
+# ---------------------------------------------------------------------------
+
+CSV_COLUMNS = ["nombre", "email", "telefono", "origen", "etapa", "estado", "etiquetas", "notas"]
+MAX_IMPORT_ROWS = 500
+
+
+def _contact_or_404(db: Session, contact_id: int) -> Contact:
+    contact = db.get(Contact, contact_id)
+    if contact is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return contact
+
+
+def _reminder_out(r: CrmReminder) -> ReminderOut:
+    return ReminderOut(
+        id=r.id,
+        contact_id=r.contact_id,
+        remind_date=r.remind_date.isoformat(),
+        note=r.note or "",
+        done=bool(r.done),
+        created_at=r.created_at.isoformat() if r.created_at else None,
+    )
 
 
 @router.post("", response_model=ContactOut, status_code=status.HTTP_201_CREATED)
@@ -387,9 +464,14 @@ def create_contact(
         source=_check_source(payload.source),
         tags=[str(t).strip() for t in payload.tags if str(t).strip()],
         status=_check_status(payload.status),
+        stage=_check_stage(payload.stage),
         notes=payload.notes,
     )
     db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    # Fila inicial del historial: la etapa con la que nace el contacto.
+    db.add(CrmStageHistory(contact_id=contact.id, from_stage=None, to_stage=contact.stage))
     db.commit()
     db.refresh(contact)
     return _out(contact)
@@ -417,6 +499,15 @@ def update_contact(
         contact.tags = [str(t).strip() for t in payload.tags if str(t).strip()]
     if payload.status is not None:
         contact.status = _check_status(payload.status)
+    if payload.stage is not None:
+        new_stage = _check_stage(payload.stage)
+        if new_stage != contact.stage:
+            db.add(
+                CrmStageHistory(
+                    contact_id=contact.id, from_stage=contact.stage, to_stage=new_stage
+                )
+            )
+            contact.stage = new_stage
     if payload.notes is not None:
         contact.notes = payload.notes
     db.commit()
@@ -457,6 +548,232 @@ def delete_contact(
             status_code=409,
             detail="Contact has future appointments; cancel them first",
         )
+    # Historial de etapas y recordatorios: la FK CASCADE los cubre en
+    # Postgres, pero en SQLite el pragma de FK no está activado, así que
+    # se borran explícito para no dejar filas huérfanas que un futuro
+    # contacto reutilizando el id heredaría.
+    db.query(CrmStageHistory).filter(CrmStageHistory.contact_id == contact.id).delete()
+    db.query(CrmReminder).filter(CrmReminder.contact_id == contact.id).delete()
     db.delete(contact)
     db.commit()
     return None
+
+
+# ---------- Historial de etapas ----------
+
+
+@router.get("/{contact_id}/historial", response_model=list[StageHistoryOut])
+def stage_history(
+    contact_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deny_linked_reader(db, user)
+    _contact_or_404(db, contact_id)
+    rows = (
+        db.query(CrmStageHistory)
+        .filter(CrmStageHistory.contact_id == contact_id)
+        .order_by(CrmStageHistory.changed_at.desc(), CrmStageHistory.id.desc())
+        .limit(100)
+        .all()
+    )
+    return [
+        StageHistoryOut(
+            id=r.id,
+            contact_id=r.contact_id,
+            from_stage=r.from_stage,
+            to_stage=r.to_stage,
+            changed_at=r.changed_at.isoformat() if r.changed_at else None,
+        )
+        for r in rows
+    ]
+
+
+# ---------- Recordatorios ----------
+
+
+@router.get("/{contact_id}/recordatorios", response_model=list[ReminderOut])
+def list_reminders(
+    contact_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deny_linked_reader(db, user)
+    _contact_or_404(db, contact_id)
+    rows = (
+        db.query(CrmReminder)
+        .filter(CrmReminder.contact_id == contact_id)
+        .order_by(CrmReminder.remind_date.asc(), CrmReminder.id.asc())
+        .limit(100)
+        .all()
+    )
+    return [_reminder_out(r) for r in rows]
+
+
+@router.post("/{contact_id}/recordatorios", response_model=ReminderOut, status_code=status.HTTP_201_CREATED)
+def create_reminder(
+    contact_id: int,
+    payload: ReminderCreate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    contact = _contact_or_404(db, contact_id)
+    row = CrmReminder(contact_id=contact.id, remind_date=payload.remind_date, note=payload.note, done=False)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _reminder_out(row)
+
+
+@router.patch("/recordatorios/{reminder_id}", response_model=ReminderOut)
+def update_reminder(
+    reminder_id: int,
+    payload: ReminderUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(CrmReminder, reminder_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    if payload.remind_date is not None:
+        row.remind_date = payload.remind_date
+    if payload.note is not None:
+        row.note = payload.note
+    if payload.done is not None:
+        row.done = payload.done
+    db.commit()
+    db.refresh(row)
+    return _reminder_out(row)
+
+
+@router.delete("/recordatorios/{reminder_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reminder(
+    reminder_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.get(CrmReminder, reminder_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    db.delete(row)
+    db.commit()
+    return None
+
+
+# ---------- CSV: plantilla, exportar, importar ----------
+
+
+@router.get("/plantilla", response_class=StreamingResponse)
+def csv_template(user: User = Depends(get_current_user)):
+    """Plantilla CSV vacía con las columnas reales de importación."""
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(CSV_COLUMNS)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.read()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=contactos-plantilla.csv"},
+    )
+
+
+@router.get("/export", response_class=StreamingResponse)
+def csv_export(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deny_linked_reader(db, user)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(CSV_COLUMNS)
+    for c in db.query(Contact).order_by(Contact.id.asc()).all():
+        w.writerow(
+            [
+                c.name,
+                c.email or "",
+                c.phone or "",
+                c.source,
+                c.stage or "nuevo",
+                c.status,
+                "; ".join(c.tags or []),
+                c.notes or "",
+            ]
+        )
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.read()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=contactos.csv"},
+    )
+
+
+@router.post("/import")
+async def csv_import(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Importa contactos desde un CSV con las columnas de la plantilla.
+
+    El cuerpo es el texto CSV (Content-Type: text/csv): así no hace
+    falta multipart (python-multipart no es dependencia del proyecto).
+    El frontend lee el archivo con file.text() y lo envía tal cual.
+    Valida fila por fila: las válidas se crean y las inválidas se
+    reportan en `errores` con su número de fila, sin romper la
+    importación ni crear nada de esa fila. El nombre es obligatorio;
+    origen/etapa/estado inválidos son error de esa fila (no se
+    adivina otro valor). Máximo 500 filas por archivo.
+    """
+    raw = await request.body()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="El archivo debe ser CSV en UTF-8.")
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None or "nombre" not in [f.strip() if f else "" for f in reader.fieldnames]:
+        raise HTTPException(
+            status_code=422,
+            detail="El CSV debe tener la columna 'nombre' (usa la plantilla descargable).",
+        )
+    created = 0
+    errores: list[dict] = []
+    for i, row in enumerate(reader, start=2):  # fila 1 = encabezado
+        if created + len(errores) >= MAX_IMPORT_ROWS:
+            errores.append({"fila": i, "error": "Límite de 500 filas por archivo."})
+            break
+        # Fila totalmente vacía: se ignora, no es error.
+        if not any((v or "").strip() for v in row.values() if v is not None):
+            continue
+        nombre = (row.get("nombre") or "").strip()
+        if not nombre:
+            errores.append({"fila": i, "error": "El nombre es obligatorio."})
+            continue
+        origen = (row.get("origen") or "manual").strip().lower() or "manual"
+        if origen not in SOURCES:
+            errores.append({"fila": i, "error": f"Origen no válido: '{origen}'."})
+            continue
+        etapa = (row.get("etapa") or "nuevo").strip().lower() or "nuevo"
+        if etapa not in STAGES:
+            errores.append({"fila": i, "error": f"Etapa no válida: '{etapa}'."})
+            continue
+        estado = (row.get("estado") or "nuevo").strip().lower() or "nuevo"
+        if estado not in STATUSES:
+            errores.append({"fila": i, "error": f"Estado no válido: '{estado}'."})
+            continue
+        etiquetas = [t.strip() for t in (row.get("etiquetas") or "").split(";") if t.strip()]
+        contact = Contact(
+            name=nombre[:128],
+            email=(row.get("email") or "").strip()[:255],
+            phone=(row.get("telefono") or "").strip()[:64],
+            source=origen,
+            tags=etiquetas,
+            status=estado,
+            stage=etapa,
+            notes=(row.get("notas") or "")[:5000],
+        )
+        db.add(contact)
+        db.flush()
+        db.add(CrmStageHistory(contact_id=contact.id, from_stage=None, to_stage=etapa))
+        created += 1
+    db.commit()
+    return {"creados": created, "errores": errores}

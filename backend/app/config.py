@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     max_daily_loss_usd: str = "0.40"
     max_trades_per_day: int = 3
 
+    # URL pública de la web (Fase 1 mejoras-v1, tarea 1): base de los
+    # enlaces de verificación de correo. Vacía = enlace relativo
+    # (/verificar-correo?token=...); PENDIENTE: requiere al dueño
+    # fijarla en producción junto con el proveedor de correo.
+    public_base_url: str = ""
+
     # Email alerts (Phase 7). If unset, alerts are logged, not sent.
     alert_smtp_host: str = ""
     alert_smtp_port: int = 587

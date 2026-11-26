@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.hardening import audit
 from app.core.security import get_current_user, require_admin
 from app.core.perfiles import require_modulo
 from app.database import get_db
@@ -135,6 +136,10 @@ def register_connection(
     )
     db.add(conn)
     db.commit()
+    # Fase 1 mejoras-v1, tarea 6: registrar una conexión de exchange
+    # es acción sensible de admin (aunque solo sean metadatos).
+    audit(db, user, "exchange.connection_registered", "exchange_connection",
+          str(conn.id), details={"exchange": payload.exchange, "label": payload.label})
     return {"id": conn.id, "exchange": conn.exchange, "label": conn.label}
 
 

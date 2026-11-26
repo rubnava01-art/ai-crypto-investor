@@ -302,7 +302,7 @@ async def _scanner_loop() -> None:
 
 def create_app() -> FastAPI:
     from app.ai import api as ai_api
-    from app.api import academy, acceso, ajustador, analizador, asistente, auth, auditor, backtest, bi, business, chat, clases, contacto, contenido, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, marketing, misc, portfolio, portal, privacidad, profile, public_market, recomendaciones, referrals, signals, strategy, system, talento_riesgos_planillas, tendencias, users
+    from app.api import academy, acceso, analitica, auditoria, ajustador, analizador, asistente, auth, auditor, backtest, bi, business, chat, clases, contacto, contenido, correos, crear, crm, dashboard, desarrollo, espacio, exchange, facturas, inicio, inventario, market, marketing, misc, portfolio, portal, privacidad, profile, public_market, recomendaciones, referrals, signals, strategy, suscripciones, system, talento_riesgos_planillas, tendencias, two_factor, users, mis_datos
 
     app = FastAPI(
         title=settings.app_name,
@@ -328,8 +328,20 @@ def create_app() -> FastAPI:
     @app.exception_handler(Exception)
     async def unhandled_error_handler(request, exc):
         error_id = uuid.uuid4().hex[:12]
+        # Fase 8 mejoras-v1, tarea 2: registro centralizado mínimo de
+        # errores 500 — ruta, método y marca temporal UTC explícita en
+        # el mensaje (el formato del logger no garantiza fecha). Sin
+        # datos personales: nunca se registran contraseñas, tokens ni
+        # cuerpos de login/registro (aquí solo van método y ruta).
+        # Dónde se consultan: logs del servidor (salida estándar; en
+        # Render, pestaña Logs del servicio). La traza completa va al
+        # log con logger.exception; al cliente solo llega error_id.
         logger.exception(
-            "unhandled error [%s] %s %s", error_id, request.method, request.url.path
+            "error 500 [%s] %s %s %s",
+            error_id,
+            dt.datetime.now(dt.timezone.utc).isoformat(),
+            request.method,
+            request.url.path,
         )
         return JSONResponse(
             status_code=500,
@@ -364,7 +376,9 @@ def create_app() -> FastAPI:
 
     app.add_middleware(RequestTimeoutMiddleware)
     app.include_router(auth.router)
+    app.include_router(two_factor.router)
     app.include_router(acceso.router)
+    app.include_router(auditoria.router)
     app.include_router(system.router)
     app.include_router(portfolio.router)
     app.include_router(signals.router)
@@ -407,6 +421,7 @@ def create_app() -> FastAPI:
     app.include_router(tendencias.router)
     app.include_router(auditor.router)
     app.include_router(privacidad.router)
+    app.include_router(mis_datos.router)
     app.include_router(inicio.router)
     app.include_router(inventario.router)
     app.include_router(talento_riesgos_planillas.talento_router)
@@ -416,6 +431,8 @@ def create_app() -> FastAPI:
     app.include_router(ajustador.videos_router)
     app.include_router(analizador.router)
     app.include_router(asistente.router)
+    app.include_router(suscripciones.router)
+    app.include_router(analitica.router)
     app.include_router(ai_api.router)
     return app
 

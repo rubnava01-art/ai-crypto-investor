@@ -40,6 +40,12 @@ export interface PerformanceResponse {
   as_of_utc: string;
 }
 export type SignalSide = "buy" | "sell" | "hold";
+export interface SignalHistory {
+  wins: number;
+  losses: number;
+  total: number;
+  win_rate_pct: number | null;
+}
 export interface SignalOut {
   id: number;
   symbol: string;
@@ -50,6 +56,8 @@ export interface SignalOut {
   reason: string;
   status: string;
   created_utc: string;
+  confidence_pct: number | null;
+  history: SignalHistory | null;
 }
 export interface SignalsResponse {
   signals: SignalOut[];
@@ -213,10 +221,14 @@ export interface MeResponse {
   is_admin: boolean;
   is_super_admin: boolean;
   role: "admin" | "prueba" | "super_admin";
+  // Fase 1 mejoras-v1, tarea 1 y 3: el backend /me devuelve el correo
+  // y su verificación, y si el 2FA está activo en la cuenta.
+  email: string | null;
+  email_verified: boolean;
+  two_factor_enabled: boolean;
   // Perfil editable (paquete 2026-10-28): vacíos hasta que el usuario
   // los llene — nunca se inventan.
   display_name: string | null;
-  email: string | null;
   address: string | null;
   avatar_data_url: string | null;
 }
@@ -237,6 +249,9 @@ export interface UserProfile {
   business_handle: string | null;
   business_description: string | null;
   skills: string[] | null;
+  // Fase 1 mejoras-v1, tarea 1: el backend /api/profile/me devuelve si
+  // el correo está verificado (el panel muestra el aviso + reenvío).
+  email_verified: boolean;
 }
 
 export interface UserProfileInput {
@@ -249,6 +264,41 @@ export interface UserProfileInput {
   business_handle?: string;
   business_description?: string;
   skills?: string[];
+}
+
+// Fase 7 mejoras-v1: suscripción propia (GET /api/suscripciones/mia).
+export interface Suscripcion {
+  id: number;
+  user_id: number;
+  plan: string;
+  plan_nombre: string;
+  precio_mensual_usd: number;
+  estado: string;
+  estado_efectivo: string;
+  acceso_activo: boolean;
+  prueba_inicio: string | null;
+  prueba_fin: string | null;
+  renovacion_en: string | null;
+  cancelada_en: string | null;
+  acceso_hasta: string | null;
+  dias_restantes_prueba: number | null;
+  creado_en: string | null;
+  actualizado_en: string | null;
+}
+
+export interface MiSuscripcion {
+  suscripcion: Suscripcion | null;
+  pago_en_linea: {
+    configurado: boolean;
+    proveedor: string | null;
+    mensaje: string;
+    pendientes: string[];
+  };
+}
+
+export interface CancelarSuscripcionResult {
+  suscripcion: Suscripcion;
+  mensaje: string;
 }
 
 // ---------- Chat en vivo ----------
@@ -372,6 +422,21 @@ export interface InventoryItemInput {
   unit?: InventoryUnit;
   unit_price?: number;
   min_stock?: number;
+  // Motivo del cambio de cantidad (Fase 5b, tarea 3): solo alimenta el
+  // historial de movimientos; no se guarda en el producto.
+  motivo?: string;
+}
+
+// Movimiento de stock (Fase 5b mejoras-v1, tarea 3): una fila por cambio
+// real de cantidad, con delta con signo y stock resultante.
+export interface InventoryMovement {
+  id: number;
+  item_id: number;
+  tipo: "entrada" | "venta" | "ajuste";
+  cantidad_delta: number;
+  cantidad_final: number;
+  motivo: string;
+  created_at: string | null;
 }
 
 // ---------- Privacidad y cumplimiento ----------
@@ -535,6 +600,10 @@ export interface DashboardResponse {
 export type CrmSource = "manual" | "academia" | "cohley" | "rivgoods" | "otro";
 export type CrmStatus = "nuevo" | "contactado" | "interesado" | "cliente" | "inactivo";
 
+// Etapa de venta (Fase 5b mejoras-v1, tarea 1): embudo propio, distinto
+// del estado general. "ganado"/"perdido" cierran el embudo.
+export type CrmStage = "nuevo" | "contactado" | "propuesta" | "negociacion" | "ganado" | "perdido";
+
 export interface CrmContact {
   id: number;
   name: string;
@@ -543,6 +612,7 @@ export interface CrmContact {
   source: CrmSource;
   tags: string[];
   status: CrmStatus;
+  stage: CrmStage;
   notes: string;
   created_at: string | null;
   updated_at: string | null;
@@ -555,7 +625,30 @@ export interface CrmContactInput {
   source?: CrmSource;
   tags?: string[];
   status?: CrmStatus;
+  stage?: CrmStage;
   notes?: string;
+}
+
+export interface CrmStageHistory {
+  id: number;
+  contact_id: number;
+  from_stage: CrmStage | null;
+  to_stage: CrmStage;
+  changed_at: string | null;
+}
+
+export interface CrmReminder {
+  id: number;
+  contact_id: number;
+  remind_date: string;
+  note: string;
+  done: boolean;
+  created_at: string | null;
+}
+
+export interface CrmImportResult {
+  creados: number;
+  errores: { fila: number; error: string }[];
 }
 
 // Resumen del CRM (Fase 3, rediseño estilo Vivero): solo datos reales
@@ -690,6 +783,64 @@ export interface EduClass {
   created_at: string | null;
 }
 
+export interface EduProgressKind {
+  total: number;
+  completed: number;
+  pct: number;
+}
+
+export interface EduProgress {
+  completed_class_ids: number[];
+  total: number;
+  completed: number;
+  pct: number;
+  by_kind: Record<EduClassKind, EduProgressKind>;
+}
+
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+}
+
+export interface QuizOut {
+  class_id: number;
+  has_quiz: boolean;
+  questions: QuizQuestion[];
+}
+
+export interface QuizResultItem {
+  question_id: number;
+  correct: boolean;
+  correct_index: number;
+  explanation: string;
+}
+
+export interface QuizResult {
+  score: number;
+  total: number;
+  results: QuizResultItem[];
+}
+
+export interface QuizQuestionAdmin {
+  id: number;
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+  source: string;
+}
+
+export interface CertificateOut {
+  kind: EduClassKind;
+  completed: boolean;
+  total: number;
+  completed_count: number;
+  pct: number;
+  user_name: string;
+  completed_at: string | null;
+}
+
 // ---------- Correos ----------
 
 export interface EmailTemplate {
@@ -759,6 +910,12 @@ export interface Invoice {
   items: InvoiceItem[];
   tax_rate: number;
   status: InvoiceStatus;
+  /** Estado de cobro DERIVADO del backend (Fase 5b, tarea 2): pagada,
+   * vencida (enviada con fecha <= hoy) o pendiente. No es un estado
+   * editable: se recalcula con la fecha de vencimiento. */
+  estado_cobro: "pendiente" | "pagada" | "vencida";
+  /** Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): AAAA-MM-DD o null. */
+  due_date?: string | null;
   notes: string;
   created_at: string | null;
 }
@@ -840,8 +997,25 @@ export interface BusinessTask {
   area: BusinessArea;
   title: string;
   done: boolean;
+  /** Fecha de vencimiento (Fase 4 mejoras-v1, tarea 7): AAAA-MM-DD o null. */
+  due_date?: string | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+// Notificaciones en la app (Fase 5b mejoras-v1, tarea 5): tareas no
+// hechas que vencen hoy o ya vencieron, en todas las áreas.
+export interface BusinessNotificacionTarea {
+  id: number;
+  area: BusinessArea;
+  title: string;
+  due_date: string | null;
+}
+
+export interface BusinessNotificaciones {
+  fecha: string;
+  vencidas: BusinessNotificacionTarea[];
+  de_hoy: BusinessNotificacionTarea[];
 }
 
 // ---------- Marketing + Citas (NEST, 2026-11-17) ----------
@@ -1191,4 +1365,61 @@ export interface BusinessCostUpdate {
   concept?: string;
   amount?: number;
   notes?: string;
+}
+
+// ---------- Panel "Hoy" (Fase 4 mejoras-v1, tarea 7) ----------
+// GET /api/dashboard/hoy. Una sección es [] cuando el perfil no tiene
+// ese módulo (sin acceso) y null solo si esa sección falló.
+export interface HoyTarea {
+  id: number;
+  area: string;
+  title: string;
+  due_date: string | null;
+  href: string;
+}
+
+export interface HoyFactura {
+  id: number;
+  number: string;
+  client_name: string;
+  due_date: string | null;
+  total: number;
+  href: string;
+}
+
+export interface HoyStock {
+  id: number;
+  name: string;
+  quantity: number;
+  min_stock: number;
+  href: string;
+}
+
+export interface HoyCita {
+  id: number;
+  client_name: string;
+  service_type: string;
+  starts_at: string;
+  href: string;
+}
+
+// Recordatorio del CRM (Fase 5b mejoras-v1, tarea 1): no hecho, con
+// fecha <= hoy. El detalle es la nota del recordatorio.
+export interface HoyRecordatorio {
+  id: number;
+  contact_name: string;
+  note: string;
+  remind_date: string | null;
+  href: string;
+}
+
+export interface HoyResponse {
+  fecha: string;
+  tareas: HoyTarea[] | null;
+  facturas_vencidas: HoyFactura[] | null;
+  facturas_por_vencer: HoyFactura[] | null;
+  facturas_por_cobrar: HoyFactura[] | null;
+  stock_bajo: HoyStock[] | null;
+  citas: HoyCita[] | null;
+  recordatorios: HoyRecordatorio[] | null;
 }

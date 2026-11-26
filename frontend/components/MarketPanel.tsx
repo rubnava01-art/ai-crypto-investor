@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { api, ApiError, type CoinPrice } from "../lib/api";
+import { api, ApiError, displaySourceName, type CoinPrice } from "../lib/api";
+import { ageInMinutes, formatDateTimeTz } from "../lib/dates";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
 import { apiErrorText } from "./ui";
 import { MetricCard } from "./MetricCard";
+import { SimulacionAviso } from "./SimulacionAviso";
 import { MetricCardSkeleton } from "./Skeleton";
 
 // URL del WebSocket público de Kraken por variable de entorno (Fase 4,
@@ -38,7 +40,7 @@ const PAIR_TO_SYMBOL: Record<string, string> = {
 };
 
 function Sparkline({ data, up }: { data: number[]; up: boolean }) {
-  if (data.length < 2) return <span className="text-xs text-slate-600">—</span>;
+  if (data.length < 2) return <span className="text-xs text-zinc-400">—</span>;
   const w = 96;
   const h = 32;
   const min = Math.min(...data);
@@ -204,6 +206,7 @@ export function MarketPanel() {
 
   return (
     <Panel title={t.market.title} badge={liveBadge}>
+      <SimulacionAviso />
       {error && <p role="alert" className="py-6 text-center text-sm leading-relaxed text-amber-400">{error}</p>}
       {/* Franja de MetricCards con los precios reales (REST o tick WS en
           vivo): mismo dato que la lista detallada, en formato tarjeta.
@@ -293,11 +296,35 @@ export function MarketPanel() {
           className={`mt-3 text-xs leading-relaxed ${!wsFresh && (meta.stale || lastTickAt > 0) ? "text-amber-400" : "text-slate-400"}`}
           role={!wsFresh && (meta.stale || lastTickAt > 0) ? "status" : undefined}
         >
-          {wsFresh
-            ? t.market.liveNote
-            : meta.stale || lastTickAt > 0
-              ? t.market.staleNote.replace("{time}", new Date(meta.updated).toLocaleTimeString(locale, { hour12: false }))
-              : t.market.publicNote.replace("{time}", new Date(meta.updated).toLocaleTimeString(locale, { hour12: false }))}
+          {(() => {
+            // Fase 5a, tarea 1: cada precio lleva su fecha/hora en hora de
+            // Los Ángeles y su fuente real; un precio en caché añade su
+            // antigüedad ("hace N min"), nunca se presenta como actual.
+            const updatedLA = formatDateTimeTz(meta.updated, locale);
+            const sourceName = displaySourceName(meta.source);
+            const ageMin = ageInMinutes(meta.updated, now);
+            const age =
+              ageMin === null
+                ? ""
+                : ageMin < 1
+                  ? t.market.ageNow
+                  : ageMin < 60
+                    ? t.market.ageMinutes.replace("{n}", String(ageMin))
+                    : t.market.ageHours.replace("{n}", String(Math.floor(ageMin / 60)));
+            if (wsFresh) {
+              return t.market.liveNote.replace(
+                "{time}",
+                formatDateTimeTz(new Date(lastTickAt).toISOString(), locale),
+              );
+            }
+            if (meta.stale || lastTickAt > 0) {
+              return t.market.staleNote
+                .replace("{source}", sourceName)
+                .replace("{time}", updatedLA)
+                .replace("{age}", age);
+            }
+            return t.market.publicNote.replace("{source}", sourceName).replace("{time}", updatedLA);
+          })()}
         </p>
       )}
       <button

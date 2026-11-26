@@ -56,7 +56,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       setTitle("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errAddTask);
+      setError(t.desarrollo.errAddTask);
     } finally {
       setBusy(false);
     }
@@ -67,7 +67,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       await api.updateDigitalTask(tk.id, { done: !tk.done });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errUpdateTask);
+      setError(t.desarrollo.errUpdateTask);
     }
   };
 
@@ -77,7 +77,7 @@ function ProjectTasks({ project, isAdmin }: { project: DigitalProject; isAdmin: 
       await api.deleteDigitalTask(tk.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errDeleteTask);
+      setError(t.desarrollo.errDeleteTask);
     }
   };
 
@@ -185,7 +185,7 @@ export function DesarrolloPanel() {
       setNotes("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errCreate);
+      setError(t.desarrollo.errCreate);
     } finally {
       setBusy(false);
     }
@@ -197,7 +197,7 @@ export function DesarrolloPanel() {
       await api.updateDigitalProject(p.id, { stage: next });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errChangeStage);
+      setError(t.desarrollo.errChangeStage);
     }
   };
 
@@ -208,7 +208,7 @@ export function DesarrolloPanel() {
       await api.deleteDigitalProject(p.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.desarrollo.errDeleteProject);
+      setError(t.desarrollo.errDeleteProject);
     }
   };
 

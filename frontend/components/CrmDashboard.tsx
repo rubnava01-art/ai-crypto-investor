@@ -310,7 +310,7 @@ export function CrmDashboard({
               })}
             </div>
           </ChartCard>
-          <p className="mt-2 text-xs text-zinc-500">{t.crm.resumenNotaVentas}</p>
+          <p className="mt-2 text-xs text-zinc-400">{t.crm.resumenNotaVentas}</p>
         </div>
       </section>
     </div>

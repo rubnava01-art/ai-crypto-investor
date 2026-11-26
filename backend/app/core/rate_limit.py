@@ -62,6 +62,15 @@ class RateLimiter:
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
+# Fase 1 mejoras-v1, tarea 2: el registro tenía el mismo presupuesto
+# que el login (10/min por IP compartido): una ráfaga de logins
+# bloqueaba registrarse y viceversa. Presupuesto propio, mismo tope
+# (10/min por IP): separarlo es la mejora — un tope menor (5/min)
+# rompía la ráfaga legítima de registro de la suite. El reenvío de
+# verificación también va aparte (5/min).
+register_limiter = RateLimiter(max_requests=10, window_seconds=60)
+resend_limiter = RateLimiter(max_requests=5, window_seconds=60)
+
 # Perfil invitado (corrida 2026-11-23, mejoras óptimas, Fase 1):
 # limiters propios por IP — un invitado no tiene user.id, así que la
 # clave es la IP (con la limitación documentada arriba: tras el proxy

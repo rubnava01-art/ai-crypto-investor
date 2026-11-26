@@ -8,6 +8,7 @@ import { loginUrl } from "../lib/session";
 import { FAMILY_ACCENT, familyForHref, KEY_BY_HREF, ModuleNav } from "./ModuleNav";
 import { GUEST_MODULES } from "../lib/api/guest";
 import { ProfileMenu } from "./ProfileMenu";
+import { CommandPalette } from "./CommandPalette";
 import { Footer } from "./Footer";
 import { SkipLink } from "./ui";
 import { Skeleton } from "./Skeleton";
@@ -126,6 +127,8 @@ export function ModuleShell({
         </div>
         <div className="flex items-center gap-2">
           <LanguageToggle />
+          {/* Fase 4 mejoras-v1, tarea 4: buscador global Ctrl+K. */}
+          <CommandPalette />
           <ProfileMenu onLogout={logout} />
         </div>
       </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiError, type AIAskResponse, type AILessonsResponse, type AIStatusResponse } from "../lib/api";
+import { api, type AIAskResponse, type AILessonsResponse, type AIStatusResponse } from "../lib/api";
 import { Panel } from "./Panel";
 import { DemoBadge, EmptyState } from "./badges";
 import { useLanguage } from "../lib/i18n";
@@ -42,7 +42,7 @@ export function AiAssistant() {
       const res = await api.aiAsk(q);
       setAnswer(res);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.ai.askFailed);
+      setError(t.ai.askFailed);
     } finally {
       setAsking(false);
     }

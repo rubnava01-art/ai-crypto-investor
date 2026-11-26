@@ -38,7 +38,7 @@ def _register(client, username):
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": username, "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
+        json={"username": username, "password": "pass1234abcd", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
     return r.json()
@@ -49,9 +49,20 @@ def _token(username):
 
 
 def _list_users(client, headers):
-    r = client.get("/api/users", headers=headers)
-    assert r.status_code == 200, r.text
-    return {u["username"]: u for u in r.json()}
+    # Fase 8: la suite comparte una BD y ya supera los 100 usuarios
+    # del límite por defecto — un usuario creado tarde quedaba fuera
+    # de la primera página (KeyError). Se pagina hasta agotar.
+    users = {}
+    offset = 0
+    while True:
+        r = client.get(f"/api/users?limit=200&offset={offset}", headers=headers)
+        assert r.status_code == 200, r.text
+        page = r.json()
+        if not page:
+            break
+        users.update({u["username"]: u for u in page})
+        offset += len(page)
+    return users
 
 
 def test_register_creates_pending_and_login_blocked(client, admin_headers):

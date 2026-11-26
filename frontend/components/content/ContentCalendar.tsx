@@ -147,7 +147,7 @@ export function ContentCalendar({ isAdmin }: { isAdmin: boolean }) {
       setEditing(null);
       load.reload();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t.contenido.errSaveItem);
+      setFormError(t.contenido.errSaveItem);
     } finally {
       setBusy(false);
     }
@@ -161,7 +161,7 @@ export function ContentCalendar({ isAdmin }: { isAdmin: boolean }) {
       setMsg(t.contenido.msgPublished);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.contenido.errPublish);
+      setActionError(t.contenido.errPublish);
     }
   };
 
@@ -174,7 +174,7 @@ export function ContentCalendar({ isAdmin }: { isAdmin: boolean }) {
       setMsg(t.contenido.msgItemDeleted);
       load.reload();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : t.contenido.errDeleteItem);
+      setActionError(t.contenido.errDeleteItem);
     }
   };
 
@@ -232,7 +232,7 @@ export function ContentCalendar({ isAdmin }: { isAdmin: boolean }) {
                             ? "border-emerald-500 bg-emerald-500/15 text-zinc-100"
                             : d.inMonth
                               ? "border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800"
-                              : "border-zinc-800/50 bg-zinc-950/40 text-zinc-600"
+                              : "border-zinc-800/50 bg-zinc-950/40 text-zinc-400"
                         }`}
                       >
                         <span className={`font-semibold ${isToday ? "rounded-full bg-emerald-600 px-1.5 text-white" : ""}`}>{d.day}</span>

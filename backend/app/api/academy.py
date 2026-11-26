@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import (
+    Guest,
     Principal,
     get_current_user,
     guest_read_guard,
@@ -391,18 +392,33 @@ def list_courses(
 def download_course_pdf(
     course_id: int,
     # Fase 1 (2026-11-23): descarga de PDF abierta a invitado
-    # (Estudiar en solo lectura).
+    # (Estudiar en solo lectura) — SOLO para la guía gratuita
+    # (H-02, Fase 1 mejoras-v1, tarea 5): los PDF de pago exigen
+    # cuenta registrada no-invitado (403 para el invitado).
     user: Principal = Depends(guest_read_guard),
     db: Session = Depends(get_db),
 ):
-    """Serve the course's real PDF — authenticated users only (any role).
+    """Serve the course's real PDF.
 
-    404 when the course does not exist or has no single PDF file (the Pack
-    is the 6 ebook PDFs, downloaded from each ebook's own entry).
+    La guía gratuita (precio 0) se descarga con cualquier principal
+    autenticado, incluido el invitado. Los PDF de pago (ebooks $19.99,
+    Pack, Academia $400) exigen cuenta registrada no-invitado: el
+    invitado recibe 403. Límite conocido (decisión de producto
+    PENDIENTE): cualquier cuenta registrada puede descargarlos; el
+    gating por compra real (Hotmart/PayPal) no existe hoy porque la
+    entrega se verifica a mano con el comprobante.
     """
     course = db.get(Course, course_id)
     if course is None:
         raise HTTPException(status_code=404, detail="Course not found")
+    if isinstance(user, Guest) and (course.price_usd or 0) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Este PDF es de pago: inicia sesión con tu cuenta "
+                "para descargarlo."
+            ),
+        )
     filename = PDF_FILES.get(course.slug)
     if not filename:
         raise HTTPException(

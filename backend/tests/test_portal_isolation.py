@@ -636,7 +636,7 @@ def test_18_token_cuenta_pendiente_403_en_portal(client, admin_headers):
         "/api/auth/register",
         json={"username": username, "password": "pass1234abcd",
               "challenge_id": data["challenge_id"],
-              "answer": int(m.group(1)) + int(m.group(2))},
+              "answer": int(m.group(1)) + int(m.group(2)), "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "pending"

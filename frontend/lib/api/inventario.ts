@@ -1,7 +1,7 @@
 // Dominio inventario del API (extraído de lib/api.ts en Fase 4, sin cambios de comportamiento).
 import { request } from "./client";
 import { catalogMemo } from "./memo";
-import type { InventoryItem, InventoryItemInput } from "./types";
+import type { InventoryItem, InventoryItemInput, InventoryMovement } from "./types";
 
 export const inventarioApi = {
   // Lista casi estática (2026-11-25): la lista de stock es la misma
@@ -28,6 +28,17 @@ export const inventarioApi = {
     }),
   deleteInventoryItem: (id: number) =>
     request<void>(`/api/inventario/items/${id}`, { method: "DELETE", auth: true }).then((res) => {
+      catalogMemo.invalidate("/api/inventario/items");
+      return res;
+    }),
+
+  // ---------- Historial de movimientos (Fase 5b mejoras-v1, tarea 3) ----------
+  // El ajuste +/-1 del panel usa addMovement (queda registrado con su
+  // motivo) en vez del PUT de cantidad, que no dejaba rastro.
+  listMovements: (itemId: number) =>
+    request<InventoryMovement[]>(`/api/inventario/items/${itemId}/movimientos`, { auth: true, retry: true }),
+  addMovement: (itemId: number, body: { tipo: "entrada" | "venta" | "ajuste"; cantidad: number; motivo?: string }) =>
+    request<InventoryMovement>(`/api/inventario/items/${itemId}/movimientos`, { method: "POST", auth: true, body }).then((res) => {
       catalogMemo.invalidate("/api/inventario/items");
       return res;
     }),

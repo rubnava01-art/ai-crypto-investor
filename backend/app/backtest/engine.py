@@ -37,8 +37,17 @@ class TradeRecord:
     exit_price: float
     quantity: float
     fee_paid: float
-    pnl_net: float
-    exit_reason: str
+    # Fase 5a, tarea 2: la comisión y el deslizamiento se registran por
+    # separado (antes iban mezclados en fee_paid) y pnl_gross es el
+    # resultado bruto, sin costes. pnl_net = pnl_gross - fee_paid -
+    # slippage_paid (comisión + deslizamiento de ENTRADA y de salida).
+    # El bug previo: pnl_net restaba solo los costes de salida, así que
+    # la suma de pnl_net no cuadraba con la equidad final (que sí
+    # descontaba la entrada desde el efectivo).
+    slippage_paid: float = 0.0
+    pnl_gross: float = 0.0
+    pnl_net: float = 0.0
+    exit_reason: str = ""
 
 
 @dataclass
@@ -53,10 +62,12 @@ class BacktestResult:
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(["entry_idx", "exit_idx", "side", "entry_price", "exit_price",
-                    "quantity", "fee_paid", "pnl_net", "exit_reason"])
+                    "quantity", "fee_paid", "slippage_paid", "pnl_gross",
+                    "pnl_net", "exit_reason"])
         for t in self.trades:
             w.writerow([t.entry_idx, t.exit_idx, t.side, t.entry_price, t.exit_price,
-                        t.quantity, t.fee_paid, t.pnl_net, t.exit_reason])
+                        t.quantity, t.fee_paid, t.slippage_paid, t.pnl_gross,
+                        t.pnl_net, t.exit_reason])
         return buf.getvalue()
 
 
@@ -69,6 +80,8 @@ def run_backtest(closes: list[float], config: BacktestConfig) -> BacktestResult:
     cash = float(config.initial_equity)
     position_qty = 0.0
     entry_price = 0.0
+    entry_fee = 0.0
+    entry_slippage = 0.0
     stop_price = 0.0
     target_price = 0.0
     equity_curve = []
@@ -92,15 +105,21 @@ def run_backtest(closes: list[float], config: BacktestConfig) -> BacktestResult:
                 exit_reason = "signal"
             if exit_reason:
                 proceeds = position_qty * price
-                fee = proceeds * float(config.fee_rate) + proceeds * float(config.slippage_rate)
-                pnl = proceeds - fee - (position_qty * entry_price)
+                exit_fee = proceeds * float(config.fee_rate)
+                exit_slip = proceeds * float(config.slippage_rate)
+                entry_cost = position_qty * entry_price
+                pnl_gross = proceeds - entry_cost
+                pnl = pnl_gross - (entry_fee + entry_slippage + exit_fee + exit_slip)
                 result.trades.append(TradeRecord(
                     entry_idx=i, exit_idx=i, side="buy",
                     entry_price=entry_price, exit_price=price,
-                    quantity=position_qty, fee_paid=fee, pnl_net=pnl,
+                    quantity=position_qty,
+                    fee_paid=entry_fee + exit_fee,
+                    slippage_paid=entry_slippage + exit_slip,
+                    pnl_gross=pnl_gross, pnl_net=pnl,
                     exit_reason=exit_reason,
                 ))
-                cash += proceeds - fee
+                cash += proceeds - exit_fee - exit_slip
                 position_qty = 0.0
 
         # Open new position
@@ -112,21 +131,24 @@ def run_backtest(closes: list[float], config: BacktestConfig) -> BacktestResult:
                 Decimal(str(cash)), config.risk_pct,
                 Decimal(str(entry)), Decimal(str(stop))))
             cost = qty * entry
-            fee = cost * float(config.fee_rate) + cost * float(config.slippage_rate)
+            fee = cost * float(config.fee_rate)
+            slip = cost * float(config.slippage_rate)
             # Scale down if cost+fee exceeds cash (same balance rule as live guard)
-            if cost + fee > cash and (cost + fee) > 0:
-                scale = cash / (cost + fee)
+            if cost + fee + slip > cash and (cost + fee + slip) > 0:
+                scale = cash / (cost + fee + slip)
                 qty *= scale
                 cost = qty * entry
-                fee = cost * float(config.fee_rate) + cost * float(config.slippage_rate)
+                fee = cost * float(config.fee_rate)
+                slip = cost * float(config.slippage_rate)
             if qty > 0:
                 # round-trip cost guard (same rule as live)
                 ok, _ = risk_math.round_trip_cost_ok(
                     Decimal(str(qty)), Decimal(str(entry)), Decimal(str(target)),
                     config.fee_rate, config.slippage_rate)
                 if ok:
-                    cash -= cost + fee
+                    cash -= cost + fee + slip
                     position_qty, entry_price = qty, entry
+                    entry_fee, entry_slippage = fee, slip
                     stop_price, target_price = stop, target
 
         equity_curve.append(cash + position_qty * price)
@@ -164,8 +186,17 @@ def compute_metrics(result: BacktestResult, initial: float) -> dict:
     base_final = result.baseline_equity[-1] if result.baseline_equity else initial
     baseline_return_pct = (base_final - initial) / initial * 100
 
+    # Fase 5a, tarea 2: bruto vs neto. El neto ya lo era (la equidad
+    # descuenta los costes en efectivo); el bruto es el resultado sin
+    # comisión ni deslizamiento, para que el coste se vea explícito.
+    total_fees = sum(t.fee_paid for t in trades)
+    total_slippage = sum(t.slippage_paid for t in trades)
+    total_costs = total_fees + total_slippage
+    gross_return_pct = (final + total_costs - initial) / initial * 100
+
     return {
         "net_return_pct": round(net_return_pct, 2),
+        "gross_return_pct": round(gross_return_pct, 2),
         "baseline_return_pct": round(baseline_return_pct, 2),
         "max_drawdown_pct": round(max_dd, 2),
         "sharpe_per_trade": round(sharpe, 3) if sharpe is not None else None,
@@ -173,6 +204,11 @@ def compute_metrics(result: BacktestResult, initial: float) -> dict:
         "expectancy_usd": round(expectancy, 4),
         "n_trades": len(trades),
         "final_equity_usd": round(final, 2),
+        "total_fees_usd": round(total_fees, 4),
+        "total_slippage_usd": round(total_slippage, 4),
+        "total_costs_usd": round(total_costs, 4),
+        "fee_rate": float(result.config.fee_rate),
+        "slippage_rate": float(result.config.slippage_rate),
     }
 
 

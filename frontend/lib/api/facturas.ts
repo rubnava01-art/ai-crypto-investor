@@ -20,13 +20,22 @@ export const facturasApi = {
     catalogMemo.get<Invoice[]>("/api/facturas/invoices", () =>
       request<Invoice[]>("/api/facturas/invoices", { auth: true, retry: true }),
     ),
-  createInvoice: (body: { number?: string; client_name: string; client_email?: string; client_phone?: string; items: InvoiceItem[]; tax_rate?: number; notes?: string }) =>
+  createInvoice: (body: { number?: string; client_name: string; client_email?: string; client_phone?: string; items: InvoiceItem[]; tax_rate?: number; due_date?: string | null; notes?: string }) =>
     request<Invoice>("/api/facturas/invoices", { method: "POST", auth: true, body }).then((res) => {
       catalogMemo.invalidate("/api/facturas/invoices");
       return res;
     }),
   updateInvoiceStatus: (id: number, status: InvoiceStatus) =>
     request<Invoice>(`/api/facturas/invoices/${id}`, { method: "PATCH", auth: true, body: { status } }).then((res) => {
+      catalogMemo.invalidate("/api/facturas/invoices");
+      return res;
+    }),
+  // Fecha de vencimiento de una factura existente (Fase 5b, tarea 2;
+  // cierra el pendiente de Fase 4): fijar con "AAAA-MM-DD" o borrar
+  // con null. El endpoint PATCH ya lo soportaba (fix H1 Fase 4); aquí
+  // solo faltaba el cliente y el control por fila del panel.
+  updateInvoiceDueDate: (id: number, due_date: string | null) =>
+    request<Invoice>(`/api/facturas/invoices/${id}`, { method: "PATCH", auth: true, body: { due_date } }).then((res) => {
       catalogMemo.invalidate("/api/facturas/invoices");
       return res;
     }),

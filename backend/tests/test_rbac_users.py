@@ -32,9 +32,12 @@ def test_admin_user_crud(client):
     uid = r.json()["id"]
     assert r.json()["role"] == "prueba"
 
-    r = client.get("/api/users", headers=h)
+    r = client.get("/api/users?limit=200", headers=h)
     assert r.status_code == 200
     names = [u["username"] for u in r.json()]
+    # limit=200 (máximo): la suite comparte una única BD y el total de
+    # usuarios ya supera el límite por defecto (100), así que el usuario
+    # recién creado quedaba fuera de la primera página.
     assert "nuevo" in names and "admin" in names
 
     r = client.patch(f"/api/users/{uid}", json={"role": "admin"}, headers=h)

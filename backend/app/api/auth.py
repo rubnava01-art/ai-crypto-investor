@@ -25,14 +25,25 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core import analitica
+from app.core.email_verification import (
+    is_valid_email,
+    issue_verification_token,
+    requires_email_verification,
+    verify_email_token,
+)
 from app.core.hardening import audit
 from app.core.rate_limit import (
     LoginLockout,
     guest_issue_limiter,
     login_limiter,
     login_lockout,
+    register_limiter,
+    resend_limiter,
 )
 from app.core.security import (
     GUEST_TOKEN_EXPIRE_SECONDS,
@@ -48,7 +59,7 @@ from app.core.security import (
     verify_password,
 )
 from app.database import get_db
-from app.models.tables import PendingActivation, User
+from app.models.tables import PendingActivation, User, utcnow
 from app.schemas.api import LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -139,6 +150,22 @@ class RegisterRequest(BaseModel):
     # Plan elegido en la landing (?plan=<clave>). Opcional: registrarse
     # sin elegir plan sigue funcionando y guarda NULL.
     plan: str | None = None
+    # Correo para verificación (Fase 1 mejoras-v1, tarea 1). Opcional:
+    # sin correo no hay verificación que hacer (cuentas viejas y
+    # registros sin correo entran como antes, tras la aprobación).
+    # Con correo: se emite el token y la cuenta no entra hasta
+    # verificar, una vez aprobada.
+    email: str | None = None
+    # Aceptación de los textos legales (Fase 2 mejoras-v1, tarea 1):
+    # el registro exige aceptar los Términos y la Política de
+    # privacidad (checkbox en /login?mode=register). Sin aceptación
+    # no hay cuenta: el validador lo rechaza con 422.
+    # H1 (corrección QA Fase 2, 2026-11-25): SIN default. Con
+    # `= False` Pydantic v2 no ejecutaba el validador sobre el valor
+    # por defecto y un registro sin el campo devolvía 201 y estampaba
+    # terms_accepted_at, registrando un consentimiento que nunca
+    # ocurrió. Obligatorio: omitirlo es 422 ("Field required").
+    terms_accepted: bool
 
     @field_validator("username")
     @classmethod
@@ -162,6 +189,28 @@ class RegisterRequest(BaseModel):
         if v is None:
             return None
         return normalize_requested_plan(v)
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = (v or "").strip()
+        if not v:
+            return None
+        if len(v) > 255 or not is_valid_email(v):
+            raise ValueError("El correo no tiene un formato válido.")
+        return v
+
+    @field_validator("terms_accepted")
+    @classmethod
+    def _require_terms(cls, v: bool) -> bool:
+        if v is not True:
+            raise ValueError(
+                "Debes aceptar los Términos y la Política de privacidad "
+                "para crear la cuenta."
+            )
+        return v
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -215,7 +264,61 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
             status_code=status.HTTP_403_FORBIDDEN,
             detail=PENDING_DETAIL,
         )
+    # Correo sin verificar (Fase 1 mejoras-v1, tarea 1): la cuenta
+    # está aprobada pero su correo sigue sin confirmar, así que no
+    # entra. Acceso limitado, no bloqueo total: verificar y reenviar
+    # siguen disponibles sin sesión (ver abajo). Sin correo no hay
+    # verificación que exigir; los admin están exentos.
+    if requires_email_verification(user):
+        audit(
+            db, user, "auth.login_failed", "auth",
+            details={"username": payload.username, "reason": "email_unverified"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Tu correo aún no está verificado. Revisa tu bandeja de "
+                "entrada o pide un reenvío del enlace de verificación."
+            ),
+        )
+    # 2FA (Fase 1 mejoras-v1, tarea 3): con el 2FA activado, la
+    # contraseña sola no basta. Sin código -> 401 con mensaje propio
+    # (el cliente reintenta con el código); código inválido -> 401 y
+    # cuenta como fallo de login para el bloqueo por cuenta. Los
+    # códigos de recuperación valen una sola vez.
+    if user.totp_enabled:
+        from app.core.two_factor import verify_second_factor
+
+        if not payload.totp_code:
+            # F3 (corrección Fase 1 mejoras-v1): la contraseña es
+            # correcta y solo falta el código: se responde 2fa_required
+            # SIN registrar fallo de lockout (antes, 10 logins sin
+            # código bloqueaban la cuenta). El fallo solo se registra
+            # con contraseña incorrecta o código TOTP incorrecto. La
+            # auditoría sí se conserva: el intento queda registrado.
+            audit(
+                db, user, "auth.login_failed", "auth",
+                details={"username": payload.username, "reason": "2fa_required"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Se requiere el código de verificación en dos pasos.",
+            )
+        if not verify_second_factor(db, user, payload.totp_code):
+            login_lockout.record_failure(payload.username)
+            audit(
+                db, user, "auth.login_failed", "auth",
+                details={"username": payload.username, "reason": "2fa_failed"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Código de verificación incorrecto.",
+            )
     login_lockout.record_success(payload.username)
+    # Fase 8 mejoras-v1, tarea 4: estampa el último acceso (base de
+    # la reactivación por inactividad). Lo persiste el commit de
+    # audit() justo debajo.
+    user.last_login_at = utcnow()
     audit(db, user, "auth.login_success", "auth")
     return TokenResponse(
         access_token=create_access_token(
@@ -277,6 +380,13 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
         "is_admin": user.is_admin,
         "is_super_admin": super_flag,
         "role": effective_role(user, db, super_flag=super_flag),
+        # Fase 1 mejoras-v1, tarea 1: el frontend muestra el aviso de
+        # verificación con estos dos campos.
+        "email": user.email,
+        "email_verified": bool(user.email_verified),
+        # Fase 1 mejoras-v1, tarea 3: el frontend muestra el estado
+        # del 2FA y el aviso de activación para admin/super admin.
+        "two_factor_enabled": bool(user.totp_enabled),
     }
 
 
@@ -355,6 +465,33 @@ def register_challenge(request: Request):
     return {"challenge_id": cid, "question": f"¿Cuánto es {a} + {b}?"}
 
 
+def _email_taken(db: Session, email: str) -> bool:
+    """True si otra cuenta ya usa ese correo (comparación sin
+    distinguir mayúsculas: el correo no distingue 'A@x.com' de
+    'a@x.com' para el usuario, aunque la UNIQUE de la BD sí lo haga)."""
+    return (
+        db.query(User)
+        .filter(func.lower(User.email) == (email or "").strip().lower())
+        .first()
+        is not None
+    )
+
+
+def _pending_registration_response(username: str, plan: str | None) -> dict:
+    """Cuerpo genérico del registro pendiente (S-1): idéntico para
+    registro nuevo y duplicado, para no delatar si el nombre existe."""
+    return {
+        "id": None,
+        "username": username,
+        "role": "prueba",
+        "is_admin": False,
+        "is_super_admin": False,
+        "status": "pending",
+        "requested_plan": plan,
+        "created_at": None,
+    }
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """Public registration. Always creates a prueba account in pending
@@ -362,7 +499,7 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     panel. Promotion to admin/super_admin happens only through user
     management, after approval."""
     client_ip = request.client.host if request.client else "unknown"
-    if not login_limiter.allow(f"register:{client_ip}"):
+    if not register_limiter.allow(f"register:{client_ip}"):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos de registro. Espera un minuto.",
@@ -386,16 +523,17 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         # responde más rápido y delata que el nombre existe.
         hash_password(payload.password)
         # Sin id ni created_at: no hay fila creada que referenciar.
-        return {
-            "id": None,
-            "username": username,
-            "role": "prueba",
-            "is_admin": False,
-            "is_super_admin": False,
-            "status": "pending",
-            "requested_plan": payload.plan,
-            "created_at": None,
-        }
+        return _pending_registration_response(username, payload.plan)
+    # F2 (corrección Fase 1 mejoras-v1): el correo es único entre
+    # cuentas. A diferencia del nombre, aquí SÍ se responde 409: el
+    # correo lo aporta quien se registra y el error claro evita que
+    # dos cuentas compartan un correo que luego se verifica. La UNIQUE
+    # de la BD (uq_users_email) respalda este chequeo ante carreras.
+    if payload.email and _email_taken(db, payload.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cuenta con ese correo electrónico.",
+        )
     user = User(
         username=username,
         password_hash=hash_password(payload.password),
@@ -403,6 +541,13 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
         # A2: la elección de plan de la landing, ya canonicalizada por
         # el validador (None si se registró sin elegir plan).
         requested_plan=payload.plan,
+        # Fase 1 mejoras-v1, tarea 1: correo opcional para verificación.
+        email=payload.email,
+        # Fase 2 mejoras-v1, tarea 1: la aceptación ya pasó el
+        # validador (terms_accepted=True). H1 (corrección QA Fase 2,
+        # 2026-11-25): la fecha solo se estampa con aceptación real;
+        # sin ella sería un consentimiento inventado.
+        terms_accepted_at=utcnow() if payload.terms_accepted else None,
     )
     db.add(user)
     db.flush()  # populate user.id without committing yet
@@ -410,18 +555,107 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     # dos commits y una caída entre ambos dejaba una cuenta activa sin
     # fila pending — es decir, aprobada sin aprobación.
     db.add(PendingActivation(user_id=user.id))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Carrera: otra petición creó el mismo correo (o nombre) entre
+        # el chequeo y el commit. El correo duplicado es 409; el nombre
+        # duplicado, el mismo 201 genérico de arriba.
+        db.rollback()
+        if payload.email and _email_taken(db, payload.email):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ya existe una cuenta con ese correo electrónico.",
+            ) from None
+        hash_password(payload.password)
+        return _pending_registration_response(username, payload.plan)
     db.refresh(user)
+    # Fase 8 mejoras-v1, tarea 3: evento "registro" (una vez por
+    # usuario; el camino de nombre duplicado no llega aquí porque no
+    # crea fila).
+    analitica.registrar_evento(db, analitica.TIPO_REGISTRO, user.id)
+    # Fase 1 mejoras-v1, tarea 1: con correo, se emite el token de
+    # verificación y se encola el correo (stub: sin envío real,
+    # PENDIENTE proveedor). Sin correo no hay nada que verificar.
+    if payload.email:
+        issue_verification_token(db, user)
+        db.commit()
     # S-1 (corrida 2026-11-24, A3 H-01): el cuerpo es IDÉNTICO al del
     # duplicado (id null, created_at null en ambos): devolver el id o la
     # fecha solo en el registro nuevo delataba si el nombre ya existía.
+    return _pending_registration_response(user.username, user.requested_plan)
+
+
+# ------------------------------------------------- verificación de correo --
+# Fase 1 mejoras-v1, tarea 1. Sin sesión: el usuario verifica desde el
+# enlace que recibió (o pide un reenvío) antes de poder entrar.
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=1)
+
+
+class ResendVerificationRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/verify-email")
+def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)):
+    """Verifica el correo con el token del enlace (un solo uso, 24 h).
+
+    200 cuando el token es válido (la cuenta queda verificada);
+    400 cuando no existe, ya se usó ("no es válido") o venció
+    ("ya venció"): la página /verificar-correo muestra cada caso.
+    """
+    user, result = verify_email_token(db, payload.token)
+    if result == "expired":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "El enlace de verificación ya venció. "
+                "Pide un reenvío del enlace."
+            ),
+        )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "El enlace de verificación no es válido. "
+                "Pide un reenvío del enlace."
+            ),
+        )
+    audit(db, user, "auth.email_verified", "auth")
+    return {"ok": True, "username": user.username}
+
+
+@router.post("/resend-verification")
+def resend_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Reenvía el enlace de verificación (invalida el anterior).
+
+    Respuesta SIEMPRE 200 con el mismo texto, exista o no la cuenta:
+    un 404/409 aquí permitiría enumerar usuarios. Solo se emite un
+    token nuevo cuando la cuenta existe, tiene correo sin verificar
+    y no es admin. Limitado por IP (presupuesto propio, 5/min).
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not resend_limiter.allow(f"resend:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados reenvíos. Espera un minuto.",
+            headers={"Retry-After": "60"},
+        )
+    user = db.query(User).filter(User.username == payload.username.strip()).first()
+    if user is not None and requires_email_verification(user):
+        issue_verification_token(db, user)
+        db.commit()
+        audit(db, user, "auth.email_verification_resent", "auth")
     return {
-        "id": None,
-        "username": user.username,
-        "role": "prueba",
-        "is_admin": False,
-        "is_super_admin": False,
-        "status": "pending",
-        "requested_plan": user.requested_plan,
-        "created_at": None,
+        "ok": True,
+        "detail": (
+            "Si la cuenta existe y su correo sigue sin verificar, "
+            "recibirás un enlace nuevo."
+        ),
     }

@@ -99,13 +99,81 @@ def test_pending_user_token_is_403(client, admin_headers):
     r = client.post(
         "/api/auth/register",
         json={"username": username, "password": "pass1234abcd",
-              "challenge_id": cid, "answer": int(m.group(1)) + int(m.group(2))},
+              "challenge_id": cid, "answer": int(m.group(1)) + int(m.group(2)), "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
     token = create_access_token(username)
     r = client.get("/api/system/status", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
     assert "pendiente" in r.json()["detail"]
+
+
+def test_register_terms_accepted_omitido_o_falso_es_422(client, app):
+    # M2 (corrección QA Fase 2, 2026-11-25): regresión de H1. Omitir
+    # terms_accepted o mandarlo en false es 422 y NO crea la cuenta
+    # (ni fila User, ni PendingActivation, ni terms_accepted_at
+    # fantasma); con true es 201 y la aceptación queda estampada.
+    import re
+
+    from app.core.rate_limit import login_limiter, register_limiter
+    from app.models.tables import PendingActivation, User
+
+    login_limiter._hits.clear()
+    register_limiter._hits.clear()
+
+    def _challenge():
+        r = client.get("/api/auth/register-challenge")
+        assert r.status_code == 200, r.text
+        m = re.search(r"(\d+)\s*\+\s*(\d+)", r.json()["question"])
+        return r.json()["challenge_id"], int(m.group(1)) + int(m.group(2))
+
+    def _user_row(username):
+        db, gen = _db(app)
+        try:
+            return db.query(User).filter(User.username == username).first()
+        finally:
+            _close(gen)
+
+    # 1) Campo omitido -> 422, sin cuenta.
+    u1 = _uid("noterms")
+    cid, answer = _challenge()
+    r = client.post(
+        "/api/auth/register",
+        json={"username": u1, "password": "pass1234abcd",
+              "challenge_id": cid, "answer": answer},
+    )
+    assert r.status_code == 422, r.text
+    assert _user_row(u1) is None
+
+    # 2) false explícito -> 422, sin cuenta.
+    u2 = _uid("falseterms")
+    cid, answer = _challenge()
+    r = client.post(
+        "/api/auth/register",
+        json={"username": u2, "password": "pass1234abcd",
+              "challenge_id": cid, "answer": answer, "terms_accepted": False},
+    )
+    assert r.status_code == 422, r.text
+    assert _user_row(u2) is None
+
+    # 3) true -> 201, cuenta pendiente con la aceptación estampada.
+    u3 = _uid("yesterms")
+    cid, answer = _challenge()
+    r = client.post(
+        "/api/auth/register",
+        json={"username": u3, "password": "pass1234abcd",
+              "challenge_id": cid, "answer": answer, "terms_accepted": True},
+    )
+    assert r.status_code == 201, r.text
+    row = _user_row(u3)
+    assert row is not None
+    assert row.terms_accepted_at is not None
+    db, gen = _db(app)
+    try:
+        assert db.query(PendingActivation).filter(
+            PendingActivation.user_id == row.id).first() is not None
+    finally:
+        _close(gen)
 
 
 def test_password_change_revokes_old_token(client, admin_headers):

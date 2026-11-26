@@ -25,8 +25,54 @@ export const usersApi = {
       body: { current_password, new_password },
     }),
   registerChallenge: () => request<RegisterChallenge>("/api/auth/register-challenge"),
-  register: (body: { username: string; password: string; challenge_id: string; answer: number; plan?: string }) =>
+  register: (body: { username: string; password: string; challenge_id: string; answer: number; plan?: string; terms_accepted: boolean }) =>
     request<AdminUser>("/api/auth/register", { method: "POST", body }),
+  // Verificación de correo (Fase 1 mejoras-v1, correcciones F1): la
+  // página pública /verificar-correo usa verifyEmail; el reenvío es
+  // genérico (siempre 200) y no filtra si la cuenta existe.
+  verifyEmail: (token: string) =>
+    request<{ ok: boolean; username: string }>("/api/auth/verify-email", {
+      method: "POST",
+      body: { token },
+    }),
+  resendVerification: (username: string) =>
+    request<{ ok: boolean; detail: string }>("/api/auth/resend-verification", {
+      method: "POST",
+      body: { username },
+    }),
+  // 2FA TOTP propio (Fase 1 mejoras-v1, correcciones F1): solo admin y
+  // super admin (el backend lo refuerza con require_admin). El setup
+  // devuelve el secreto + otpauth_url (QR); confirm activa y devuelve
+  // los 10 códigos de recuperación (una sola vez); disable exige clave
+  // + código y revoca la sesión.
+  getTwoFactorStatus: () =>
+    request<{ enabled: boolean; pending_setup: boolean; recovery_codes_left: number }>(
+      "/api/auth/2fa/status",
+      { auth: true },
+    ),
+  setupTwoFactor: () =>
+    request<{ secret: string; otpauth_url: string; issuer: string; account: string }>(
+      "/api/auth/2fa/setup",
+      { method: "POST", auth: true },
+    ),
+  confirmTwoFactor: (code: string) =>
+    request<{ ok: boolean; recovery_codes: string[] }>("/api/auth/2fa/confirm", {
+      method: "POST",
+      auth: true,
+      body: { code },
+    }),
+  disableTwoFactor: (password: string, code: string) =>
+    request<{ ok: boolean }>("/api/auth/2fa/disable", {
+      method: "POST",
+      auth: true,
+      body: { password, code },
+    }),
+  regenerateTwoFactorRecoveryCodes: (code: string) =>
+    request<{ ok: boolean; recovery_codes: string[] }>("/api/auth/2fa/recovery-codes", {
+      method: "POST",
+      auth: true,
+      body: { code },
+    }),
   deleteUser: (id: number) =>
     request<void>(`/api/users/${id}`, { method: "DELETE", auth: true }),
   approveUser: (id: number) =>

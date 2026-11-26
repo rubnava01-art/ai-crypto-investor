@@ -21,6 +21,8 @@ import { contactoApi } from "./api/contacto";
 import { referidosApi } from "./api/referidos";
 import { businessApi } from "./api/business";
 import { perfilApi } from "./api/perfil";
+import { misDatosApi } from "./api/mis_datos";
+import { suscripcionesApi } from "./api/suscripciones";
 import { chatApi } from "./api/chat";
 import { recomendacionesApi } from "./api/recomendaciones";
 import { inicioApi } from "./api/inicio";
@@ -36,6 +38,7 @@ import { contenidoApi } from "./api/contenido";
 import { biApi } from "./api/bi";
 import { accesoApi } from "./api/acceso";
 import { guestApi } from "./api/guest";
+import { hoyApi } from "./api/hoy";
 
 export const api = {
   ...systemApi,
@@ -52,6 +55,8 @@ export const api = {
   ...referidosApi,
   ...businessApi,
   ...perfilApi,
+  ...misDatosApi,
+  ...suscripcionesApi,
   ...chatApi,
   ...recomendacionesApi,
   ...inicioApi,
@@ -67,4 +72,5 @@ export const api = {
   ...biApi,
   ...accesoApi,
   ...guestApi,
+  ...hoyApi,
 };

@@ -41,6 +41,16 @@ export function isMarketNoData(err: unknown): boolean {
   return err instanceof ApiError && err.status === 503;
 }
 
+/** Nombre visible de la fuente de un precio (Fase 5a, tarea 1): el
+ * backend devuelve el identificador del exchange ("kraken",
+ * "coinbase"); la interfaz muestra el nombre, nunca el identificador
+ * crudo. Una fuente desconocida se muestra capitalizada, no inventada. */
+export function displaySourceName(source: string): string {
+  const known: Record<string, string> = { kraken: "Kraken", coinbase: "Coinbase" };
+  if (source in known) return known[source];
+  return source.charAt(0).toUpperCase() + source.slice(1);
+}
+
 /** Base de mercado según el perfil (corrección P0-1, 2026-11-23).
  * Invitado → `/api/public/market` (solo lectura, con su token);
  * cualquier otro perfil → `/api/market`, como hoy. El perfil se

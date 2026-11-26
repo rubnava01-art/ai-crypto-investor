@@ -75,7 +75,7 @@ export function ChatPanel() {
       setText("");
       await load(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.chat.errSend);
+      setError(t.chat.errSend);
     } finally {
       setBusy(false);
     }
@@ -88,7 +88,7 @@ export function ChatPanel() {
       await api.deleteChatMessage(m.id);
       await load(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.chat.errDelete);
+      setError(t.chat.errDelete);
     }
   };
 

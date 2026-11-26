@@ -1,4 +1,4 @@
-import type { PlanKey } from "../components/PlanesPanel";
+import type { PlanKey } from "./planes";
 
 /** Punto de cableado de pagos (Onda C-2, Agente C5, 2026-11-14).
  *

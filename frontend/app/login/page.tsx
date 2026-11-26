@@ -3,11 +3,13 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken, logout, ApiError } from "../../lib/api";
 import { isTokenExpired, safeNext } from "../../lib/session";
+import { setSessionCookie } from "../../lib/sessionCookie";
 import { passwordStrength } from "../../lib/passwordStrength";
-import { isPlanKey, planNameForKey, type PlanKey } from "../../components/PlanesPanel";
+import { isPlanKey, planNameForKey, type PlanKey } from "../../lib/planes";
 import { useLanguage } from "../../lib/i18n";
 import { usePrefersReducedMotion } from "../../lib/useSwipeNav";
 import { PublicNav } from "../../components/PublicNav";
@@ -96,6 +98,21 @@ function LoginPageInner() {
     : "text-emerald-700";
   const [challenge, setChallenge] = useState<{ challenge_id: string; question: string } | null>(null);
   const [answer, setAnswer] = useState("");
+  // Fase 2 mejoras-v1, tarea 1: aceptación de los textos legales al
+  // registrarse (checkbox obligatorio; el backend lo exige con 422 y
+  // guarda la fecha). Sin marcarlo no se envía el registro.
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  // F1 (correcciones Fase 1 mejoras-v1): segundo paso del login (2FA).
+  // Cuando la contraseña es correcta pero falta el código, el backend
+  // responde 401 "Se requiere el código…": se muestra este campo y el
+  // reenvío usa la contraseña ya escrita, sin pedirla de nuevo.
+  const [totpCode, setTotpCode] = useState("");
+  const [needsTotp, setNeedsTotp] = useState(false);
+  // Correo sin verificar (403 con "verific" en el detalle): aviso +
+  // botón de reenvío del enlace, distinto de la cuenta pendiente.
+  const [isEmailUnverified, setIsEmailUnverified] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [resendBusy, setResendBusy] = useState(false);
   // F1-7: si la carga del reto falla se muestra el error con reintento,
   // en vez de dejar el botón deshabilitado sin explicación.
   const [challengeError, setChallengeError] = useState(false);
@@ -194,6 +211,10 @@ function LoginPageInner() {
     setRegisteredPlan(null);
     setShowPassword(false);
     setAnswer("");
+    setNeedsTotp(false);
+    setTotpCode("");
+    setIsEmailUnverified(false);
+    setResendMsg(null);
     if (m === "register") loadChallenge();
   }, [loadChallenge]);
 
@@ -216,20 +237,49 @@ function LoginPageInner() {
     setCanRetryLogin(false);
     setIsPendingAccount(false);
     setRateLimitUntil(null);
+    setNeedsTotp(false);
+    setIsEmailUnverified(false);
+    setResendMsg(null);
   }
 
   // F1-3: el error del login se mapea por estado a un mensaje i18n
   // preciso; el detail crudo del backend nunca se muestra. Red/timeout
   // y 429 admiten reintento; 401/403 no (repetir no ayudaría).
+  // 3.4 (plan Gemini, 2026-11-26): red/timeout NO usa el mensaje
+  // genérico de "sin conexión" ni se confunde con credenciales: el
+  // servidor puede estar despertando (arranque en frío) y el mensaje
+  // lo dice y pide reintentar en unos segundos. El ColdStartNotice ya
+  // avisa durante la espera (≥5 s); este mensaje cubre el fallo
+  // posterior a la espera, sin duplicar el aviso.
+  // F1 (correcciones Fase 1): el 401 distingue el segundo paso del
+  // 2FA (falta el código / código incorrecto: se muestra el campo y se
+  // reintenta sin reescribir la contraseña) y el 403 distingue el
+  // correo sin verificar de la cuenta pendiente.
   function loginErrorFrom(err: unknown): {
     message: string;
     canRetry: boolean;
     pending?: boolean;
     retryAfter?: number | null;
+    needsTotp?: boolean;
+    emailUnverified?: boolean;
   } {
     if (err instanceof ApiError) {
-      if (err.status === 401) return { message: t.login.errorWrongCredentials, canRetry: false };
-      if (err.status === 403) return { message: t.login.errorPending, canRetry: false, pending: true };
+      if (err.status === 401) {
+        const detail = err.detail ?? "";
+        if (detail.includes("dos pasos")) {
+          return { message: t.login.errorTotpRequired, canRetry: false, needsTotp: true };
+        }
+        if (detail.includes("Código de verificación incorrecto")) {
+          return { message: t.login.errorTotpWrong, canRetry: false, needsTotp: true };
+        }
+        return { message: t.login.errorWrongCredentials, canRetry: false };
+      }
+      if (err.status === 403) {
+        if ((err.detail ?? "").includes("verific")) {
+          return { message: t.login.errorEmailUnverified, canRetry: false, emailUnverified: true };
+        }
+        return { message: t.login.errorPending, canRetry: false, pending: true };
+      }
       if (err.status === 429) {
         const seconds = err.retryAfter;
         return {
@@ -241,20 +291,25 @@ function LoginPageInner() {
           retryAfter: seconds ?? null,
         };
       }
-      if (err.key === "network") return { message: t.login.errorNetwork, canRetry: true };
-      if (err.key === "timeout") return { message: t.login.errorTimeout, canRetry: true };
+      if (err.key === "network") return { message: t.login.errorServerWaking, canRetry: true };
+      if (err.key === "timeout") return { message: t.login.errorServerWaking, canRetry: true };
       if (err.status >= 500) return { message: t.login.errorLogin, canRetry: true };
     }
     return { message: t.login.errorLogin, canRetry: false };
   }
 
-  async function attemptLogin(user: string, pass: string) {
+  async function attemptLogin(user: string, pass: string, totp?: string) {
     setLoading(true);
     try {
       // M6: el login también recorta el usuario (el registro ya lo hacía):
       // " ruben " no debe fallar cuando la cuenta es "ruben".
-      const res = await api.login(user.trim(), pass);
+      const res = await api.login(user.trim(), pass, totp);
+      setNeedsTotp(false);
       setToken(res.access_token);
+      // Corrección QA H2: marca no sensible para que el servidor sirva
+      // la cáscara del dashboard en la raíz en vez de la landing. Si la
+      // validación /me luego da 401, logout() la borra.
+      setSessionCookie();
       // F1-6: validar el token recién emitido con /me antes de redirigir.
       try {
         await api.me();
@@ -274,6 +329,8 @@ function LoginPageInner() {
       setError(mapped.message);
       setCanRetryLogin(mapped.canRetry);
       setIsPendingAccount(mapped.pending ?? false);
+      setNeedsTotp(mapped.needsTotp ?? false);
+      setIsEmailUnverified(mapped.emailUnverified ?? false);
       if (mapped.retryAfter != null) {
         setRateLimitUntil(Date.now() + mapped.retryAfter * 1000);
         setNowMs(Date.now());
@@ -285,6 +342,10 @@ function LoginPageInner() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // El paso 2FA no borra el código ya escrito al reenviar: se guarda
+    // antes de limpiar el error (clearLoginError resetea needsTotp).
+    const totpStep = needsTotp;
+    const code = totpCode.trim();
     clearLoginError();
     setNotice(null);
     setRegisteredPlan(null);
@@ -293,8 +354,13 @@ function LoginPageInner() {
       setError(validationError);
       return;
     }
+    if (totpStep && !code) {
+      setNeedsTotp(true);
+      setError(t.login.errorTotpRequired);
+      return;
+    }
     lastLoginRef.current = { username, password };
-    await attemptLogin(username, password);
+    await attemptLogin(username, password, totpStep ? code : undefined);
   }
 
   // Reintento del login (F1-3): reenvía las credenciales ya escritas, sin
@@ -306,7 +372,22 @@ function LoginPageInner() {
     // justo para una petición colgada; el botón de error ya se deshabilita
     // mientras carga.
     clearLoginError();
-    await attemptLogin(last.username, last.password);
+    await attemptLogin(last.username, last.password, totpCode.trim() || undefined);
+  }
+
+  // Reenvío del enlace de verificación (correo sin verificar): el
+  // backend responde siempre 200 genérico, exista o no la cuenta.
+  async function resendVerificationLink() {
+    setResendMsg(null);
+    setResendBusy(true);
+    try {
+      await api.resendVerification(username.trim());
+      setResendMsg(t.login.resendSent);
+    } catch {
+      setError(t.login.resendFailed);
+    } finally {
+      setResendBusy(false);
+    }
   }
 
   async function onRegister(e: React.FormEvent) {
@@ -326,6 +407,12 @@ function LoginPageInner() {
       setError(t.login.errorAnswerInvalid);
       return;
     }
+    // Fase 2 mejoras-v1, tarea 1: sin aceptar los textos legales no hay
+    // registro (el backend también lo exige: 422).
+    if (!termsAccepted) {
+      setError(t.login.errorTermsRequired);
+      return;
+    }
     setLoading(true);
     try {
       if (!challenge) throw new Error(t.login.errorChallenge);
@@ -334,6 +421,7 @@ function LoginPageInner() {
         password,
         challenge_id: challenge.challenge_id,
         answer: Number(trimmedAnswer),
+        terms_accepted: true,
         // A2: la elección de plan viaja al backend (requested_plan) para
         // que el admin la vea en los pendientes. Sin plan, no se envía.
         ...(plan ? { plan } : {}),
@@ -383,12 +471,12 @@ function LoginPageInner() {
         {/* Logo NEST: marca + N3ST en trazos blancos sobre el azul fuerte.
          * Recorte de presentación del logo original (sin el lema ni el
          * katakana, que no se leen a este tamaño). */}
-        <img
+        <Image
           src="/nest-logo.svg"
           alt="NEST"
           width={176}
           height={122}
-          fetchPriority="high"
+          priority
           className={`mb-5 h-auto w-44${reducedMotion ? "" : " login-intro-badge"}`}
         />
         <h1 className={`text-2xl font-bold tracking-tight text-white sm:text-3xl${introCls ? " login-intro" : ""}`} style={introStyle(150)}>
@@ -496,6 +584,39 @@ function LoginPageInner() {
           <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">{t.login.passwordMinHint}</p>
         </label>
 
+        {/* F1 (correcciones Fase 1): segundo paso del login (2FA). Solo
+            aparece cuando la contraseña ya fue correcta y falta el
+            código: la contraseña no se pide de nuevo, el reenvío usa
+            la ya escrita. Vale el TOTP de la app o un código de
+            recuperación (XXXX-XXXX). */}
+        {mode === "login" && needsTotp && (
+          <label className="mb-5 block">
+            <span className="mb-1.5 block text-sm font-semibold text-zinc-700">{t.login.totpLabel}</span>
+            <input
+              className={inputCls}
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value)}
+              autoComplete="one-time-code"
+              placeholder={t.login.totpPlaceholder}
+              maxLength={16}
+              required
+              autoFocus
+            />
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-600">{t.login.totpHint}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setNeedsTotp(false);
+                setTotpCode("");
+                setError(null);
+              }}
+              className="mt-1 inline-block min-h-[44px] px-2 py-2.5 text-sm font-semibold text-blue-700 underline-offset-4 hover:underline"
+            >
+              {t.login.totpBack}
+            </button>
+          </label>
+        )}
+
         {/* Medidor de seguridad (solo registro y con algo escrito): 4
             segmentos + etiqueta; no bloquea el envío. */}
         {mode === "register" && password.length > 0 && (
@@ -561,6 +682,28 @@ function LoginPageInner() {
         )}
 
         {mode === "register" && (
+          <label className="mb-5 flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-zinc-700">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              required
+              className="mt-0.5 h-5 w-5 shrink-0 accent-blue-700"
+            />
+            <span>
+              {t.login.termsAcceptPrefix}{" "}
+              <Link href="/legal/terminos" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800">
+                {t.login.termsLink}
+              </Link>{" "}
+              {t.login.termsAcceptMiddle}{" "}
+              <Link href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800">
+                {t.login.privacyLink}
+              </Link>
+            </span>
+          </label>
+        )}
+
+        {mode === "register" && (
           <p className="mb-5 rounded-none bg-blue-50 px-3.5 py-2.5 text-sm leading-relaxed text-blue-800 ring-1 ring-blue-200">
             {t.login.registerPendingNote}
           </p>
@@ -601,6 +744,21 @@ function LoginPageInner() {
                 </Link>
               </p>
             )}
+            {isEmailUnverified && (
+              <p className="mt-2">
+                <button
+                  type="button"
+                  onClick={resendVerificationLink}
+                  disabled={resendBusy}
+                  className="inline-flex min-h-[44px] items-center rounded-none border border-red-300 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  {resendBusy ? t.login.resending : t.login.resendVerification}
+                </button>
+                {resendMsg && (
+                  <span role="status" className="mt-2 block text-sm leading-relaxed text-emerald-700">{resendMsg}</span>
+                )}
+              </p>
+            )}
             {/* F1-3: reintento sin reescribir credenciales (red, timeout,
                 429 cumplido, 5xx). En 429 con cuenta atrás, el botón
                 aparece cuando el plazo termina. */}
@@ -635,7 +793,13 @@ function LoginPageInner() {
               <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="opacity-75" />
             </svg>
           )}
-          {loading ? t.login.processing : mode === "login" ? t.login.loginSubmit : t.login.createSubmit}
+          {loading
+            ? t.login.processing
+            : mode === "login"
+              ? needsTotp
+                ? t.login.totpSubmit
+                : t.login.loginSubmit
+              : t.login.createSubmit}
         </button>
 
         <p className="mt-5 text-center text-sm text-zinc-600">

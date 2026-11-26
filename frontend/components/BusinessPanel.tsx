@@ -21,13 +21,14 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api, ApiError,
-  type BusinessArea, type BusinessNote, type BusinessTask, type MeResponse,
+  type BusinessArea, type BusinessNote, type BusinessNotificaciones, type BusinessTask, type MeResponse,
 } from "../lib/api";
 import { Panel } from "./Panel";
 import { EmptyState } from "./badges";
 import { useConfirm, Field, PanelLoading, isAdminOnlyForbidden } from "./ui";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
+import { formatDateOnly } from "../lib/dates";
 
 const MarketingPanel = dynamic(
   () => import("./marketing/MarketingPanel").then((m) => m.MarketingPanel),
@@ -57,7 +58,8 @@ type MarketingSub = "notas" | "marketing" | "portal" | "contenido" | "desarrollo
 
 export function BusinessPanel() {
   const isCancelled = useCancelled();
-  const { t: tt } = useLanguage();
+  const { t: tt, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const { confirm, dialog } = useConfirm(tt);
   const AREAS: { value: BusinessArea; label: string; hint: string }[] = [
     { value: "marketing", label: tt.business.areaMarketing, hint: tt.business.hintMarketing },
@@ -79,6 +81,9 @@ export function BusinessPanel() {
   const [noteTitle, setNoteTitle] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
+  // Fecha de vencimiento opcional de la tarea nueva (Fase 4 mejoras-v1,
+  // tarea 7): alimenta el panel "Hoy". Vacía = sin fecha.
+  const [taskDue, setTaskDue] = useState("");
   // Refs para los EmptyState con acción: el botón enfoca el campo de
   // creación (primera nota / primera tarea) en vez de dejar una frase.
   const noteTitleRef = useRef<HTMLInputElement | null>(null);
@@ -90,6 +95,9 @@ export function BusinessPanel() {
   const [editingNote, setEditingNote] = useState<BusinessNote | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
+  // Notificaciones en la app (Fase 5b, tarea 5): tareas vencidas o de
+  // hoy en todas las áreas; se cargan una vez al montar el panel.
+  const [notif, setNotif] = useState<BusinessNotificaciones | null>(null);
 
   const isAdmin = me?.is_admin ?? false;
   // H1 (2026-11-17): cliente vinculado → 403 (S1) en notas/tareas: estado
@@ -121,6 +129,7 @@ export function BusinessPanel() {
 
   useEffect(() => {
     load(area);
+    api.listNotificaciones().then((n) => { if (!isCancelled()) setNotif(n); }).catch(() => { if (!isCancelled()) setNotif(null); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [area]);
 
@@ -134,7 +143,7 @@ export function BusinessPanel() {
       setNoteBody("");
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : tt.business.errCreateNote);
+      setError(tt.business.errCreateNote);
     }
   };
 
@@ -145,18 +154,19 @@ export function BusinessPanel() {
       setEditingNote(null);
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : tt.business.errSaveNote);
+      setError(tt.business.errSaveNote);
     }
   };
 
   const createTask = async () => {
     if (!taskTitle.trim()) return;
     try {
-      await api.createBusinessTask(area, { title: taskTitle.trim() });
+      await api.createBusinessTask(area, { title: taskTitle.trim(), due_date: taskDue || null });
       setTaskTitle("");
+      setTaskDue("");
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : tt.business.errCreateTask);
+      setError(tt.business.errCreateTask);
     }
   };
 
@@ -165,7 +175,7 @@ export function BusinessPanel() {
       await api.updateBusinessTask(t.id, { done: !t.done });
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : tt.business.errUpdateTask);
+      setError(tt.business.errUpdateTask);
     }
   };
 
@@ -187,6 +197,34 @@ export function BusinessPanel() {
   ) : forbidden ? (
     <EmptyState text={tt.reliability.adminOnlySection} />
   ) : (
+    <>
+      {/* Aviso en la app (Fase 5b, tarea 5): tareas vencidas o que vencen
+        hoy, en todas las áreas, con distintivo. El detalle vive en el
+        panel "Hoy" del inicio. Sin nada urgente no se muestra nada. */}
+      {notif !== null && (notif.vencidas.length > 0 || notif.de_hoy.length > 0) && (
+        <div role="alert" className="mb-4 rounded-lg border border-amber-700/60 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-300">
+          <p className="font-semibold">
+            {notif.vencidas.length > 0 && notif.de_hoy.length > 0
+              ? tt.business.notifBannerBoth.replace("{vencidas}", String(notif.vencidas.length)).replace("{hoy}", String(notif.de_hoy.length))
+              : notif.vencidas.length > 0
+                ? tt.business.notifBannerOverdue.replace("{vencidas}", String(notif.vencidas.length))
+                : tt.business.notifBannerToday.replace("{hoy}", String(notif.de_hoy.length))}
+            {" "}
+            <a href="/" className="font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60">
+              {tt.business.notifViewToday}
+            </a>
+          </p>
+          <ul className="mt-1.5 space-y-0.5 text-xs text-amber-200/90">
+            {[...notif.vencidas, ...notif.de_hoy].slice(0, 5).map((nt) => (
+              <li key={nt.id}>
+                {nt.title} · {AREAS.find((a) => a.value === nt.area)?.label ?? nt.area}
+                {nt.due_date ? ` · ${formatDateOnly(nt.due_date, locale)}` : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-zinc-400">{tt.business.notifEmailPending}</p>
+        </div>
+      )}
     <div className="grid gap-6 md:grid-cols-2">
       <Panel title={tt.business.notesTitle.replace("{area}", areaLabel)} badge={tt.business.areaBadge}>
         {notes.length === 0 && (
@@ -275,8 +313,13 @@ export function BusinessPanel() {
                 onChange={() => toggleTask(t)}
                 aria-label={tt.business.markTask.replace("{titulo}", t.title)}
               />
-              <span className={`flex-1 text-sm ${t.done ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
+              <span className={`min-w-0 flex-1 text-sm ${t.done ? "text-zinc-400 line-through" : "text-zinc-100"}`}>
                 {t.title}
+                {t.due_date && (
+                  <span className="mt-0.5 block text-xs text-zinc-400">
+                    {tt.hoy.duePrefix.replace("{fecha}", formatDateOnly(t.due_date, locale))}
+                  </span>
+                )}
               </span>
               {isAdmin && (
                 <button
@@ -290,8 +333,8 @@ export function BusinessPanel() {
           ))}
         </ul>
         {isAdmin && (
-          <div className="mt-5 flex gap-2 border-t border-zinc-800 pt-5">
-            <Field label={tt.business.newTaskAria} className="flex-1"><input aria-label={tt.business.newTaskAria}
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-zinc-800 pt-5">
+            <Field label={tt.business.newTaskAria} className="min-w-[180px] flex-1"><input aria-label={tt.business.newTaskAria}
               ref={taskTitleRef}
               className={inputCls}
               placeholder={tt.business.newTaskPlaceholder}
@@ -299,13 +342,22 @@ export function BusinessPanel() {
               onChange={(e) => setTaskTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") createTask(); }}
             /></Field>
-            <button onClick={createTask} className="min-h-[44px] shrink-0 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+            {/* Fecha de vencimiento opcional (Fase 4 mejoras-v1, tarea 7):
+                sin ella la tarea no aparece como urgente en "Hoy". */}
+            <Field label={tt.business.dueDateAria} className="shrink-0"><input aria-label={tt.business.dueDateAria}
+              type="date"
+              className={inputCls}
+              value={taskDue}
+              onChange={(e) => setTaskDue(e.target.value)}
+            /></Field>
+            <button onClick={createTask} className="min-h-[44px] shrink-0 self-end rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
               {tt.business.add}
             </button>
           </div>
         )}
       </Panel>
     </div>
+    </>
   );
 
   return (
@@ -335,7 +387,7 @@ export function BusinessPanel() {
       )}
 
       {loadError != null && !forbidden && (
-        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{loadError instanceof ApiError ? loadError.message : tt.business.errLoad}</p>
+        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm leading-relaxed text-red-300">{tt.business.errLoad}</p>
       )}
 
       {area === "marketing" && (

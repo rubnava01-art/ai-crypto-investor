@@ -1,8 +1,15 @@
-"""Backtest endpoints (Phase 4)."""
+"""Backtest endpoints (Phase 4).
+
+Fase 5a, tarea 2: el run acepta comisión y deslizamiento como
+parámetros y las métricas desglosan bruto vs neto. UI PENDIENTE: no
+existe pantalla de backtest en el frontend (solo API + mención en la
+landing); la UI queda fuera de esta fase a propósito.
+"""
 import datetime as dt
 import json
 import os
 import re
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
@@ -51,6 +58,12 @@ def _save_run(run_id: str, payload: dict, csv_text: str) -> None:
 def run(
     symbol: str = Query("BTC/USD"),
     timeframe: str = Query("1h"),
+    # Fase 5a, tarea 2: comisión y deslizamiento como parámetros (antes
+    # el endpoint usaba siempre los del BacktestConfig por defecto y el
+    # resultado no desglosaba bruto vs neto). Rango 0–10 %: una comisión
+    # mayor no es realista y un valor negativo no tiene sentido.
+    fee_rate: float = Query(0.001, ge=0.0, le=0.1),
+    slippage_rate: float = Query(0.0005, ge=0.0, le=0.1),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -76,7 +89,12 @@ def run(
             detail=f"Need >= 100 candles for backtest, have {len(candles)}.",
         )
     closes = [float(c.close) for c in candles]
-    config = BacktestConfig(symbol=symbol, timeframe=timeframe)
+    config = BacktestConfig(
+        symbol=symbol,
+        timeframe=timeframe,
+        fee_rate=Decimal(str(fee_rate)),
+        slippage_rate=Decimal(str(slippage_rate)),
+    )
     n = len(closes)
 
     # Per-split evaluation (train/val/test) + full run

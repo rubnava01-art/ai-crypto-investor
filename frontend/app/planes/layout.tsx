@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 // Metas propias de /planes (Fase 4, 2026-11-23): la página es "use
 // client", así que el metadata vive en este layout de servidor.
 export const metadata: Metadata = {
-  title: "Planes — Grow Business Platform | Simulador de inversión cripto desde $19/mes",
+  title: "Planes desde $19/mes — Grow Business Platform",
   description:
     "Planes de Grow Business Platform: Esencial $19, Crecimiento $49 y Negocio Total $99 al mes, con 14 días de prueba gratis. Simulador de inversión cripto, calculadora de interés compuesto y academia para aprender trading sin riesgo.",
   alternates: { canonical: "https://crypto-investor-web.onrender.com/planes" },

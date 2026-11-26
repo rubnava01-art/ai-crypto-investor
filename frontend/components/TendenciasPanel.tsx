@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type TrendResearch, type TrendSearch } from "../lib/api";
+import { api, type TrendResearch, type TrendSearch } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
@@ -53,7 +53,7 @@ export function TendenciasPanel() {
       setResult(data);
       await loadRecent();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.tendencias.errResearch);
+      setError(t.tendencias.errResearch);
     } finally {
       setBusy(false);
     }

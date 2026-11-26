@@ -104,7 +104,7 @@ export function UsersPanel() {
       );
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errCreateUser);
+      setError(t.usuarios.errCreateUser);
     } finally {
       setBusy(false);
     }
@@ -118,7 +118,7 @@ export function UsersPanel() {
       await api.updateUser(u.id, { role: u.is_admin ? "prueba" : "admin" });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errChangeRole);
+      setError(t.usuarios.errChangeRole);
     }
   };
 
@@ -135,7 +135,7 @@ export function UsersPanel() {
       );
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errChangeRole);
+      setError(t.usuarios.errChangeRole);
     }
   };
 
@@ -148,7 +148,7 @@ export function UsersPanel() {
       setMsg(t.usuarios.msgActivated.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errActivate);
+      setError(t.usuarios.errActivate);
     }
   };
 
@@ -161,7 +161,7 @@ export function UsersPanel() {
       setMsg(t.usuarios.msgRejected.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errReject);
+      setError(t.usuarios.errReject);
     }
   };
 
@@ -195,7 +195,7 @@ export function UsersPanel() {
         setMsg(t.usuarios.msgPwUpdated.replace("{nombre}", u.username));
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errChangePw);
+      setError(t.usuarios.errChangePw);
     } finally {
       setPwBusy(false);
     }
@@ -235,9 +235,7 @@ export function UsersPanel() {
       setError(
         err instanceof ApiError && err.status === 409
           ? t.usuarios.errUsernameTaken
-          : err instanceof ApiError
-            ? err.message
-            : t.usuarios.errRename,
+          : t.usuarios.errRename,
       );
     } finally {
       setRenameBusy(false);
@@ -259,7 +257,7 @@ export function UsersPanel() {
       setPwTemp(temp);
       setMsg(t.usuarios.msgPwReset.replace("{nombre}", u.username));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errResetPw);
+      setError(t.usuarios.errResetPw);
     } finally {
       setPwBusy(false);
     }
@@ -284,7 +282,7 @@ export function UsersPanel() {
       setMsg(t.usuarios.msgUserDeleted.replace("{nombre}", u.username));
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.usuarios.errDeleteUser);
+      setError(t.usuarios.errDeleteUser);
     }
   };
 

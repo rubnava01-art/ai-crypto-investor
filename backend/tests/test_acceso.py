@@ -30,20 +30,20 @@ def test_register_human_check_and_prueba_role(client, admin_headers):
     # Wrong answer -> rejected, challenge consumed.
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer + 1},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer + 1, "terms_accepted": True},
     )
     assert r.status_code == 400
     # Same challenge cannot be replayed.
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 400
 
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
     assert r.json()["role"] == "prueba"
@@ -55,7 +55,7 @@ def test_register_human_check_and_prueba_role(client, admin_headers):
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer},
+        json={"username": "nuevo1", "password": "pass1234abcd", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "pending"

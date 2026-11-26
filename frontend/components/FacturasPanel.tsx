@@ -12,6 +12,7 @@ import { useLanguage } from "../lib/i18n";
 import { useAsyncLoad, useCancelled } from "../lib/useLoad";
 import { ApiErrorBanner, isAdminOnlyForbidden, useConfirm, Field } from "./ui";
 import { formatDate, formatMoney } from "../lib/format";
+import { formatDateOnly } from "../lib/dates";
 import { buildInvoiceHtml, invoiceTotals } from "../lib/invoiceHtml";
 
 const inputCls =
@@ -158,6 +159,18 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
     enviada: "bg-sky-500/15 text-sky-300",
     pagada: "bg-emerald-500/15 text-emerald-300",
   };
+  // Estado de cobro DERIVADO (Fase 5b, tarea 2): lo calcula el backend
+  // con la fecha de vencimiento; aquí solo se muestra con color.
+  const COBRO_LABEL: Record<string, string> = {
+    pendiente: tt.facturas.cobroPendiente,
+    pagada: tt.facturas.cobroPagada,
+    vencida: tt.facturas.cobroVencida,
+  };
+  const COBRO_BADGE: Record<string, string> = {
+    pendiente: "bg-zinc-500/15 text-zinc-300",
+    pagada: "bg-emerald-500/15 text-emerald-300",
+    vencida: "bg-red-500/15 text-red-300",
+  };
   const printTxt = {
     title: tt.facturas.printTitle, heading: tt.facturas.printHeading,
     concept: tt.facturas.printConcept, qty: tt.facturas.printQty, price: tt.facturas.printPrice,
@@ -185,6 +198,10 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
   const [items, setItems] = useState<InvoiceItem[]>([emptyItem()]);
   const [taxRate, setTaxRate] = useState(0);
   const [notes, setNotes] = useState("");
+  // Fecha de vencimiento opcional (Fase 4 mejoras-v1, tarea 7): sin
+  // ella la factura enviada es "por cobrar"; con ella, "vencida" o
+  // "por vencer" en el panel "Hoy".
+  const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -236,12 +253,14 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
         client_phone: clientPhone.trim(),
         items: validItems,
         tax_rate: taxRate,
+        due_date: dueDate || null,
         notes,
       });
       setMsg(tt.facturas.msgInvoiceSaved.replace("{numero}", inv.number));
+      setDueDate("");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : tt.facturas.errSaveInvoice);
+      setError(tt.facturas.errSaveInvoice);
     } finally {
       setBusy(false);
     }
@@ -252,7 +271,20 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       await api.updateInvoiceStatus(inv.id, st);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : tt.facturas.errChangeStatus);
+      setError(tt.facturas.errChangeStatus);
+    }
+  };
+
+  // Fecha de vencimiento de una factura existente (Fase 5b, tarea 2;
+  // cierra el pendiente de Fase 4): fijar con el input date o borrar
+  // con el botón "Quitar fecha" (due_date=null). El estado de cobro
+  // (vencida/pendiente/pagada) se recalcula en el backend al guardar.
+  const changeDueDate = async (inv: Invoice, dueDate: string | null) => {
+    try {
+      await api.updateInvoiceDueDate(inv.id, dueDate);
+      await load();
+    } catch (err) {
+      setError(tt.facturas.errChangeStatus);
     }
   };
 
@@ -262,7 +294,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
       await api.deleteInvoice(inv.id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : tt.facturas.errDeleteInvoice);
+      setError(tt.facturas.errDeleteInvoice);
     }
   };
 
@@ -343,6 +375,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                 <input className={`${inputCls} mt-1`} type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
               </label>
               <Field label={tt.facturas.notesAria}><input aria-label={tt.facturas.notesAria} className={inputCls} placeholder={tt.facturas.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} /></Field>
+              <Field label={tt.facturas.dueDateLabel}><input aria-label={tt.facturas.dueDateLabel} type="date" className={inputCls} value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
             </div>
 
             <div className="space-y-1 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-200">
@@ -415,16 +448,32 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                       <span className="text-sm font-semibold text-zinc-100">{inv.number}</span>
                       <span className="text-sm text-zinc-400">{inv.client_name}</span>
                       <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${COBRO_BADGE[inv.estado_cobro] ?? COBRO_BADGE.pendiente}`}>{COBRO_LABEL[inv.estado_cobro] ?? inv.estado_cobro}</span>
                       <span className="text-sm font-semibold text-emerald-400">{money(it.total)}</span>
+                      {inv.due_date && (
+                        <span className="text-xs text-zinc-400">{tt.hoy.duePrefix.replace("{fecha}", formatDateOnly(inv.due_date, locale))}</span>
+                      )}
                       <span className="ml-auto flex items-center gap-2">
                         <span className="text-xs text-zinc-400">{fmtDate(inv.created_at, locale)}</span>
-                        <button onClick={() => printSaved(inv)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                        <button onClick={() => printSaved(inv)} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
                           {tt.facturas.print}
                         </button>
                         {isAdmin && (
                           <>
+                            <Field label={tt.facturas.dueDateEditAria}><input
+                              type="date"
+                              className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                              value={inv.due_date ?? ""}
+                              onChange={(e) => void changeDueDate(inv, e.target.value || null)}
+                              aria-label={tt.facturas.dueDateEditAria}
+                            /></Field>
+                            {inv.due_date && (
+                              <button onClick={() => void changeDueDate(inv, null)} className="min-h-[44px] rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">
+                                {tt.facturas.dueDateClear}
+                              </button>
+                            )}
                             <Field label={tt.facturas.invoiceStatusAria}><select
-                              className="rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+                              className="min-h-[44px] rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                               value={inv.status}
                               onChange={(e) => changeStatus(inv, e.target.value as InvoiceStatus)}
                               aria-label={tt.facturas.invoiceStatusAria}
@@ -433,7 +482,7 @@ function InvoiceGenerator({ isAdmin }: { isAdmin: boolean }) {
                                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                               ))}
                             </select></Field>
-                            <button onClick={() => remove(inv)} className="rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
+                            <button onClick={() => remove(inv)} className="min-h-[44px] rounded-lg border border-red-900/60 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60">
                               {tt.facturas.delete}
                             </button>
                           </>

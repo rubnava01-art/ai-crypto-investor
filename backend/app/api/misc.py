@@ -16,7 +16,7 @@ from app.core.runtime import (
     KEY_SCANNER,
     persist_runtime_setting,
 )
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user, require_admin, require_super_admin
 from app.core.perfiles import require_modulo
 from app.core.state import state
 from app.database import get_db
@@ -91,7 +91,11 @@ def get_modes(user: User = Depends(get_current_user)):
 @simulation_router.post("/mode", response_model=SimulationModes)
 def set_mode(
     payload: SetModeRequest,
-    user: User = Depends(require_admin),
+    # Fase 1 mejoras-v1, tarea 7: el interruptor de modo (que puede
+    # poner "real") es solo super admin. El modo real sigue además
+    # bloqueado por el flag del servidor + claves Kraken (ver abajo):
+    # esta API nunca activa el trading real por sí sola.
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     if payload.mode == "real":
@@ -378,7 +382,10 @@ def risk_limits(user: User = Depends(get_current_user)):
 @risk_router.post("/kill-switch", response_model=KillSwitchResponse)
 def kill_switch(
     request: Request,
-    user: User = Depends(require_admin),
+    # Fase 1 mejoras-v1, tarea 7: el interruptor de emergencia es
+    # solo super admin (antes bastaba admin). Un admin plano ya no
+    # puede parar ni reanudar el trading.
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     """Emergency stop. Idempotent via Idempotency-Key header (replays return the
@@ -419,7 +426,9 @@ def kill_switch(
 
 @risk_router.post("/kill-switch/deactivate")
 def kill_switch_deactivate(
-    user: User = Depends(require_admin),
+    # Fase 1 mejoras-v1, tarea 7: soltar el interruptor también es
+    # solo super admin (igual que activarlo).
+    user: User = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     """Release the kill switch (Fase 2, A3). Engaging it used to be a

@@ -9,6 +9,9 @@
 //   DELETE /api/asistente/preguntas/{id}
 //   GET  /api/asistente/reglas
 //   DELETE /api/asistente/reglas/{id}
+//   GET  /api/asistente/uso -> {"plan","plan_nombre","limite_diario","mensajes_hoy","restantes","fecha"} (Fase 6)
+//   POST /api/asistente/feedback {"pregunta","voto":"util"|"no_util"} -> {"id","voto","creado_en"} (Fase 6)
+//   GET  /api/asistente/feedback?voto= (solo admin, Fase 6)
 // Respuestas del chat en español, servidas por el backend y mostradas tal cual.
 // Sin persistencia: el historial vive solo en la sesión (estado React).
 // Usa el fetch central (lib/api/client.ts): JWT Bearer con auth:true,
@@ -196,5 +199,25 @@ export function deleteRegla(reglaId: number) {
   return request<void>(`/api/asistente/reglas/${reglaId}`, {
     method: "DELETE",
     auth: true,
+  });
+}
+
+// ---------- Feedback útil / no útil (Fase 6, tarea 3) ----------
+// Se guarda pregunta + voto + usuario + fecha; nunca la respuesta
+// del asistente ni la conversación completa (ver backend).
+
+export type AsistenteFeedbackVoto = "util" | "no_util";
+
+export type AsistenteFeedbackResponse = {
+  id: number;
+  voto: AsistenteFeedbackVoto;
+  creado_en: string | null;
+};
+
+export function postFeedback(pregunta: string, voto: AsistenteFeedbackVoto) {
+  return request<AsistenteFeedbackResponse>("/api/asistente/feedback", {
+    method: "POST",
+    auth: true,
+    body: { pregunta, voto },
   });
 }

@@ -104,7 +104,7 @@ export function InicioPanel() {
       resetForm();
       postsLoad.reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inicio.saveError);
+      setError(t.inicio.saveError);
     } finally {
       setBusy(false);
     }
@@ -117,7 +117,7 @@ export function InicioPanel() {
       await api.deleteHomePost(p.id);
       postsLoad.reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inicio.deleteError);
+      setError(t.inicio.deleteError);
     }
   };
 
@@ -131,7 +131,7 @@ export function InicioPanel() {
       await loadComments(postId);
       postsLoad.reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inicio.commentError);
+      setError(t.inicio.commentError);
     }
   };
 
@@ -143,7 +143,7 @@ export function InicioPanel() {
       await loadComments(postId);
       postsLoad.reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.inicio.deleteCommentError);
+      setError(t.inicio.deleteCommentError);
     }
   };
 
@@ -187,14 +187,18 @@ export function InicioPanel() {
         {t.inicio.intro}
       </p>
 
-      {/* Fila de métricas estilo Semrush: número grande + contexto, con
-          datos reales de la plataforma (publicaciones, avances,
-          comentarios). Sin datos, el esqueleto; nunca cifras inventadas. */}
-      <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
+      {/* Bento (2026-11-25): métricas 1×1 + avance como tarjeta ancha en
+          la misma rejilla — 1 col en móvil (sin spans); en sm 2 cols
+          (métricas 1-2 arriba, métrica 3 + avance abajo); en lg 3 cols
+          (3 métricas en fila 1, avance a lo ancho en fila 2). Rectángulo
+          sin huecos, orden del DOM = orden de lectura. `items-start`
+          para que la métrica 3 no se estire a la altura de la línea de
+          tiempo en sm. El feed de posts y el formulario admin quedan
+          fuera de la rejilla, como estaban. */}
+      <div className="mb-5 grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard label={t.inicio.metricPosts} value={String(items.length)} loading={metricsLoading} loadingAriaLabel={t.misc.loadingAria} />
         <MetricCard label={t.inicio.metricProgress} value={String(avances.length)} />
         <MetricCard label={t.inicio.metricComments} value={String(totalComments)} loading={metricsLoading} loadingAriaLabel={t.misc.loadingAria} />
-      </div>
 
       {/* Avance de la plataforma: línea de tiempo con las novedades
           reales del sistema (lib/novedades.ts), de lo más reciente a
@@ -203,7 +207,7 @@ export function InicioPanel() {
       {(() => {
         if (avances.length === 0) return null;
         return (
-          <section aria-label={t.inicio.progressTitle} className="mb-5 rounded-xl border border-emerald-900/60 bg-zinc-950 p-4 shadow-sm sm:p-5">
+          <section aria-label={t.inicio.progressTitle} className="fintech-card border-emerald-900/60 p-4 sm:p-5 lg:col-span-3">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold text-zinc-100">{t.inicio.progressTitle}</h2>
               <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
@@ -228,6 +232,7 @@ export function InicioPanel() {
           </section>
         );
       })()}
+      </div>
 
       {isAdmin && (
         <form onSubmit={savePost} className="space-y-3">

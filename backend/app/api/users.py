@@ -389,6 +389,12 @@ def approve_user(
     db.refresh(user)
     audit(db, admin, "users.approve", "user", str(user.id),
           details={"username": user.username})
+    # Fase 8 mejoras-v1, tarea 4: bienvenida tras la aprobación (no
+    # antes). Solo si tiene correo; queda encolada en la cola stub —
+    # PENDIENTE de proveedor, ningún correo sale real. Una vez al día.
+    from app.core import correos_fase8
+
+    correos_fase8.encolar_bienvenida(db, user)
     return _out(user, db)
 
 

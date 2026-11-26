@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { api, ApiError } from "../lib/api";
+import { api, displaySourceName } from "../lib/api";
+import { ageInMinutes, formatDateTimeTz } from "../lib/dates";
 import { Panel } from "./Panel";
 import { Skeleton } from "./Skeleton";
 import { newId } from "./ui";
 import { useLanguage } from "../lib/i18n";
+import { SimulacionAviso } from "./SimulacionAviso";
 
 const inputCls =
   "min-h-[44px] w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-400 focus:border-emerald-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60";
@@ -28,6 +30,9 @@ export function InvestorPanel({
   const [amount, setAmount] = useState("");
   const [price, setPrice] = useState<number | null>(null);
   const [priceUpdatedAt, setPriceUpdatedAt] = useState<Date | null>(null);
+  // Fase 5a, tarea 1: la fuente real del precio (exchange) que devuelve
+  // /prices, para mostrarla junto a la fecha/hora en vez de asumirla.
+  const [priceSource, setPriceSource] = useState<string | null>(null);
   // 2026-11-07: si la carga del precio falla, antes el panel se quedaba
   // en "cargando…" para siempre con VALIDAR deshabilitado y sin decir por
   // qué. Ahora avisa y ofrece reintentar.
@@ -38,7 +43,8 @@ export function InvestorPanel({
   // panel debe decirlo en vez de mostrarlo como actual.
   const [priceStale, setPriceStale] = useState(false);
   const priceRef = useRef<number | null>(null);
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const locale = lang === "en" ? "en-US" : "es-MX";
   const [step, setStep] = useState<Step>("form");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +70,11 @@ export function InvestorPanel({
         if (coin?.price_usd) {
           priceRef.current = coin.price_usd;
           setPrice(coin.price_usd);
-          setPriceUpdatedAt(new Date());
+          // Fase 5a, tarea 1: la hora del precio es la que da el servidor
+          // (updated_utc), no la hora en que llegó al navegador; la
+          // fuente es el exchange que sirvió los precios.
+          setPriceUpdatedAt(new Date(res.updated_utc));
+          setPriceSource(res.source);
           setPriceStale(res.stale === true);
           setPriceError(false);
         }
@@ -87,6 +97,7 @@ export function InvestorPanel({
     priceRef.current = null;
     setPrice(null);
     setPriceUpdatedAt(null);
+    setPriceSource(null);
     setPriceStale(false);
     setPriceError(false);
   }, [symbol]);
@@ -118,6 +129,26 @@ export function InvestorPanel({
   const isReal = mode === "real" && realEnabled;
   const orderMode = isReal ? "real" : mode === "paper" ? "paper" : "simulation";
 
+  // Fase 5a, tarea 1: línea de procedencia del precio — fuente real +
+  // fecha/hora en hora de Los Ángeles; si es caché, añade su antigüedad.
+  const priceMeta = (): string | null => {
+    if (price === null || priceUpdatedAt === null) return null;
+    const line = t.invertir.sourceLine
+      .replace("{source}", displaySourceName(priceSource ?? "kraken"))
+      .replace("{time}", formatDateTimeTz(priceUpdatedAt.toISOString(), locale));
+    if (!priceStale) return line;
+    const ageMin = ageInMinutes(priceUpdatedAt.toISOString());
+    const age =
+      ageMin === null
+        ? ""
+        : ageMin < 1
+          ? t.market.ageNow
+          : ageMin < 60
+            ? t.market.ageMinutes.replace("{n}", String(ageMin))
+            : t.market.ageHours.replace("{n}", String(Math.floor(ageMin / 60)));
+    return `${line} · ${t.invertir.sourceStale.replace("{age}", age)}`;
+  };
+
   const confirm = async () => {
     setBusy(true);
     setError(null);
@@ -136,7 +167,7 @@ export function InvestorPanel({
       setStep("done");
       onExecuted();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.invertir.orderFailed);
+      setError(t.invertir.orderFailed);
       setStep("form");
     } finally {
       setBusy(false);
@@ -165,6 +196,7 @@ export function InvestorPanel({
         )
       }
     >
+      <SimulacionAviso />
       {/* Indicador visual de pasos (1 Arma → 2 Valida): el texto del paso
           sigue dentro de cada rama para lectores de pantalla. */}
       {step !== "done" && (
@@ -210,14 +242,9 @@ export function InvestorPanel({
                 title={priceStale ? t.reliability.stalePrice : undefined}
               >
                 ${price?.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                {priceUpdatedAt && (
+                {priceMeta() !== null && (
                   <span className="block text-xs font-sans text-zinc-400">
-                    {t.invertir.updatedAt}{" "}
-                    {priceUpdatedAt.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })}
+                    {priceMeta()}
                   </span>
                 )}
               </dd>
@@ -360,14 +387,9 @@ export function InvestorPanel({
               )}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-              {priceUpdatedAt && (
-                <span>
-                  {t.invertir.updatedAt}{" "}
-                  {priceUpdatedAt.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })}
+              {priceMeta() !== null && (
+                <span className={priceStale ? "text-amber-400" : undefined}>
+                  {priceMeta()}
                 </span>
               )}
               <span>

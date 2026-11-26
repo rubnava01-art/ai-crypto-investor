@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError, type CrmContact, type Invoice, type MeResponse } from "../lib/api";
+import { api, type CrmContact, type Invoice, type MeResponse } from "../lib/api";
 import { Panel } from "./Panel";
 import { useLanguage } from "../lib/i18n";
 import { useCancelled } from "../lib/useLoad";
@@ -91,7 +91,7 @@ export function CrmAsistente() {
       setPhone("");
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t.crm.asistenteErrSave);
+      setError(t.crm.asistenteErrSave);
     } finally {
       setBusy(false);
     }

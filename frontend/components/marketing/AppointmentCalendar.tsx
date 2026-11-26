@@ -103,7 +103,7 @@ export function AppointmentCalendar({
             ? "border-emerald-500 bg-emerald-500/15 text-zinc-100"
             : inMonth
               ? "border-zinc-800 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800"
-              : "border-zinc-800/50 bg-zinc-950/40 text-zinc-600"
+              : "border-zinc-800/50 bg-zinc-950/40 text-zinc-400"
         }`}
       >
         <span className={`font-semibold ${isToday ? "rounded-full bg-emerald-600 px-1.5 text-white" : ""}`}>{day}</span>

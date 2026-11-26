@@ -50,13 +50,13 @@ def test_password_minimum_12_register_create_change(client, admin_headers):
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "corto11", "password": "oncechars11", "challenge_id": cid, "answer": answer},
+        json={"username": "corto11", "password": "oncechars11", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 422, r.text
     cid, answer = _challenge(client)
     r = client.post(
         "/api/auth/register",
-        json={"username": "largo12ok", "password": "docechars123", "challenge_id": cid, "answer": answer},
+        json={"username": "largo12ok", "password": "docechars123", "challenge_id": cid, "answer": answer, "terms_accepted": True},
     )
     assert r.status_code == 201, r.text
 

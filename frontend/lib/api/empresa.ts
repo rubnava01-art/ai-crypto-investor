@@ -41,6 +41,8 @@ export interface Riesgo {
   mitigacion: string;
   responsable: string;
   estado: RiesgoEstado;
+  // Fecha de revisión (Fase 5b mejoras-v1, tarea 4): AAAA-MM-DD o null.
+  fecha_revision: string | null;
 }
 export interface RiesgoInput {
   riesgo: string;
@@ -50,6 +52,7 @@ export interface RiesgoInput {
   mitigacion?: string;
   responsable?: string;
   estado?: RiesgoEstado;
+  fecha_revision?: string | null;
 }
 
 export type PlanillaEstado = "pendiente" | "pagado";

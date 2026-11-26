@@ -214,13 +214,16 @@ export function Landing() {
     }, 100);
     return () => clearInterval(timer);
   }, []);
-  // Mini-índice de las 5 herramientas de Clases (mini-panel Estudiar).
+  // Mini-índice de las 6 herramientas de Clases (mini-panel Estudiar).
+  // 2026-11-25 (arreglos rápidos): la calculadora de rentabilidad se
+  // sumó como 6.ª herramienta en sync #71; el índice quedó en 5.
   const classTools = [
     { name: c.calcTitle, desc: l.pillarEstudiarTool1Desc },
     { name: c.convTitle, desc: l.pillarEstudiarTool2Desc },
     { name: c.chartTitle, desc: l.pillarEstudiarTool3Desc },
     { name: c.indTitle, desc: l.pillarEstudiarTool4Desc },
     { name: c.btcTitle, desc: l.pillarEstudiarTool5Desc },
+    { name: c.rentTitle, desc: l.pillarEstudiarTool6Desc },
   ];
   // Franja de confianza: SOLO números reales derivados del código.
   // 25 = módulos reales del menú; pilares y planes se derivan de sus
@@ -354,7 +357,7 @@ export function Landing() {
                     <p className="mt-2 text-sm font-medium text-amber-400">{l.pillarInvertirSimNote}</p>
                   </div>
                 )}
-                {/* Mini-panel Estudiar: índice de las 5 herramientas de Clases. */}
+                {/* Mini-panel Estudiar: índice de las 6 herramientas de Clases. */}
                 {i === 1 && (
                   <div className="mt-4 rounded-lg border border-white/10 bg-[#0B0F19]/70 p-4">
                     <p className="text-sm font-semibold text-slate-100">{l.pillarEstudiarPanelTitle}</p>

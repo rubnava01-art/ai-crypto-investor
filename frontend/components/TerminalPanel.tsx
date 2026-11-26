@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { API_URL, fetchMe } from "../lib/api/client";
 import { useLanguage } from "../lib/i18n";
+import { MODULES } from "./ModuleNav";
 import { novedadesSistema } from "../lib/novedades";
 
 /** Terminal de pruebas (2026-11-05, mejoras 2026-11-06): consola SIMULADA
@@ -23,36 +24,12 @@ const PROMPT = "nest@grow:~$";
 const HEALTH_TIMEOUT_MS = 8000;
 const NOVEDADES_LIMIT = 5;
 
-/** Rutas reales de la plataforma (copia exacta de MODULES en
- * components/ModuleNav.tsx, incluida /terminal). */
-const MODULES: { href: string; label: string }[] = [
-  { href: "/inicio", label: "Inicio" },
-  { href: "/", label: "Invertir" },
-  { href: "/estudiar", label: "Estudiar" },
-  { href: "/crear", label: "Crear" },
-  { href: "/analizador", label: "Analizador IA" },
-  { href: "/crm", label: "Gestor de Clientes" },
-  { href: "/referidos", label: "Referidos" },
-  { href: "/business", label: "Business" },
-  { href: "/espacio", label: "Espacio" },
-  { href: "/facturas", label: "Facturas" },
-  { href: "/correos", label: "Correos" },
-  { href: "/chat", label: "Chat" },
-  { href: "/recomendaciones", label: "Recomendaciones" },
-  { href: "/desarrollo", label: "Desarrollo digital" },
-  { href: "/talento", label: "Talento humano" },
-  { href: "/riesgos", label: "Gestión de Riesgos" },
-  { href: "/planillas", label: "Planillas" },
-  { href: "/analisis", label: "Análisis de datos" },
-  { href: "/tendencias", label: "Tendencias" },
-  { href: "/auditor", label: "Auditor web" },
-  { href: "/privacidad", label: "Privacidad" },
-  { href: "/inventario", label: "Inventario" },
-  { href: "/perfil", label: "Mi perfil" },
-  { href: "/usuarios", label: "Control de usuarios" },
-  { href: "/ajustador", label: "Ajustador" },
-  { href: "/terminal", label: "Terminal" },
-];
+/** 4.2 (plan Gemini, 2026-11-26): la lista de módulos ya NO es una copia
+ * local — se importa MODULES de components/ModuleNav.tsx, la misma fuente
+ * del menú real, para que `modules`/`routes` no se desincronicen nunca
+ * más. La copia anterior tenía 26 entradas y le faltaban /flujos,
+ * /planes y /portal (el menú real tiene 29). Las etiquetas fijas de
+ * MODULES coinciden con las de i18n nav que muestra el menú. */
 
 /** Sustituye {clave} en una cadena del diccionario. */
 function fmt(template: string, vars: Record<string, string | number>): string {

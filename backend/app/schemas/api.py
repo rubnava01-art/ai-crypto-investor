@@ -19,6 +19,10 @@ class LoginRequest(BaseModel):
     # nuevas o cambiadas, nunca a entrar con una ya existente).
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=128)
+    # Fase 1 mejoras-v1, tarea 3: código TOTP (6 dígitos) o código de
+    # recuperación. Opcional: solo se exige cuando la cuenta tiene el
+    # 2FA activado. Sin él, el login de una cuenta con 2FA es 401.
+    totp_code: str | None = Field(default=None, max_length=16)
 
     # S-1b (corrida 2026-11-24): validar tras strip — "   " es 422 y
     # " ruben " entra como "ruben" (el strip vive aquí, no solo en el
@@ -65,6 +69,13 @@ class HealthResponse(BaseModel):
     # como health check y un reinicio por un fallo transitorio de la BD
     # empeoraría la caída en vez de diagnosticarla.
     database: str = "unknown"
+    # Fase 8 mejoras-v1, tarea 2: cabeza de migración (revisión
+    # Alembic) y estado de las migraciones frente a la BD ("al_dia" |
+    # "pendientes" | "desconocido" si no hay tabla alembic_version,
+    # como en una BD creada con create_all). Sin secretos ni datos
+    # sensibles: solo identificadores de revisión.
+    alembic_head: str = "unknown"
+    migraciones: str = "desconocido"
 
 
 class SystemStatus(BaseModel):
@@ -100,6 +111,21 @@ class PerformanceResponse(BaseModel):
 
 
 # ---------- signals ----------
+class SignalHistoryOut(BaseModel):
+    """Historial real de señales iguales anteriores (mismo símbolo y lado).
+
+    Cuenta señales distintas con resultado resuelto por el ciclo de
+    aprendizaje (ai_explanations.outcome win/loss, contra objetivo e
+    invalidación con velas posteriores). Sin resultados resueltos el
+    historial es None y la UI dice "sin historial" — nunca se inventa.
+    """
+
+    wins: int = 0
+    losses: int = 0
+    total: int = 0
+    win_rate_pct: float | None = None
+
+
 class SignalOut(BaseModel):
     id: int
     symbol: str
@@ -110,6 +136,11 @@ class SignalOut(BaseModel):
     reason: str = ""
     status: str = "demo"
     created_utc: str
+    # Fase 5a, tarea 3: confianza expresada por el asistente (chat-potencia,
+    # ai_explanations.confidence, 0-100) para esta señal, si la hay; None
+    # cuando el asistente nunca explicó esta señal.
+    confidence_pct: float | None = None
+    history: SignalHistoryOut | None = None
 
 
 class SignalsResponse(BaseModel):

@@ -125,6 +125,33 @@ def _log_out(r: EmailLog) -> EmailLogOut:
     )
 
 
+# ------------------------------------------- reactivación (Fase 8, T4) --
+
+@router.get("/reactivacion/candidatos")
+def candidatos_reactivacion_endpoint(
+    dias: int = Query(
+        30,
+        ge=1,
+        le=365,
+        description="Días sin entrar para considerar inactivo (propuesta: 30)",
+    ),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Usuarios inactivos candidatos al correo de reactivación.
+
+    Solo admin. No envía nada: lista candidatos (con correo, sin
+    admins ni pendientes, sin quien ya recibió la reactivación hoy).
+    El envío real queda PENDIENTE de proveedor de correo.
+    """
+    from app.core import correos_fase8
+
+    return {
+        "dias_inactividad": dias,
+        "candidatos": correos_fase8.candidatos_reactivacion(db, dias=dias),
+    }
+
+
 # ------------------------------------------------------------- templates --
 
 @router.get("/templates", response_model=list[EmailTemplateOut])
